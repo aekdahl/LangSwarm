@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_namespace_packages
 
 setup(
     name="LangSwarm",
@@ -8,9 +8,9 @@ setup(
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/aekdahl/langswarm",
-    packages=["langswarm"],
+    packages=find_namespace_packages(include=["langswarm.*"]),
     install_requires=[
-        "LangSwarm-Cortex>=0.0.16",  # Core package
+        "LangSwarm-Core>=0.0.16",  # Core package
         #"LangSwarm-Cortex>=1.0.0",  # Memory management and self-reflection
         #"LangSwarm-Synapse>=1.0.0",  # Consensus, aggregation, voting, branching
         #"LangSwarm-Profiler>=1.0.0",  # Profiling LLMs, agents, and prompts
