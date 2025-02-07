@@ -1,0 +1,37 @@
+# Compiled Python files
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.so
+
+# Virtual environment
+venv/
+.env
+.venv/
+
+# Distribution / build directories
+build/
+dist/
+*.egg
+*.egg-info/
+
+# PyInstaller
+*.spec
+
+# Checkpoints (e.g., for ML frameworks)
+checkpoints/
+*.ckpt
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# IDE / Editor settings
+.vscode/
+.idea/
+
+# Mac / OS X
+.DS_Store
+
+# Windows
+Thumbs.db
