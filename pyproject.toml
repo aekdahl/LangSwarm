@@ -7,7 +7,7 @@ authors = ["Alexander Ekdahl <alexander.ekdahl@gmail.com>"]
 license = "MIT"
 homepage = "https://github.com/aekdahl/langswarm"
 repository = "https://github.com/aekdahl/langswarm"
-keywords = ["LLM", "multi-agent", "langchain", "hugginface", "openai", "MCP"]
+keywords = ["LLM", "multi-agent", "langchain", "hugginface", "openai", "MCP", "agent", "orchestration"]
 
 [tool.poetry.dependencies]
 python = ">=3.8,<4.0"
