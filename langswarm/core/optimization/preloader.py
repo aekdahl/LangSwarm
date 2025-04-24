@@ -15,20 +15,20 @@ class PreLoadConfig:
     _instance = None
     
     def __new__(cls, default=False):
-    if cls._instance is None:
-        cls._instance = super(PreloadConfig, cls).__new__(cls)
-        if default:
-            # Default list of models to preload
-            cls._instance.models_to_preload = [
-                "distilbert-base-uncased",
-                "microsoft/MiniLM-L12-H384-uncased",
-                "gpt2",
-                "all-MiniLM-L6-v2"
-            ]
-        else:
-            # Initialize with an empty list
-            cls._instance.models_to_preload = []
-    return cls._instance
+        if cls._instance is None:
+            cls._instance = super(PreloadConfig, cls).__new__(cls)
+            if default:
+                # Default list of models to preload
+                cls._instance.models_to_preload = [
+                    "distilbert-base-uncased",
+                    "microsoft/MiniLM-L12-H384-uncased",
+                    "gpt2",
+                    "all-MiniLM-L6-v2"
+                ]
+            else:
+                # Initialize with an empty list
+                cls._instance.models_to_preload = []
+        return cls._instance
 
 
 class PreLoadModels:
