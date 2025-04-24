@@ -26,7 +26,7 @@ jobs:
 
       - name: Generate requirements.in from imports
         run: |
-          pipreqs . --force --savepath requirements.in
+          pipreqs . --force --savepath requirements.in --ignore packaging
 
       - name: Pin versions into requirements.txt
         run: |
