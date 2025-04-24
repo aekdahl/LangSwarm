@@ -1,10 +1,64 @@
 import re
-import requests
+import sys
 import json
-import subprocess
-import socket
 import time
+import socket
+import requests
+import subprocess
+import importlib.util
 from typing import Any, Dict, Optional
+
+"""
+steps:
+  - id: check_greeting
+    function: langswarm.core.utils.workflows.functions.external_function
+    args:
+      module_path: "/workspace/workflow_helpers.py"   # or wherever your file lives
+      func_name: "is_simple_greeting"
+      args:
+        - ${context.user_input}                       # positional args
+      kwargs: {}                                      # if you need named args
+    output:
+      to: respond
+
+-
+When that step runs, it will:
+
+Load and execute workflow_helpers.py
+
+Pull out is_simple_greeting
+
+Call it with positional args drawn from your workflow context
+
+You can now call any function in any file, without having to install it as a package.
+"""
+def external_function(
+    module_path: str,
+    func_name: str,
+    args: Dict[str, Any] = None,
+    kwargs: Dict[str, Any] = None,
+    **extra
+) -> Any:
+    """
+    Dynamically load a .py file and call a function inside it.
+
+    • module_path: absolute or relative path to your .py file  
+    • func_name:   the name of the function inside that file  
+    • args:        a dict of positional args (will be expanded)  
+    • kwargs:      a dict of keyword args  
+    • extra:       ignored (for future extensibility)
+    """
+    args   = args   or {}
+    kwargs = kwargs or {}
+
+    # 1) Load the module from the given path
+    spec = importlib.util.spec_from_file_location("__external__", module_path)
+    mod  = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    # 2) Grab the function and call it
+    func = getattr(mod, func_name)
+    return func(*args, **kwargs)
 
 
 def health_check(url: str, timeout: int = 5) -> bool:
