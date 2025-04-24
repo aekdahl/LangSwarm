@@ -1,3 +1,25 @@
+[tool.poetry]
+name = "langswarm"
+version = "0.0.3"
+description = "A multi-agent ecosystem for large language models (LLMs) and autonomous systems."
+readme = "README.md"
+authors = ["Alexander Ekdahl <alexander.ekdahl@gmail.com>"]
+license = "MIT"
+homepage = "https://github.com/aekdahl/langswarm"
+repository = "https://github.com/aekdahl/langswarm"
+keywords = ["LLM", "multi-agent", "langchain", "hugginface", "openai", "MCP"]
+
+[tool.poetry.dependencies]
+python = ">=3.8,<4.0"
+# your direct deps go here, un-pinned; Poetry will lock them in poetry.lock
+
+[tool.poetry.extras]
+dev = [
+  "pytest",
+  "black",
+  "flake8",
+]
+
 [build-system]
-requires = ["setuptools>=42", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
