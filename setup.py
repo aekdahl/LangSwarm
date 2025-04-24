@@ -20,7 +20,7 @@ if not any(arg.startswith("--extras") or "[" in arg for arg in sys.argv):
     
 setup(
     name="LangSwarm",
-    version="0.0.1",
+    version="0.0.3",
     author="Alexander Ekdahl",
     description="A multi-agent ecosystem for large language models (LLMs) and autonomous systems.",
     long_description=open("README.md").read(),
