@@ -1,0 +1,16 @@
+queues:
+  redis_queue:
+    type: redis
+    config:
+      redis_url: redis://localhost:6379
+      channel: agent_queue
+
+  gcp_queue:
+    type: gcp
+    config:
+      project_id: your-project-id
+      topic_id: agent-events
+      subscription_id: agent-sub
+
+  internal_queue:
+    type: internal

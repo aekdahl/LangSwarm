@@ -13,6 +13,10 @@ except ImportError:
         # Fallback BaseClass when Pydantic is missing
         BaseClass = object
 
+import inspect
+from typing import Dict, Any
+
+
 class BaseTool(BaseClass):  # Conditional Inheritance
     name: str = Field(..., description="A generic name for the tool.")
     description: str = Field(..., description="Description for the tool.")
@@ -52,22 +56,36 @@ class BaseTool(BaseClass):  # Conditional Inheritance
     def run(self, *args, **kwargs):
         """Override this method to define the tool's behavior."""
         raise NotImplementedError("This method should be implemented in a subclass.")
-    
+
     def _safe_call(self, func, *args, **kwargs):
-        """Safely calls a function and detects incorrect arguments."""
-        # ToDo: Now it returns if any argument is invalid, it should only return if
-        # required arguments are missing, else we just skip invalid ones.
+        """Safely calls a function:
+        - Ignores unexpected keyword arguments
+        - Returns error if required arguments are missing
+        """
 
         func_signature = inspect.signature(func)
-        accepted_args = func_signature.parameters.keys()  # Valid argument names
+        params = func_signature.parameters
 
-        # Separate valid and invalid arguments
+        # Identify required parameters (excluding *args, **kwargs and those with default values)
+        required_params = [
+            name for name, param in params.items()
+            if param.default is param.empty
+            and param.kind in (param.POSITIONAL_OR_KEYWORD, param.KEYWORD_ONLY)
+        ]
+
+        # Filter kwargs to valid ones
+        accepted_args = params.keys()
         valid_kwargs = {k: v for k, v in kwargs.items() if k in accepted_args}
-        invalid_kwargs = {k: v for k, v in kwargs.items() if k not in accepted_args}
 
-        # If there are invalid arguments, return an error message instead of calling
-        if invalid_kwargs:
-            return f"Error: Unexpected arguments {list(invalid_kwargs.keys())}. Expected: {list(accepted_args)}"
+        # Check for missing required arguments
+        missing_required = [
+            p for p in required_params
+            if p not in valid_kwargs and p not in func_signature.bind_partial(*args).arguments
+        ]
 
-        # Call the function with only valid arguments
+        if missing_required:
+            return f"Error: Missing required arguments: {missing_required}"
+
+        # Safe call with filtered valid kwargs
         return func(*args, **valid_kwargs)
+

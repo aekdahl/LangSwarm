@@ -5,7 +5,6 @@ import logging
 from types import SimpleNamespace
 
 from ..utils.utilities import Utils
-from ..defaults.prompts.system import HelloWorld, ResourceUsageWorkflow
 
 class LLM:
     """
@@ -30,9 +29,6 @@ class LLM:
         team=None,
         memory=None,
         specialization=None,
-        plugin_instruction=None,
-        tool_instruction=None,
-        rag_instruction=None,
         **kwargs
     ):
         """
@@ -82,7 +78,7 @@ class LLM:
             raise ValueError(f"Unsupported provider: {provider}.")
 
         
-        self.memory = memory if not isinstance(memory, list) else None
+        self.memory = memory if not isinstance(memory, list) and not isinstance(memory, str) else None
         self.in_memory = memory if isinstance(memory, list) else []
         self.agent_type = agent_type
         self.model = model
@@ -90,55 +86,13 @@ class LLM:
         self.team = team
         self.last_in_memory = ''
         self.verbose = verbose
-        
-        self.system_prompt = self._build_system_prompt(
-            system_prompt=system_prompt or HelloWorld,
-            rag_instruction=rag_instruction,
-            tool_instruction=tool_instruction,
-            plugin_instruction=plugin_instruction
-        )
+        self.system_prompt = system_prompt
         
         self.specialization = specialization
 
         self.update_system_prompt()
         self.utils.bot_log(self.name, {"role": "admin", "content": "Bot was created."})
-    
-    def _build_system_prompt(
-        self,
-        system_prompt=None,
-        rag_instruction=None,
-        tool_instruction=None,
-        plugin_instruction=None
-    ):
-        """
-        Constructs a system prompt by combining the main system prompt (or hello_world)
-        with optional instructions for RAG, tools, and plugins. If any instruction is added,
-        a final note is appended indicating multiple requests can be combined.
-        """
-        # Start with either system_prompt or the default hello_world.
-        main_part = system_prompt
 
-        # Gather all instructions that are not None or empty.
-        instructions = []
-        if rag_instruction:
-            instructions.append(rag_instruction)
-        if tool_instruction:
-            instructions.append(tool_instruction)
-        if plugin_instruction:
-            instructions.append(plugin_instruction)
-
-        # If we actually added instructions, add the final note.
-        if len(instructions) > 0:
-            instructions.append(ResourceUsageWorkflow)
-
-        # Build the final prompt with minimal line breaks.
-        # The main_part is mandatory, instructions are optional.
-        parts = [main_part] + instructions
-
-        # Join only non-empty parts with two newlines between sections.
-        system_prompt_combined = "\n\n".join(part for part in parts if part)
-
-        return system_prompt_combined
 
     def update_system_prompt(self, system_prompt=None):
         """

@@ -1,4 +1,5 @@
 import time
+import json
 import datetime
 
 from ..base.log import GlobalLogger  # Import the existing logging system
@@ -172,7 +173,7 @@ class AgentRegistry:
         """
         Set a global prepaid credit balance (shared by all agents).
         """
-        cls.total_credits = None if budget == 0 else budget
+        cls.total_credits = None if credits == 0 else credits
 
     @classmethod
     def reset_costs(cls):

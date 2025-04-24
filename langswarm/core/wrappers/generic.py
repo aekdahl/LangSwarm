@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Type, Any, Optional, Dict, Callable, List
 
 from langswarm.memory.adapters.database_adapter import DatabaseAdapter
+from langswarm.synapse.tools.message_queue_publisher.brokers import MessageBroker
 
 from ..base.bot import LLM
 from .base_wrapper import BaseWrapper
@@ -21,13 +22,13 @@ except ImportError:
     LlamaAI21 = None
     
 try:
-    from langchain.chat_models import ChatOpenAI, AzureChatOpenAI
+    from langchain_community.chat_models import ChatOpenAI, AzureChatOpenAI
 except ImportError:
     ChatOpenAI = None
     AzureChatOpenAI = None
     
 try:
-    from langchain.llms import OpenAI as LangChainOpenAI, Anthropic, Cohere, AI21, VertexAI
+    from langchain_community.llms import OpenAI as LangChainOpenAI, Anthropic, Cohere, AI21, VertexAI
 except ImportError:
     LangChainOpenAI = None
     Anthropic = None
@@ -36,7 +37,7 @@ except ImportError:
     VertexAI = None
     
 try:
-    from langchain.llms.huggingface_hub import HuggingFaceHub
+    from langchain_community.llms import HuggingFaceHub
 except ImportError:
     HuggingFaceHub = None
     
@@ -44,21 +45,6 @@ try:
     from openai import OpenAI
 except ImportError:
     OpenAI = None
-
-try:
-    from langswarm.cortex.defaults.prompts.system import PluginInstructions
-except ImportError:
-    PluginInstructions = None
-    
-try:
-    from langswarm.memory.defaults.prompts.system import RagInstructions
-except ImportError:
-    RagInstructions = None
-
-try:
-    from langswarm.synapse.defaults.prompts.system import ToolInstructions
-except ImportError:
-    ToolInstructions = None
 
 
 class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, MiddlewareMixin):
@@ -85,11 +71,10 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
         context_limit=None,
         system_prompt=None,
         tool_registry=None, 
-        plugin_registry=None, 
-        plugin_instruction=None,
-        tool_instruction=None,
-        rag_instruction=None,
+        plugin_registry=None,
         memory_adapter: Optional[Type[DatabaseAdapter]] = None,
+        memory_summary_adapter: Optional[Type[DatabaseAdapter]] = None,
+        broker: Optional[MessageBroker] = None,
         **kwargs
     ):
         kwargs.pop("provider", None)  # Remove `provider` if it exists
@@ -111,39 +96,6 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
             provider="wrapper",
             agent_type=agent_type,
             system_prompt=system_prompt,
-            rag_instruction=(
-                (
-                    f"{rag_instruction or RagInstructions}" + "\n\n"
-                    "-- AVAILABLE RAGS AND RETRIEVERS --\n"
-                    + "\n\n".join(rag_registry.list_rags())
-                )
-                if (rag_instruction or RagInstructions) 
-                and rag_registry is not None 
-                and rag_registry.count_rags() > 0
-                else None
-            ),
-            tool_instruction = (
-                (
-                    f"{tool_instruction or ToolInstructions}" + "\n\n"
-                    f"-- AVAILABLE TOOLS -- \n"
-                    + "\n\n".join(tool_registry.list_tools())
-                )
-                if (tool_instruction or ToolInstructions) 
-                and tool_registry is not None 
-                and tool_registry.count_tools() > 0
-                else None
-            ),
-            plugin_instruction=(
-                (
-                    f"{plugin_instruction or PluginInstructions}" + "\n\n"
-                    f"-- AVAILABLE PLUGINS -- \n"
-                    + "\n\n".join(plugin_registry.list_plugins())
-                )
-                if (plugin_instruction or PluginInstructions) 
-                and plugin_registry is not None 
-                and plugin_registry.count_plugins() > 0
-                else None
-            ),
             **kwargs
         )
         
@@ -163,9 +115,45 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
         self.model_details["limit"] = context_limit or self.model_details["limit"]
         self.model_details["ppm"] = kwargs.get("ppm", None) or self.model_details["ppm"]
         self.memory_adapter = memory_adapter
-        self._update_memory_summary(memory_adapter: Any, memory_summary_adapter: Any) -> Optional[Any]:
-        
-        
+        self._update_memory_summary(memory_adapter, memory_summary_adapter)
+
+        self.broker = broker  # Can be None to disable queue-based execution
+
+        if self.broker:
+            # Subscribe agent to relevant channels
+            self.broker.subscribe(f"{self.agent.identifier}_incoming", self.handle_push_message)
+
+    def handle_push_message(self, payload):
+        """Handles incoming messages for the agent if a broker is active."""
+        if not self.broker or not payload:
+            return  # Skip processing if the broker is disabled
+
+        message_type = payload.get("type")
+        data = payload.get("data")
+
+        if message_type == "follow_up_request":
+            response = self.agent.process_followup(data)
+            self._send_response("response", response)
+
+        elif message_type == "task_result":
+            self._send_response("task_result", data)
+
+    def _send_response(self, message_type, data):
+        """Helper function to send responses if a broker exists."""
+        if self.broker:
+            self.broker.publish("communicator_incoming", {"type": message_type, "data": data})
+        else:
+            print(f"[INFO] No broker found. Handling response locally: {data}")
+
+    def send_task(self, task_data):
+        """Pushes a task to the Executor Agent via the broker, or calls it directly if no broker."""
+        if self.broker:
+            self.broker.publish("executor_incoming", {"type": "task", "data": task_data})
+        else:
+            print(f"[INFO] No broker found. Executing task directly.")
+            response = self.agent.execute_task(task_data)
+            self._send_response("task_result", response)
+            
     def _report_estimated_usage(self, context, price_key="ppm", enforce=False, verbose=False):
         if enforce or self._cost_api_detected():
             num_tokens, price = self.utils.price_tokens_from_string(
@@ -336,18 +324,33 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
 
         if q:
             #q = "\n\nINITIAL QUERY\n\n"+q
+            #print("q", q)
+            
             response = self._call_agent(q, erase_query=erase_query, remove_linebreaks=remove_linebreaks)
 
-            if self.__allow_middleware:
-                # MIDDLEWARE IMPLEMENTATION
-                middleware_status, middleware_response = self.to_middleware(response)
-                if middleware_status == 201:  # Middleware used tool successfully
-                    #middleware_response = "\n\nTOOL OR CAPABILITY OUTPUT\n\n"+middleware_response
-                    response = self._call_agent(
-                        middleware_response, erase_query=erase_query, remove_linebreaks=remove_linebreaks)
+            print("response", response)
+            
+            # Could check for tool call already here now.
+            parsed_json = self.utils.safe_json_loads(response.strip())
+            
+            print("parsed_json", parsed_json)
+            
+            if parsed_json and isinstance(parsed_json, dict):
+                if self.__allow_middleware and parsed_json.get('mcp'):
+                    # MIDDLEWARE IMPLEMENTATION
+                    middleware_status, middleware_response = self.to_middleware(parsed_json.get('mcp'))
+                    if middleware_status == 201:  # Middleware used tool successfully
+                        #middleware_response = "\n\nTOOL OR CAPABILITY OUTPUT\n\n"+middleware_response
+                        response = self._call_agent(
+                            middleware_response, erase_query=erase_query, remove_linebreaks=remove_linebreaks)
+                    parsed_json = self.utils.safe_json_loads(response.strip())
+
+                response = (parsed_json.get('response') 
+                            if isinstance(parsed_json, dict) and 'response' in parsed_json else parsed_json)
 
         return response
     
+    # ToDo: Not in use yet.
     def reflect_and_improve(response):
         prompt = f"""Evaluate the following response for clarity, correctness, and relevance.
         If it can be improved, return a revised version. Otherwise, return it unchanged.

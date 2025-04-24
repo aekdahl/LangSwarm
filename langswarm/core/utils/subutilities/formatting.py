@@ -6,6 +6,7 @@ import ast
 import json
 import re
 import os
+import unicodedata
 
 from ...registry.agents import AgentRegistry
 
@@ -243,7 +244,7 @@ Ensure your call follows the correct format.
             try:
                 return json.loads(json_string)
             except json.JSONDecodeError as final_error:
-                print(f"JSON parsing still failed after sanitization: {final_error}")
+                #print(f"JSON parsing still failed after sanitization: {final_error}")
                 
                 # Fix unescaped quotes and trailing commas
                 json_string = self.escape_unescaped_quotes_in_json_values(json_string)
@@ -260,9 +261,9 @@ Ensure your call follows the correct format.
                     end = min(len(json_string), error_pos + 10)
                     context = json_string[start:end]
 
-                    print(f"JSON Final Parse Error: {e.msg}")
-                    print(f"Error Character: '{error_char}' at position {error_pos}")
-                    print(f"Context: ...{context}...")
+                    #print(f"JSON Final Parse Error: {e.msg}")
+                    #print(f"Error Character: '{error_char}' at position {error_pos}")
+                    #print(f"Context: ...{context}...")
         
                     use_agent = True
                     
@@ -275,6 +276,8 @@ Ensure your call follows the correct format.
             )
             if result:
                 return json.loads(json_string)
+            else:
+                return json_string
         
             
         return None
@@ -362,7 +365,7 @@ Ensure your call follows the correct format.
         
         agent = agent or AgentRegistry.get("ls_json_parser")
         if agent is None:
-            print('No agent available...')
+            print('No JSON parser agent available. Returning original response.')
             return False, data
         
         if isinstance(agent, dict):
@@ -440,13 +443,11 @@ Ensure your call follows the correct format.
             text = text.rsplit('```',1)[0]
 
         return text
-
-    def clean_text(self, text, remove_linebreaks = False):
-        txt = text.encode('ascii', 'ignore').decode()
-        #txt = txt.replace('\\n',' ')
-        #if remove_linebreaks:
-        #    txt = txt.replace('\n',' ')
-        return txt.replace('\\u00a0',' ')
+    
+    def clean_text(self, text: str, remove_linebreaks: bool = False) -> str:
+        # Normalize unicode and replace non-breaking space with normal space
+        text = text.replace("\u00a0", " ")
+        return unicodedata.normalize("NFKD", text)
 
     def strip_tags(self, text, remove_linebreaks = False):
         strip_tags = StripTags()

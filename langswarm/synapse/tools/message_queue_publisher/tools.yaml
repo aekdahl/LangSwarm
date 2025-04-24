@@ -1,0 +1,6 @@
+tools:
+  - id: message_publisher_tool
+    type: MessageQueuePublisher
+    settings:
+      channel: executor_agent_incoming
+      broker_id: internal_broker

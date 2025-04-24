@@ -87,7 +87,7 @@ class Utils(Formatting):
         
         return num_tokens, price
     
-    def truncate_text_to_tokens(self, text, max_tokens, tokenizer_name="gpt2", current_conversation=""):
+    def truncate_text_to_tokens(self, text, max_tokens, tokenizer_name="gpt2", current_conversation="", verbose=False):
         """
         Truncate text to fit within the allowed number of tokens.
 

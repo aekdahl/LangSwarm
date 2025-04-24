@@ -1,1 +1,0 @@
-# Reset Context, load context. switch session. etc.

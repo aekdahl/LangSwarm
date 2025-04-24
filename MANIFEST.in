@@ -1,6 +1,8 @@
 include README.md
 include LICENSE
 include requirements.txt
-recursive-include core *
+recursive-include langswarm *
+recursive-include langswarm *.yaml
+recursive-include langswarm/presets *.md
 recursive-exclude __pycache__ *
 recursive-exclude *.pyc

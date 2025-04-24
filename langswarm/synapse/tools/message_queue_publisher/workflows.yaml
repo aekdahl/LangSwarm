@@ -1,0 +1,17 @@
+workflows:
+  main_workflow:
+    - id: send_task_via_queue
+      steps:
+        - id: step_send
+          agent: communicator_agent
+          input: "Please process this job: Clean the user data."
+          output:
+            to:
+              - user  # Confirmation back to user
+              - step: listen_and_process  # Simulate response later
+
+        - id: listen_and_process
+          agent: executor_agent
+          input: "${previous_output}"
+          output:
+            to: user

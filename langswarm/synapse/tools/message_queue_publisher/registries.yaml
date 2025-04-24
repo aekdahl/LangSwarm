@@ -1,0 +1,4 @@
+registries:
+  - tools:
+      - id: comm_tool_registry
+        registry: [message_publisher_tool]

@@ -1,0 +1,36 @@
+
+yaml:
+  - secrets
+  - agents
+  - workflows
+  
+agents:
+  - simple_agent
+
+retrievers:
+  - DatabaseAdapter
+
+tools:
+  - MessageBroker
+
+workflows:
+  - ../LangSwarm/files/examples/simple_1_step
+
+files:
+  - langswarm/core/config.py
+  - langswarm/core/factory/agents.py | def create()
+  - langswarm/core/wrappers/generic.py
+  - langswarm/core/wrappers/base_wrapper.py
+  - langswarm/core/wrappers/logging_mixin.py
+  - langswarm/core/wrappers/memory_mixin.py
+  - langswarm/core/wrappers/util_mixin.py
+  - langswarm/core/wrappers/middleware.py
+  - langswarm/core/base/bot.py
+  - langswarm/core/base/log.py
+  - langswarm/core/utils/utilities.py
+  - langswarm/core/utils/misc.py
+  - langswarm/core/utils/subutilities/formatting.py
+  - langswarm/core/registry/agents.py
+  - langswarm/memory/adapters/database_adapter.py
+  - langswarm/synapse/tools/message_queue_publisher/brokers.py
+

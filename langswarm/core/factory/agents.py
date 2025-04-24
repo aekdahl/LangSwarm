@@ -1,4 +1,5 @@
 from typing import Any, Optional
+
 from ..wrappers.generic import AgentWrapper
 from ..utils.utilities import Utils
 from ..registry.agents import AgentRegistry
@@ -67,7 +68,7 @@ class AgentFactory:
         documents: Optional[list] = None,
         memory: Optional[Any] = None,
         langsmith_api_key: Optional[str] = None,
-        register_as="agent",
+        register_as="tool",
         **kwargs,
     ) -> AgentWrapper:
         """
@@ -149,7 +150,7 @@ class AgentFactory:
         documents: Optional[list] = None,
         memory: Optional[Any] = None,
         langsmith_api_key: Optional[str] = None,
-        register_as = "agent",
+        register_as = "react",
         **kwargs,
     ) -> ReActAgent:
         """
@@ -185,7 +186,7 @@ class AgentFactory:
     
     @staticmethod
     def _register_agent(agent, register_as="agent"):
-        if register_as == "agent":
+        if register_as in ["agent","react","tool"]:
             AgentRegistry.register(agent)
         elif register_as == "helper":
             AgentRegistry.register_helper_agent(agent)

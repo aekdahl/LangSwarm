@@ -1,5 +1,9 @@
+
+import os
 import re
 import sys
+import uuid
+import traceback
 
 try:
     import signal as LS_SIGNAL
@@ -10,7 +14,7 @@ import threading
 import time
 import json
 
-from typing import List
+from typing import List, Dict
 
 try:
     from langswarm.cortex.registry.plugins import PluginRegistry
@@ -26,7 +30,7 @@ try:
     from langswarm.memory.registry.rags import RAGRegistry
 except ImportError:
     RAGRegistry = {}
-    
+
 
 class MiddlewareMixin:
     """
@@ -40,22 +44,76 @@ class MiddlewareMixin:
         self.rag_registry = rag_registry or RAGRegistry()
         self.tool_registry = tool_registry or ToolRegistry()
         self.plugin_registry = plugin_registry or PluginRegistry()
-        #self.rag_command_regex = r"execute_(?:rag|retriever):([a-zA-Z0-9_]+)\|([a-zA-Z0-9_]+)\|(\{[^}]*\})"
         
-        # self.tool_command_regex = r"execute_tool:([a-zA-Z0-9_]+)\|([a-zA-Z0-9_]+)\|(\{[^}]*\})"
-        #self.tool_command_regex = r"execute_tool:([a-zA-Z0-9_]+)\|([a-zA-Z0-9_]+)\|(\{.*\})"
+        # assume you can get the raw tools list from your loader or registry
+        from langswarm.core.config import ToolDeployer
+        self.tool_deployer = ToolDeployer(self.tool_registry.tools)
         
-        #self.plugin_command_regex = r"execute_plugin:([a-zA-Z0-9_]+)\|([a-zA-Z0-9_]+)\|(\{[^}]*\})"
-        #self.request_rags_regex = r"request:rags\|([^\s<].*)"
-        #self.request_tools_regex = r"request:tools\|([^\s<].*)"
-        #self.request_plugin_regex = r"request:plugins\|([^\s<].*)"
         self.ask_to_continue_regex = r"\[AGENT_REQUEST:PROCEED_WITH_INTERNAL_STEP\]"
+    
+    def _find_workflow_path(self, handler, filename="workflows.yaml") -> str:
+        """
+        Given a tool _instance_ or its class, find the workflows.yaml sitting
+        alongside its module.  
+        Raises FileNotFoundError if none is found.
+        """
+        import importlib
+        import inspect
+        from importlib import resources
+        # 1) figure out the module/package where the handler class lives
+        mod_name = handler.__class__.__module__
+        pkg_name = mod_name.rsplit('.', 1)[0]   # drop the class name
+
+        # 2a) Try importlib.resources (Python 3.9+)
+        try:
+            pkg = importlib.import_module(pkg_name)
+            # this gives a Traversable object pointing at the package dir
+            candidate = resources.files(pkg).joinpath(filename)
+            if candidate.is_file():
+                return str(pkg_dir), str(candidate)
+        except (ImportError, AttributeError):
+            pass
+
+        # 2b) Fallback: inspect the source file and look alongside it
+        module = importlib.import_module(pkg_name)
+        module_file = inspect.getsourcefile(module)
+        if module_file:
+            pkg_dir = os.path.dirname(os.path.abspath(module_file))
+            candidate = os.path.join(pkg_dir, "workflows.yaml")
+            if os.path.isfile(candidate):
+                return str(pkg_dir), str(candidate)
+
+        raise FileNotFoundError(f"No workflows.yaml found in package {pkg_name!r}")
+
+    def use_mcp_tool(self, tool, tool_id: str, tool_type: str, workflow_id: str, input_data: str) -> Dict:
+        """
+        High-level entrypoint to call an MCP tool via its associated workflow.
+        - Loads workflow from langswarm/mcp/tools/{tool_id}/workflows.yaml
+        - Injects input_data into the workflow
+        - Returns the output from the subflow
+        """
+        from langswarm.core.config import LangSwarmConfigLoader, WorkflowExecutor
         
-        # Not working as intended, leave for now
-        # ToDo: Fix this check
-        #self.check_for_continuation = r"(?<=\b)(?:I(?:'m| am| will| am now| will now| will go ahead)\s+(?:go(?:ing)? to|proceed(?:ing)? to|execute|start|begin|attempt|perform|carry out)|Executing\s+the\b)[^.!?]*[.!?](?!(?:\s+\S|$))"
-        # ToDo: Add these cases to regex: "Let’s proceed with that now."
-        # "Executing the fetch action now."
+        #print("tool_type", tool_type)
+        #workflow_path = os.path.join("..", "..", "mcp", "tools", tool_id, "workflows.yaml")
+        config_path, workflow_path = self._find_workflow_path(tool)
+
+        if not os.path.exists(workflow_path):
+            raise FileNotFoundError(f"No workflow found for tool: {tool_id} at {workflow_path}")
+
+        #print('Load Config...', config_path)
+        loader = LangSwarmConfigLoader(config_path=config_path)
+        workflows, agents, brokers, tools = loader.load()
+        
+        #print('Load Workflow...', workflows)
+        executor = WorkflowExecutor(workflows, agents)
+        executor.context["request_id"] = str(uuid.uuid4())  # Unique per request
+        
+        #print("input_data:", input_data)
+        output = executor.run_workflow(workflow_id, user_input=input_data, tool_deployer = self.tool_deployer)
+
+        print("MCP output", output)
+        return output
 
     def to_middleware(self, agent_input):
         """
@@ -66,200 +124,81 @@ class MiddlewareMixin:
         """
         
         # ToDo: Handle RAG
+        # ToDo: Handle multiple actions
+        # ToDo: Validate agent_input
+        
+        if not agent_input:
+            # If no action is detected, return input unchanged
+            self._log_event("No action detected, forwarding input", "info")
+            return 200, agent_input
 
         # Detect action type
-        actions = self._parse_action(agent_input)
-        if actions:
-            #status, action_result = self._route_action(*action_details)
-            #return status, self._respond_to_user([agent_input, action_result])
+        actions = [{"_id": key, **value} for key, value in agent_input.items()]
         
-            # Process each action and collect responses
-            results = [self._route_action(*action) for action in actions]
-
-            # Extract statuses and responses
-            statuses, responses = zip(*results)  # Unzipping the tuple list
-
-            # Determine final status:
-            # - If any status is NOT 200 or 201 → return that status.
-            # - Else if any status is 201 → return 201.
-            # - Otherwise, return 200.
-            if any(status not in {200, 201} for status in statuses):
-                final_status = next(status for status in statuses if status not in {200, 201})
-            elif 201 in statuses:
-                final_status = 201
-            else:
-                final_status = 200
-
-            # Concatenate responses into one string
-            final_response = "\n\n".join(responses)
-            
-            # ToDo: Implement below
+        print("Actions:", actions)
         
-            # Truncate to fit context
-            # ToDo: OptimizerManager holds a summarizer if needed
-            #return self.utils.truncate_text_to_tokens(
-            #    aggregated_response, 
-            #    self.model_details["limit"], 
-            #    tokenizer_name=self.model_details.get("name", "gpt2"),
-            #    current_conversation=self.share_conversation()
-            #)
+        # Process each action and collect responses
+        results = [self._route_action(**action) for action in actions]
+        #results = [self._route_action(action["_id"], action["method"], action.get("params", {})) for action in actions]
 
-            return final_status, final_response
 
-        # If no action is detected, return input unchanged
-        self._log_event("No action detected, forwarding input", "info")
-        return 200, agent_input
-    
-    def _extract_json_from_text(self, text):
-        """
-        Extracts and merges multiple JSON blocks enclosed within START>>> and <<<END tags (case insensitive).
-        Parses each JSON block separately and combines them into a single 'calls' list.
-        Handles malformed JSON gracefully.
-        """
-        #pattern = re.compile(
-        #    r"(?i)START>>>(.*?)<<<END", 
-        #    re.DOTALL
-        #)  # Case insensitive match
-        
-        pattern = re.compile(
-            r"START>>>\s*(\{[\s\S]*?\})\s*<<<END", 
-            re.DOTALL | re.IGNORECASE | re.MULTILINE
-        ) # Case insensitive match
-        
-        matches = pattern.findall(text)
+        # Extract statuses and responses
+        statuses, responses = zip(*results)  # Unzipping the tuple list
 
-        if not matches:
-            #self._log_event(f"No match found via regex in: {text}", "info")
-            print("No match found via regex. Trying manual extraction...")
+        # Determine final status:
+        # - If any status is NOT 200 or 201 → return that status.
+        # - Else if any status is 201 → return 201.
+        # - Otherwise, return 200.
+        if any(status not in {200, 201} for status in statuses):
+            final_status = next(status for status in statuses if status not in {200, 201})
+        elif 201 in statuses:
+            final_status = 201
+        else:
+            final_status = 200
 
-            # Step 2: If regex fails, manually search for START>>> and <<<END
-            start_idx = text.lower().find("start>>>")
-            end_idx = text.lower().find("<<<end")
+        # Concatenate responses into one string
+        final_response = "\n\n".join(responses)
 
-            if start_idx != -1 and end_idx != -1:
-                raw_section = text[start_idx + 8:end_idx].strip()  # Extract between START>>> and <<<END
-                #print("Manually Extracted Raw Section:", raw_section)
+        # ToDo: Implement below
 
-                # Locate the first '{' and last '}'
-                json_start = raw_section.find("{")
-                json_end = raw_section.rfind("}")
+        # Truncate to fit context
+        # ToDo: OptimizerManager holds a summarizer if needed
+        #return self.utils.truncate_text_to_tokens(
+        #    aggregated_response, 
+        #    self.model_details["limit"], 
+        #    tokenizer_name=self.model_details.get("name", "gpt2"),
+        #    current_conversation=self.share_conversation()
+        #)
 
-                if json_start != -1 and json_end != -1:
-                    raw_json_text = raw_section[json_start:json_end + 1]  # Get only valid JSON
-                    print("Cleaned Extracted JSON:", raw_json_text)
-                    matches = [raw_json_text]
-            elif start_idx != -1:
-                self._log_event(f"Found start, but not end in: {text}", "info")
-            elif end_idx != -1:
-                self._log_event(f"Found end, but not start in: {text}", "info")
+        return final_status, final_response
 
-        all_calls = []  # Collect all calls across multiple JSON blocks
-
-        for json_str in matches:
-            json_str = json_str.strip()
-            try:
-                parsed_json = self.utils.safe_json_loads(json_str)
-
-                # Ensure "calls" is always structured as a list
-                if isinstance(parsed_json, dict) and "calls" in parsed_json:
-                    if not isinstance(parsed_json["calls"], list):
-                        parsed_json["calls"] = [parsed_json["calls"]]  # Wrap single call in list
-                    all_calls.extend(parsed_json["calls"])
-                else:
-                    # If no "calls" key exists, wrap entire JSON object in a list
-                    all_calls.append(parsed_json)
-
-            except json.JSONDecodeError as e:
-                # Extract problematic JSON snippet
-                error_position = e.pos
-                snippet = json_str[max(0, error_position - 20):error_position + 20]
-                print(f"JSON parsing error at position {error_position}: {snippet}")
-                self._log_event(f"JSON parsing error at position {error_position}: {snippet}", "info")
-
-        self._log_event(f"Returning number of calls. {len(all_calls)}", "info")
-        return all_calls if all_calls else []  # Return as merged JSON structure
-
-    def _parse_action(self, reasoning: str) -> list:
-        """
-        Parse the reasoning output to detect tool or plugin actions.
-
-        :param reasoning: str - The reasoning output containing potential actions.
-        :return: List[Tuple[str, str, str, str, dict]] - List of (action_type, action_method, action_name, action, params).
-        
-        {
-          "type": "tool",
-          "method": "execute",
-          "instance_name": "local_file_system",
-          "action": "create_file",
-          "parameters": {
-            "filename": "test.py",
-            "content": "print('Hello World')"
-          }
-        }
-        """
-        actions = []
-        reasoning = self.utils._parse_for_actions(reasoning)
-        
-        try:
-            actions = [(
-                x.get("type"), 
-                x.get("method"), 
-                x.get("instance_name", x.get("name", "undefined")), 
-                x.get("action", "undefined"), 
-                x.get("parameters", {})
-            ) for x in self._extract_json_from_text(reasoning)]
-            self._log_event(f"Identified actions: {len(actions)}", "info")
-        except (SyntaxError, ValueError, json.JSONDecodeError) as e:
-            self._log_event(f"Failed to parse action: {e}", "warning")
-
-        return actions if actions else None
-
-    def _route_action(self, action_type, action_method, action_name, action, arguments):
-        """
-        Route actions to the appropriate handler with timeout handling.
-        :param action_type: str - Type of action (tool or plugin).
-        :param action_method: str - Method of action (execute or request).
-        :param action_name: str - Name of the action.
-        :param params: dict - Parameters for the action.
-        :return: Tuple[int, str] - (status_code, result).
-        """
+    def _route_action(self, _id, method, params):
         handler = None
         
-        if action_type in ["rag", "rags", "retriever", "retrievers"]:
-            if action_method == "execute":
-                handler = self.rag_registry.get_rag(action_name)
-            elif action_method == "request":
-                handler = self.rag_registry.search_rags(action_name)
-                return 201, json.dumps(handler)
-        elif action_type in ["tool", "tools"]:
-            if action_method == "execute":
-                handler = self.tool_registry.get_tool(action_name)
-            elif action_method == "request":
-                handler = self.tool_registry.search_tools(action_name)
-                return 201, json.dumps(handler)
-        elif action_type in ["plugin", "plugins"]:
-            if action_method == "execute":
-                handler = self.plugin_registry.get_plugin(action_name)
-            elif action_method == "request":
-                handler = self.plugin_registry.search_plugins(action_name)
-                return 201, json.dumps(handler)
-
-        # ToDo: OptimizerManager holds a query expander if needed
+        print("inputs: ", (_id, method, params))
         
-        #retrieved_docs = self.query_retrievers(query, use_all, retriever_names)
-
-        # Aggregate and rank results (simplified ranking here)
-        # ToDo: Add Rerank to get the best result first
-        # ToDo: OptimizerManager holds a Reranker if needed
+        handler = self.rag_registry.get_rag(_id)
+        if handler is None:
+            handler = self.tool_registry.get_tool(_id)
+        if handler is None:
+            handler = self.plugin_registry.get_plugin(_id)
         
         if handler:
-            self._log_event(f"Executing: {action_name} - {action}", "info")
-            return 201, self._execute_with_timeout(handler, action, arguments)
+            self._log_event(f"Executing: {_id} - {method}", "info")
 
-        self._log_event(f"Action not found: {action_type} - {action_name}", "error")
-        return 404, f"{action_type.capitalize()} '{action_name}' not found."
+            # otherwise fall back to your existing HTTP / handler.run path
+            try:
+                result = self._execute_with_timeout(handler, method, params)
+            except Exception as e:
+                self._log_event(f"Tool {_id} error: {e}", "error")
+                return 500, f"[ERROR] {str(e)}"
+            return 201, json.dumps(result, indent=2)
 
-    def _execute_with_timeout(self, handler, action, arguments):
+        self._log_event(f"Action not found: {_id} - {method}", "error")
+        return 404, f"{_id.capitalize()} '{method}' not found."
+
+
+    def _execute_with_timeout(self, handler, method, params):
         """
         Execute a handler with a timeout.
         :param handler: callable - The action handler.
@@ -285,7 +224,10 @@ class MiddlewareMixin:
 
         try:
             start_time = time.time()
-            result = handler.run(arguments, action=action)
+            if handler.type.lower().startswith('mcp'):
+                result = self.use_mcp_tool(handler, handler.id, handler.type, handler.main_workflow, f"Tool use input: {method} and {params}")
+            else:
+                result = handler.run({"method": method, "params": params})
             execution_time = time.time() - start_time
             self._log_event("Action executed successfully", "info", execution_time=execution_time)
             return result
@@ -293,8 +235,16 @@ class MiddlewareMixin:
             self._log_event("Action execution timed out", "error")
             return "The action timed out."
         except Exception as e:
-            self._log_event(f"Error executing action {action}, with args: {arguments} - {e}", "error")
-            return f"An error occurred with action {action}: {e}"
+            tb = traceback.format_exc()
+            # log the full traceback and the context
+            self._log_event(
+                f"❌ Error executing action. Error {e}\n"
+                f"    Method: {method!r}\n"
+                f"    Params: {params}\n"
+                f"{tb}",
+                "error"
+            )
+            return f"An error occurred with action {method}: {e}"
         finally:
             if LS_SIGNAL and hasattr(LS_SIGNAL, "SIGALRM"):
                 LS_SIGNAL.alarm(0)
@@ -308,4 +258,4 @@ class MiddlewareMixin:
         :param level: str - Log level.
         :param metadata: dict - Additional log metadata.
         """
-        self.log_event(f"ReAct agent {self.name}: {message}", level)  
+        self.log_event(f"Agent {self.name}: {message}", level)  

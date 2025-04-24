@@ -32,6 +32,10 @@ class GlobalLogger:
             handler.setFormatter(formatter)
             cls._logger.addHandler(handler)
             cls._logger.setLevel(logging.INFO)
+            
+            # ✅ Let pytest's caplog capture this logger too
+            cls._logger.propagate = True
+    
             print("Global logger initialized.")
             
         # Ensure extra handler is attached even if logger was already initialized
@@ -58,7 +62,7 @@ class GlobalLogger:
         return any(isinstance(h, handler_type) for h in cls._logger.handlers) if cls._logger else False
     
     @classmethod
-    def log(cls, message, level="info", name="global_log", metadata=None):
+    def log(cls, message, level="info", name=None, metadata=None):
         """
         Log a message using the global logger or LangSmith if available.
 
@@ -69,6 +73,7 @@ class GlobalLogger:
         - metadata (dict, optional): Metadata for LangSmith logging.
         """
         cls._ensure_initialized()
+        name = name or cls._logger.name
 
         if cls._langsmith_tracer:
             cls._log_with_langsmith(message, level, name, metadata)
@@ -107,3 +112,23 @@ class GlobalLogger:
                 output_data={},
                 metadata=metadata or {"level": level},
             )
+            
+    @classmethod
+    def reset(cls):
+        """
+        Reset the logger and LangSmith tracer. Useful for tests.
+        """
+        if cls._logger:
+            for handler in list(cls._logger.handlers):
+                cls._logger.removeHandler(handler)
+        cls._logger = None
+        cls._langsmith_tracer = None
+
+    @classmethod
+    def attach_handler(cls, handler):
+        """
+        Attach an external log handler (e.g., pytest caplog.handler).
+        """
+        cls._ensure_initialized()
+        if not cls.has_handler(type(handler)):
+            cls._logger.addHandler(handler)

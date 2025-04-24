@@ -1,0 +1,17 @@
+agents:
+  - id: communicator_agent
+    agent_type: langchain-openai
+    model: gpt-4o-mini-2024-07-18
+    system_prompt: >
+      You are a helpful interface agent. Collect user input and forward it via queue.
+    tool_registry: comm_tool_registry
+
+  - id: executor_agent
+    agent_type: langchain-openai
+    model: gpt-4
+    system_prompt: >
+      You receive tasks from other agents and execute them.
+
+    # This agent will subscribe to a channel to receive tasks
+    broker_channel: executor_agent_incoming
+    broker_id: internal_broker

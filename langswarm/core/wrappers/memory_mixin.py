@@ -51,8 +51,11 @@ class MemoryMixin:
 
     def _update_memory_summary(self, memory_adapter: Any, memory_summary_adapter: Any) -> Optional[Any]:
 
+        if memory_adapter is None or memory_summary_adapter is None:
+            return
+        
         # Retrieve the stored summary and last processed timestamp from ChromaDB
-        summary_record = memory_summary_adapter.query("current_summary", n=None)  # Assuming a specific query
+        summary_record = memory_summary_adapter.query("", filters={"key": {"$eq": self.agent.identifier}}, n=None) 
         summary_record = summary_record or {}
         
         # Store last processed timestamp (this should be persistent)
@@ -113,10 +116,17 @@ Output only the generated summary. Nothing else.
             # Store the summary record in ChromaDB
             memory_summary_adapter.add_document({
                 "key": self.agent.identifier, 
-                "text":summary_record["summary"], 
-                "metadata": {"last_processed_timestamp": last_processed_timestamp}
+                "text":summary, 
+                "metadata": {
+                    "last_processed_timestamp": last_processed_timestamp,
+                    "key": self.agent.identifier
+                }
             })
             
             # Set the memory for the agent
-            self.agent.set_memory([summary_record["summary"]])
+            self.agent.set_memory([summary])
+        
+        elif summary_record.get("summary"):
+            # Set the memory for the agent
+            self.agent.set_memory([summary_record.get("summary")])
             

@@ -1,6 +1,10 @@
 from typing import Any, Optional
 from langswarm.core.base.log import GlobalLogger
 
+try:
+    from langsmith.tracing import LangSmithTracer
+except ImportError:
+    LangSmithTracer = None
 
 class LoggingMixin:
     """
@@ -18,9 +22,10 @@ class LoggingMixin:
         """
         # Initialize the global logger (ensures LangSmith is set up if API key is provided)
         GlobalLogger.initialize(name=name, langsmith_api_key=langsmith_api_key)
-
+            
         # If the agent already has a LangSmith tracer, use it
-        if hasattr(agent, "tracer") and isinstance(agent.tracer, LangSmithTracer):
+        #if hasattr(agent, "tracer") and LangSmithTracer and isinstance(agent.tracer, LangSmithTracer):
+        if hasattr(agent, "tracer") and type(agent.tracer).__name__ == "LangSmithTracer":
             self.logger = agent.tracer
             print(f"LangSmith tracer found for agent {name}. Using it for logging.")
             return

@@ -1,0 +1,15 @@
+brokers:
+  redis_broker:
+    type: redis
+    config:
+      host: localhost
+      port: 6379
+      db: 0
+
+  gcp_broker:
+    type: gcp
+    config:
+      project_id: your-gcp-project-id
+
+  internal_broker:
+    type: internal

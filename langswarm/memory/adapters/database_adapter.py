@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List
+from typing import Dict, List, Any
 
 # ToDo: Make sure all implementations of DatabaseAdapter.query accepts a k=n parameter.
 
