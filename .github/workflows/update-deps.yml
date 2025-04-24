@@ -26,7 +26,13 @@ jobs:
 
       - name: Generate requirements.in from imports
         run: |
-          pipreqs . --force --savepath requirements.in --ignore packaging
+          pipreqs . --force --savepath requirements.in
+
+      - name: Strip unwanted lines from requirements.in
+        run: |
+          # Remove any direct packaging pin and your own package
+          grep -vE '^(packaging|langswarm)(==|>=|<=|~=)' requirements.in > requirements.tmp
+          mv requirements.tmp requirements.in
 
       - name: Pin versions into requirements.txt
         run: |
@@ -55,5 +61,5 @@ jobs:
           labels: dependencies, automated
           body: |
             This PR updates:
-            - requirements.in (via pipreqs)
+            - requirements.in (via pipreqs, filtered)
             - requirements.txt (via pip-compile)
