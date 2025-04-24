@@ -39,18 +39,33 @@ def test_dependency_version(package, version):
         print(f"{package}=={version} failed.")
         return False
 
-
 def find_oldest_compatible_version(package, versions):
     """
-    Find the oldest compatible version of a package by testing all versions.
+    Find the oldest compatible version of a package, biased towards the second half of the list.
     """
-    compatible_version = None
-    for version in reversed(versions):  # Test oldest versions first
-        if test_dependency_version(package, version):
-            compatible_version = version
-            break
-    return compatible_version
+    if not versions:
+        return None
 
+    left = 0
+    right = len(versions) - 1
+    compatible_version = None
+
+    # Start the binary search with a bias toward the second half
+    while right - left > 2:
+        mid = left + (right - left) // 3 * 2  # Biased towards the second half
+        if test_dependency_version(package, versions[mid]):
+            compatible_version = versions[mid]
+            right = mid - 1  # Narrow down to the left half
+        else:
+            left = mid + 1  # Narrow down to the right half
+
+    # Traverse the remaining range to confirm the oldest compatible version
+    for i in range(left, right + 1):
+        if test_dependency_version(package, versions[i]):
+            compatible_version = versions[i]
+            break
+
+    return compatible_version
 
 def get_supported_python_versions():
     """
@@ -75,7 +90,7 @@ def update_requirements_with_python_versions(dependency_versions, python_version
     """
     # Get existing supported versions
     supported_versions = set(get_supported_python_versions())
-
+    
     if success:
         supported_versions.add(python_version)  # Add the Python version if it succeeded
     else:
@@ -87,25 +102,20 @@ def update_requirements_with_python_versions(dependency_versions, python_version
     with open("requirements.txt", "w") as f:
         # Add the comment about supported Python versions
         f.write(f"# Supported versions of Python: {', '.join(supported_versions)}\n")
-        f.write("# Automatically updated by dependency_update_test.py\n\n")
+        f.write("# Automatically updated by dependency_update_test.py")
 
         # Write the compatible dependency versions
-        for package, compatible_version in dependency_versions.items():
-            f.write(f"{package}=={compatible_version}\n")
+        f.write("\n\n# Core dependencies\n")
+        for package, compatible_version in dependency_versions["core"].items():
+            f.write(f"{package}>={compatible_version}\n")
+
+        f.write("\n\n# Optional dependencies\n")
+        for package, compatible_version in dependency_versions["optional"].items():
+            f.write(f"{package}>={compatible_version}\n")
     print("requirements.txt updated successfully with Python version support comment.")
 
-
-def main(python_version):
-    # Read dependencies from requirements.txt
-    try:
-        with open("requirements.txt", "r") as f:
-            dependencies = [line.strip().split("==")[0] for line in f if "==" in line]
-    except FileNotFoundError:
-        print("requirements.txt not found.")
-        sys.exit(1)
-
+def assign_versions(dependencies, success):
     latest_versions = {}
-    success = True  # Track whether all tests passed
     for package in dependencies:
         print(f"\nFetching versions for {package}...")
         versions = fetch_versions(package)
@@ -123,12 +133,36 @@ def main(python_version):
             success = False
             break  # Exit the loop and mark the test as failed
 
+    return latest_versions, success
+    
+def main(python_version):
+    dependencies = {"core": [], "optional": []}
+    # Read dependencies from requirements.txt
+    try:
+        with open("requirements.txt", "r") as f:
+            sections = f.read().split("# Optional dependencies")  # Split the content into sections
+
+        # Process core dependencies
+        dependencies["core"] = [line.strip().replace("==",">=").split(">=")[0] for line in sections[0].strip().splitlines() if ">=" in line.replace("==",">=")]
+        
+        # Process optional dependencies
+        if len(sections) > 1:
+            dependencies["optional"] = [line.strip().replace("==",">=").split(">=")[0] for line in sections[1].strip().splitlines() if ">=" in line.replace("==",">=")]
+        
+    except FileNotFoundError:
+        print("requirements.txt not found.")
+        sys.exit(1)
+
+    success = True  # Track whether all tests passed
+    core, success = assign_versions(dependencies["core"], success)
+    optional, success = assign_versions(dependencies["optional"], success)
+    latest_versions = {"core": core, "optional": optional}
+
     # Update requirements.txt with compatible versions and supported Python versions
     update_requirements_with_python_versions(latest_versions, python_version, success)
 
     if not success:
         sys.exit(1)  # Exit with failure if any dependency test failed
-
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
