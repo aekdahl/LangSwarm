@@ -1,0 +1,59 @@
+name: 📦 Update dependencies
+
+on:
+  workflow_dispatch:    # Manual trigger
+  schedule:
+    - cron: '0 4 * * 1'  # (optional) weekly at 04:00 UTC
+
+jobs:
+  regen-deps:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Install tooling
+        run: |
+          pip install --upgrade pip
+          pip install pip-tools pipreqs
+
+      - name: Generate requirements.in from imports
+        run: |
+          pipreqs . --force --savepath requirements.in
+
+      - name: Pin versions into requirements.txt
+        run: |
+          pip-compile requirements.in \
+            --output-file requirements.txt \
+            --generate-hashes
+
+      - name: Check for changes
+        id: git-check
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Pull Request
+        if: steps.git-check.outputs.changes == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          commit-message: chore(deps): regenerate requirements
+          branch: update-dependencies
+          title: chore(deps): regenerate dependencies
+          labels: dependencies, automated
+          body: |
+            This PR updates:
+            - requirements.in (via pipreqs)
+            - requirements.txt (via pip-compile)
