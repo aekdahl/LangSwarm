@@ -101,11 +101,11 @@ class LangSwarmConfigLoader:
 
     def _load_builtin_tool_classes(self):
         # populate with whatever core tools you know about
-        from langswarm.mcp.tools.mcpgithubtool.main import MCPGitHubTool
+        ##from langswarm.mcp.tools.mcpgithubtool.main import MCPGitHubTool
         #from langswarm.synapse.tools.files.main  import FilesystemTool
         # …etc…
         self.tool_classes = {
-            "mcpgithubtool":   MCPGitHubTool,
+            ##"mcpgithubtool":   MCPGitHubTool,
         #    "filesystemtool": FilesystemTool,
         #    # add more here (or via register_tool_class below)
         }
