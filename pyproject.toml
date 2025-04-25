@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "langswarm"
-version = "0.0.5"
+version = "0.0.6"
 description = "A multi-agent ecosystem for large language models (LLMs) and autonomous systems."
 readme = "README.md"
 authors = ["Alexander Ekdahl <alexander.ekdahl@gmail.com>"]
@@ -12,6 +12,12 @@ keywords = ["LLM", "multi-agent", "langchain", "hugginface", "openai", "MCP", "a
 [tool.poetry.dependencies]
 python = ">=3.8,<4.0"
 # your direct deps go here, un-pinned; Poetry will lock them in poetry.lock
+pyyaml
+nest-asyncio
+redis
+cerberus
+tiktoken
+google-cloud-pubsub
 
 [tool.poetry.extras]
 dev = [
