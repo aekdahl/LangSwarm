@@ -616,17 +616,26 @@ class WorkflowExecutor:
             except Exception as e:
                 self._handle_step_error(step, step_id, visit_key, e)
 
+            if "output" in step:
+                to_targets = step["output"].get("to", [])
+                if any(isinstance(t, dict) and "condition" in t for t in (to_targets if isinstance(to_targets, list) else [to_targets])):
+                    # If the step branches on a condition, handle branch and exit
+                    self._handle_output(step_id, step["output"], output, step)
+                    if mark_visited:
+                        self.context["visited_steps"].add(visit_key)
+                    return
+                else:
+                    self.context['previous_output'] = output
+                    self.context['step_outputs'][step_id] = output
+                    self._handle_output(step_id, step["output"], output, step)
+            else:
+                # No explicit output block → still store the step result
+                self.context['previous_output'] = output
+                self.context['step_outputs'][step_id] = output
+            
             if mark_visited:
                 self.context["visited_steps"].add(visit_key)
-            
-            self.context['previous_output'] = output
-            self.context['step_outputs'][step_id] = output
 
-            
-            if "output" in step:
-                self._handle_output(step_id, step["output"], output, step)
-
-            
             if step.get("fan_key"):
                 self._recheck_pending_fanins()
 
@@ -697,14 +706,24 @@ class WorkflowExecutor:
             except Exception as e:
                 self._handle_step_error(step, step_id, visit_key, e)
 
+            if "output" in step:
+                to_targets = step["output"].get("to", [])
+                if any(isinstance(t, dict) and "condition" in t for t in (to_targets if isinstance(to_targets, list) else [to_targets])):
+                    # If step has a condition → branch, do NOT save output
+                    await self._handle_output_async(step_id, step["output"], output, step)
+                    if mark_visited:
+                        self.context["visited_steps"].add(visit_key)
+                    return
+                else:
+                    self.context['previous_output'] = output
+                    self.context['step_outputs'][step_id] = output
+                    await self._handle_output_async(step_id, step["output"], output, step)
+            else:
+                self.context['previous_output'] = output
+                self.context['step_outputs'][step_id] = output
+            
             if mark_visited:
                 self.context["visited_steps"].add(visit_key)
-
-            self.context['previous_output'] = output
-            self.context['step_outputs'][step_id] = output
-
-            if "output" in step:
-                await self._handle_output_async(step_id, step["output"], output, step)
 
             if step.get("fan_key"):
                 await self._recheck_pending_fanins_async()
