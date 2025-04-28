@@ -552,188 +552,165 @@ class WorkflowExecutor:
     def _execute_step_inner_sync(self, step: Dict, mark_visited: bool = True):
         if not step:
             return
-        step_id = step['id']
+    
+        step_id   = step['id']
         visit_key = self._get_visit_key(step)
         print(f"\n▶ Executing step: {step_id} (visit_key={visit_key}) (async=False)")
-
+    
         if visit_key in self.context["visited_steps"]:
             if step.get("retry") and self.context["retry_counters"].get(visit_key, 0) < step["retry"]:
-                print(f"🔁 Step {step_id} was previously visited with fan_key, but retry is allowed.")
+                print(f"🔁 Step {step_id} retry allowed.")
             else:
-                print(f"🔁 Step {step_id} with fan_key already executed, skipping.")
+                print(f"🔁 Step {step_id} already done, skipping.")
                 return
-
-        # 1️⃣ In _execute_step_inner_sync, before your normal agent/function logic:
+    
+        # 1) loop steps
         if "loop" in step:
             return self._start_loop(step)
-
+    
+        # 2) sub-workflow
         if 'invoke_workflow' in step:
-            wf_id  = step['invoke_workflow']
-            inp    = self._resolve_input(step.get("input"))
+            wf_id = step['invoke_workflow']
+            inp   = self._resolve_input(step.get("input"))
             output = self.run_workflow(wf_id, inp)
         else:
+            # 3) agent or function
             try:
                 if 'agent' in step:
-                    agent_id = step['agent']
-                    agent    = self.agents[agent_id]
-                    
-                    #print("Step:", step)
-
-                    # accept either a single string or a dict of named inputs
+                    agent = self.agents[step['agent']]
                     raw_input = step.get("input")
                     if isinstance(raw_input, dict):
-                        # 1) fully resolve all inputs
-                        resolved_args = {
-                            k: self._resolve_input(v)
-                            for k, v in raw_input.items()
-                        }
-
-                        #print("resolved_args", resolved_args)
-                        output = agent.chat(f'{resolved_args}')
+                        resolved = {k: self._resolve_input(v) for k, v in raw_input.items()}
+                        output = agent.chat(f"{resolved}")
                     else:
-                        text = self._resolve_input(raw_input)
-                        output = agent.chat(f'{text}')
-                        
-                    print("If Agent output", output)
-
+                        output = agent.chat(self._resolve_input(raw_input))
+    
                 elif 'function' in step:
                     func = self._resolve_function(step['function'], script=step.get('script'))
-                    args = step.get("args", {})
-                    input_kwargs = {k: self._resolve_input(v) for k, v in args.items()}
-                    if "context" not in input_kwargs:
-                        input_kwargs["context"] = self.context
-                    output = func(**input_kwargs)
+                    args = {k: self._resolve_input(v) for k, v in step.get("args", {}).items()}
+                    args.setdefault("context", self.context)
+                    output = func(**args)
+    
                     if output == "__NOT_READY__":
-                        print("Fan-in not ready — requeuing for later")
+                        print("Fan-in not ready — requeuing")
                         fan_key = step.get("fan_key", "default")
                         self.context["pending_fanins"][f"{step_id}@{fan_key}"] = step
                         return
-
+    
                 else:
                     print(f"⚠️ Step {step_id} missing 'agent' or 'function'")
                     return
-
+    
             except Exception as e:
                 self._handle_step_error(step, step_id, visit_key, e)
-
-            if "output" in step:
-                to_targets = step["output"].get("to", [])
-                if any(isinstance(t, dict) and "condition" in t for t in (to_targets if isinstance(to_targets, list) else [to_targets])):
-                    # ➡️ Step has conditional branch → handle output immediately
-                    self._handle_output(step_id, step["output"], output, step)
-                    if mark_visited:
-                        self.context["visited_steps"].add(visit_key)
-                    # ❗ Important: DO NOT update previous_output, because condition handles routing
-                    return
-                else:
-                    # ➡️ Step has normal output → allow normal storage
-                    self.context['previous_output'] = output
-                    self._handle_output(step_id, step["output"], output, step)
-            else:
-                # ➡️ Step has no output block → still store the result
-                self.context['previous_output'] = output
-            
-            # Always store in step_outputs
-            self.context['step_outputs'][step_id] = output
-            
-            if mark_visited:
-                self.context["visited_steps"].add(visit_key)
-
-            if step.get("fan_key"):
-                self._recheck_pending_fanins()
+    
+        # ——————————————————————————————————————————————————————————————————
+        # 4) Branch-only (pure conditional) steps
+        if "output" in step:
+            to_targets = step["output"].get("to", [])
+            if not isinstance(to_targets, list):
+                to_targets = [to_targets]
+    
+            # if *any* target is a condition, treat this as a branching step
+            if any(isinstance(t, dict) and "condition" in t for t in to_targets):
+                # handle the branch, then stop here
+                self._handle_output(step_id, step["output"], output, step)
+                if mark_visited:
+                    self.context["visited_steps"].add(visit_key)
+                return
+    
+        # ——————————————————————————————————————————————————————————————————
+        # 5) Normal save + output
+        self.context['previous_output']    = output
+        self.context['step_outputs'][step_id] = output
+    
+        if "output" in step:
+            self._handle_output(step_id, step["output"], output, step)
+    
+        if mark_visited:
+            self.context["visited_steps"].add(visit_key)
+    
+        if step.get("fan_key"):
+            self._recheck_pending_fanins()
 
     async def _execute_step_inner_async(self, step: Dict, mark_visited: bool = True):
         if not step:
             return
-        step_id = step['id']
+    
+        step_id   = step['id']
         visit_key = self._get_visit_key(step)
         print(f"\n▶ Executing step: {step_id} (visit_key={visit_key}) (async=True)")
-
+    
         if visit_key in self.context["visited_steps"]:
-            if step.get("is_fan_in"):
-                # ✅ Allow fan-in to get called multiple times
-                print(f"🔁 Fan-in step {step_id} already executed once, checking again.")
-            elif step.get("retry") and self.context["retry_counters"].get(visit_key, 0) < step["retry"]:
-                print(f"🔁 Step {step_id} was previously visited with fan_key, but retry is allowed.")
+            if step.get("retry") and self.context["retry_counters"].get(visit_key, 0) < step["retry"]:
+                print(f"🔁 Step {step_id} retry allowed.")
             else:
-                print(f"🔁 Step {step_id} with fan_key already executed, skipping.")
+                print(f"🔁 Step {step_id} already done, skipping.")
                 return
-
+    
         if 'invoke_workflow' in step:
-            wf_id  = step['invoke_workflow']
-            inp    = self._resolve_input(step.get("input"))
+            wf_id = step['invoke_workflow']
+            inp   = self._resolve_input(step.get("input"))
             output = await self.run_workflow_async(wf_id, inp)
         else:
             try:
                 if 'agent' in step:
-                    agent_id = step['agent']
-                    agent    = self.agents[agent_id]
-
-                    # accept either a single string or a dict of named inputs
+                    agent = self.agents[step['agent']]
                     raw_input = step.get("input")
                     if isinstance(raw_input, dict):
-                        # 1) fully resolve all inputs
-                        resolved_args = {
-                            k: self._resolve_input(v)
-                            for k, v in raw_input.items()
-                        }
-
-                        #print("resolved_args", resolved_args)
-                        output = agent.chat(f'{resolved_args}')
+                        resolved = {k: self._resolve_input(v) for k, v in raw_input.items()}
+                        output = agent.chat(f"{resolved}")
                     else:
-                        text = self._resolve_input(raw_input)
-                        output = agent.chat(text)
-
+                        output = agent.chat(self._resolve_input(raw_input))
+    
                 elif 'function' in step:
                     func = self._resolve_function(step['function'], script=step.get('script'))
-                    args = step.get("args", {})
-                    input_kwargs = {k: self._resolve_input(v) for k, v in args.items()}
-                    if "context" not in input_kwargs:
-                        input_kwargs["context"] = self.context
-
+                    args = {k: self._resolve_input(v) for k, v in step.get("args", {}).items()}
+                    args.setdefault("context", self.context)
                     if asyncio.iscoroutinefunction(func):
-                        output = await func(**input_kwargs)
+                        output = await func(**args)
                     else:
-                        output = func(**input_kwargs)
-
+                        output = func(**args)
+    
                     if output == "__NOT_READY__":
-                        print("Fan-in not ready — requeuing for later")
                         fan_key = step.get("fan_key", "default")
                         self.context["pending_fanins"][f"{step_id}@{fan_key}"] = step
                         return
-
+    
                 else:
                     print(f"⚠️ Step {step_id} missing 'agent' or 'function'")
                     return
-
+    
             except Exception as e:
                 self._handle_step_error(step, step_id, visit_key, e)
+    
+        # ——————————————————————————————————————————————————————————————————
+        # Branch‐only steps
+        if "output" in step:
+            to_targets = step["output"].get("to", [])
+            if not isinstance(to_targets, list):
+                to_targets = [to_targets]
+    
+            if any(isinstance(t, dict) and "condition" in t for t in to_targets):
+                await self._handle_output_async(step_id, step["output"], output, step)
+                if mark_visited:
+                    self.context["visited_steps"].add(visit_key)
+                return
+    
+        # ——————————————————————————————————————————————————————————————————
+        # Normal save + output
+        self.context['previous_output']    = output
+        self.context['step_outputs'][step_id] = output
+    
+        if "output" in step:
+            await self._handle_output_async(step_id, step["output"], output, step)
+    
+        if mark_visited:
+            self.context["visited_steps"].add(visit_key)
+    
+        if step.get("fan_key"):
+            await self._recheck_pending_fanins_async()
 
-            if "output" in step:
-                to_targets = step["output"].get("to", [])
-                if any(isinstance(t, dict) and "condition" in t for t in (to_targets if isinstance(to_targets, list) else [to_targets])):
-                    # ➡️ Step has conditional branch → handle output immediately
-                    await self._handle_output_async(step_id, step["output"], output, step)
-                    if mark_visited:
-                        self.context["visited_steps"].add(visit_key)
-                    # ❗ Important: DO NOT update previous_output, because condition handles routing
-                    return
-                else:
-                    # ➡️ Step has normal output → allow normal storage
-                    self.context['previous_output'] = output
-                    self._handle_output(step_id, step["output"], output, step)
-            else:
-                # ➡️ Step has no output block → still store the result
-                self.context['previous_output'] = output
-            
-            # Always store in step_outputs
-            self.context['step_outputs'][step_id] = output
-            
-            if mark_visited:
-                self.context["visited_steps"].add(visit_key)
-
-            if step.get("fan_key"):
-                await self._recheck_pending_fanins_async()
 
     def _handle_output(
         self,
