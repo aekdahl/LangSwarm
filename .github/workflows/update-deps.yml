@@ -24,6 +24,10 @@ jobs:
           pip install --upgrade pip
           pip install pip-tools pipreqs
 
+      - name: Upgrade pip and pip-tools
+        run: |
+          pip install --upgrade "pip<24" "pip-tools>=7.4.0"
+
       - name: Generate requirements.in from imports
         run: |
           pipreqs . --force --savepath requirements.in
