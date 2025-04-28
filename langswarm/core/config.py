@@ -625,8 +625,10 @@ class WorkflowExecutor:
                         self.context["visited_steps"].add(visit_key)
                     return
                 else:
-                    self.context['previous_output'] = output
                     self.context['step_outputs'][step_id] = output
+                    # Only update previous_output if this step is NOT a condition-only step
+                    if not step.get("output", {}).get("to", [{}])[0].get("condition"):
+                        self.context['previous_output'] = output
                     self._handle_output(step_id, step["output"], output, step)
             else:
                 # No explicit output block → still store the step result
@@ -715,8 +717,10 @@ class WorkflowExecutor:
                         self.context["visited_steps"].add(visit_key)
                     return
                 else:
-                    self.context['previous_output'] = output
                     self.context['step_outputs'][step_id] = output
+                    # Only update previous_output if this step is NOT a condition-only step
+                    if not step.get("output", {}).get("to", [{}])[0].get("condition"):
+                        self.context['previous_output'] = output
                     await self._handle_output_async(step_id, step["output"], output, step)
             else:
                 self.context['previous_output'] = output
