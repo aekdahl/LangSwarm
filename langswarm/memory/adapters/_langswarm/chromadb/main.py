@@ -4,6 +4,8 @@ from langswarm.memory.adapters.database_adapter import DatabaseAdapter
 try:
     from chromadb import Client as ChromaDB
     from chromadb.config import Settings
+    from chromadb import HttpClient as ChromaHttp
+    from chromadb import AsyncHttpClient as ChromaAsync
 except ImportError:
     ChromaDB = None
 
@@ -26,7 +28,7 @@ class ChromaDBAdapter(DatabaseAdapter):
 Replace `action` and parameters as needed.
     """
     
-    def __init__(self, identifier, collection_name="shared_memory", persist_directory=None, brief=None):
+    def __init__(self, identifier, collection_name="shared_memory", persist_directory=None, brief=None, host=None, port=8000):
         self.identifier = identifier
         self.brief = brief or (
             f"The {identifier} adapter enables semantic search in the {collection_name} collection"
@@ -61,8 +63,12 @@ Replace `action` and parameters as needed.
             raise ValueError("Unsupported database. Make sure ChromaDB is installed.")
         if persist_directory:
             self.client = ChromaDB(Settings(persist_directory=persist_directory))
+        elif host:
+            self.client = ChromaHttp(host=host, port=port)
         else:
             self.client = ChromaDB(Settings())
+            
+        # ToDo: Add abilit to set distance metric.
         self.collection = self.client.get_or_create_collection(name=collection_name)
 
     def run(self, payload, action="query"):

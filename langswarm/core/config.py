@@ -183,6 +183,17 @@ class LangSwarmConfigLoader:
                         with open(file_path, "r", encoding="utf-8") as f:
                             obj[k.replace('_file', '')] = f.read()
                             del obj[k]
+                elif isinstance(v, list) and ("prompt" in k or "instruction" in k or "description" in k) and all(isinstance(item, str) and item.endswith((".md", ".txt")) for item in v):
+                    # 🌟 New: Handle list of prompt files
+                    contents = []
+                    for item in v:
+                        file_path = os.path.join(base_path, item)
+                        if os.path.isfile(file_path):
+                            with open(file_path, "r", encoding="utf-8") as f:
+                                contents.append(f.read())
+                    combined = '\n\n---\n\n'.join(contents)
+                    obj[k.replace('_file', '')] = combined
+                    del obj[k]
                 else:
                     self._resolve_prompts(v, base_path)
         elif isinstance(obj, list):
@@ -479,7 +490,50 @@ class WorkflowExecutor:
                 print(f"⚠️ Rollback limit reached for {step_id}")
 
         raise error
+        
+    # The core loop runner:
+    def _run_loop_iteration(self, loop_id, step):
+        state = self.context["loops"][loop_id]
+        idx   = state["index"]
+        var   = step["loop"].get("var", "item")
 
+        # Done?
+        if idx >= len(state["values"]) or idx >= state["max"]:
+            # collect results into step_outputs
+            self.context["step_outputs"][loop_id] = state["results"]
+            return self._handle_output(
+                loop_id,
+                {"collect": step["output"]["collect"], "to": step["output"]["to"]},
+                state["results"],
+                step
+            )
+
+        # bind the next element
+        self.context[var] = state["values"][idx]
+
+        # run the body step
+        body_step = self._get_step_by_id(step["loop"]["body"])
+        self._execute_step(body_step)
+
+        # capture its output and advance
+        state["results"].append(self.context["step_outputs"][body_step["id"]])
+        state["index"] += 1
+
+        # and recurse
+        return self._run_loop_iteration(loop_id, step)
+
+    # New helper to kick off a loop:
+    def _start_loop(self, step):
+        loop = step["loop"]
+        values = self._resolve_input(loop["for_each"])
+        var    = loop.get("var", "item")
+        max_i  = int(self._resolve_input(loop.get("max", len(values))))
+
+        # Initialize loop state
+        self.context.setdefault("loops", {})[step["id"]] = {
+            "values": values, "index": 0, "max": max_i, "results": []
+        }
+        return self._run_loop_iteration(step["id"], step)
 
     def _execute_step(self, step: Dict, mark_visited=True):
         return self._execute_step_inner_sync(step, mark_visited)
@@ -500,6 +554,10 @@ class WorkflowExecutor:
             else:
                 print(f"🔁 Step {step_id} with fan_key already executed, skipping.")
                 return
+
+        # 1️⃣ In _execute_step_inner_sync, before your normal agent/function logic:
+        if "loop" in step:
+            return self._start_loop(step)
 
         if 'invoke_workflow' in step:
             wf_id  = step['invoke_workflow']
