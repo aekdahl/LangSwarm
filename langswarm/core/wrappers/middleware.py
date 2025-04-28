@@ -41,9 +41,9 @@ class MiddlewareMixin:
         """
         Initialize the middleware.
         """
-        self.rag_registry = rag_registry or RAGRegistry()
-        self.tool_registry = tool_registry or ToolRegistry()
-        self.plugin_registry = plugin_registry or PluginRegistry()
+        self.rag_registry = rag_registry or (RAGRegistry() if callable(RAGRegistry) else RAGRegistry)
+        self.tool_registry = tool_registry or (ToolRegistry() if callable(ToolRegistry) else ToolRegistry)
+        self.plugin_registry = plugin_registry or (PluginRegistry() if callable(PluginRegistry) else PluginRegistry)
         
         # assume you can get the raw tools list from your loader or registry
         from langswarm.core.config import ToolDeployer
