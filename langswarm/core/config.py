@@ -801,7 +801,13 @@ class WorkflowExecutor:
                 elif isinstance(target, dict) and "condition" in target:
                     branch = self._resolve_condition_branch(target.get("condition"))
                     if branch:
-                        self._handle_output(step_id, {"to": branch}, output, step)
+                        if isinstance(branch, str):
+                            # It's a direct step id → load and execute
+                            target_step = self._get_step_by_id(branch)
+                            self._execute_step(target_step)
+                        elif isinstance(branch, dict):
+                            # It's a nested output → treat it as another output instruction
+                            self._handle_output(step_id, {"to": branch}, output, step)
 
                 # 2d. {"generate_steps": ...}
                 elif "generate_steps" in target:
@@ -867,7 +873,11 @@ class WorkflowExecutor:
                 elif isinstance(target, dict) and "condition" in target:
                     branch = self._resolve_condition_branch(target.get("condition"))
                     if branch:
-                        await self._handle_output_async(step_id, {"to": branch}, output, step)
+                        if isinstance(branch, str):
+                            target_step = self._get_step_by_id(branch)
+                            await self._execute_step_async(target_step)
+                        elif isinstance(branch, dict):
+                            await self._handle_output_async(step_id, {"to": branch}, output, step)
 
                 elif "generate_steps" in target:
                     await self._run_generated_subflow_async(output, limit=target.get("limit"), return_to=target.get("return_to"))
