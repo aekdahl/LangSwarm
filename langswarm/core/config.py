@@ -619,21 +619,22 @@ class WorkflowExecutor:
             if "output" in step:
                 to_targets = step["output"].get("to", [])
                 if any(isinstance(t, dict) and "condition" in t for t in (to_targets if isinstance(to_targets, list) else [to_targets])):
-                    # If the step branches on a condition, handle branch and exit
+                    # ➡️ Step has conditional branch → handle output immediately
                     self._handle_output(step_id, step["output"], output, step)
                     if mark_visited:
                         self.context["visited_steps"].add(visit_key)
+                    # ❗ Important: DO NOT update previous_output, because condition handles routing
                     return
                 else:
-                    self.context['step_outputs'][step_id] = output
-                    # Only update previous_output if this step is NOT a condition-only step
-                    if not step.get("output", {}).get("to", [{}])[0].get("condition"):
-                        self.context['previous_output'] = output
+                    # ➡️ Step has normal output → allow normal storage
+                    self.context['previous_output'] = output
                     self._handle_output(step_id, step["output"], output, step)
             else:
-                # No explicit output block → still store the step result
+                # ➡️ Step has no output block → still store the result
                 self.context['previous_output'] = output
-                self.context['step_outputs'][step_id] = output
+            
+            # Always store in step_outputs
+            self.context['step_outputs'][step_id] = output
             
             if mark_visited:
                 self.context["visited_steps"].add(visit_key)
@@ -711,20 +712,22 @@ class WorkflowExecutor:
             if "output" in step:
                 to_targets = step["output"].get("to", [])
                 if any(isinstance(t, dict) and "condition" in t for t in (to_targets if isinstance(to_targets, list) else [to_targets])):
-                    # If step has a condition → branch, do NOT save output
+                    # ➡️ Step has conditional branch → handle output immediately
                     await self._handle_output_async(step_id, step["output"], output, step)
                     if mark_visited:
                         self.context["visited_steps"].add(visit_key)
+                    # ❗ Important: DO NOT update previous_output, because condition handles routing
                     return
                 else:
-                    self.context['step_outputs'][step_id] = output
-                    # Only update previous_output if this step is NOT a condition-only step
-                    if not step.get("output", {}).get("to", [{}])[0].get("condition"):
-                        self.context['previous_output'] = output
-                    await self._handle_output_async(step_id, step["output"], output, step)
+                    # ➡️ Step has normal output → allow normal storage
+                    self.context['previous_output'] = output
+                    self._handle_output(step_id, step["output"], output, step)
             else:
+                # ➡️ Step has no output block → still store the result
                 self.context['previous_output'] = output
-                self.context['step_outputs'][step_id] = output
+            
+            # Always store in step_outputs
+            self.context['step_outputs'][step_id] = output
             
             if mark_visited:
                 self.context["visited_steps"].add(visit_key)
