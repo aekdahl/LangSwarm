@@ -917,12 +917,13 @@ class WorkflowExecutor:
             self._execute_by_step_id(return_to)
 
     def _evaluate_condition(self, expr: str) -> bool:
+        resolved_expr = self._resolve_input(expr)
         s = SimpleEval(names=self.context)
         try:
-            result = s.eval(expr)
-            return bool(result)
+            return bool(s.eval(resolved_expr))
         except Exception as e:
             print(f"Condition eval error: {e}")
+            print(f"Resolved expr was: {resolved_expr}")
             return False
 
     def _evaluate_expression(self, expr: str):
