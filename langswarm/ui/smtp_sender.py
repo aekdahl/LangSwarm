@@ -59,7 +59,7 @@ class SMTPEmailSender:
         except Exception as e:
             print(f"Failed to send email: {str(e)}")
 
-
+"""
             
 # Example:
 sender = SMTPEmailSender(
@@ -75,10 +75,10 @@ sender.send_email(
     body="This is a test email from your agent!"
 )
 
-✅ Notes for Gmail:
+# Notes for Gmail:
 
-You must enable App Passwords (not your main password) if you have 2FA enabled.
-Gmail SMTP requires TLS (use_tls=True by default).
+#You must enable App Passwords (not your main password) if you have 2FA enabled.
+#Gmail SMTP requires TLS (use_tls=True by default).
 
 # Example
 sender = SMTPEmailSender(
@@ -94,9 +94,9 @@ sender.send_email(
     body="This is a test email from your agent!"
 )
 
-✅ Notes for Outlook:
+# Notes for Outlook:
 
-Same as Gmail: SMTP server = smtp.office365.com, port = 587, TLS enabled.
+# Same as Gmail: SMTP server = smtp.office365.com, port = 587, TLS enabled.
 
 
 # Example:
@@ -122,10 +122,9 @@ sender.send_email(
     attachments=["/path/to/your/file.pdf"]
 )
 
-✅ Multiple attachments?
-Just pass a list:
+# Multiple attachments?
+#Just pass a list:
 
-python
-Copy
-Edit
-attachments=["/path/file1.pdf", "/path/file2.png"]
+# attachments=["/path/file1.pdf", "/path/file2.png"]
+
+"""
