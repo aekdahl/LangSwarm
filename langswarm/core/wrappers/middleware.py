@@ -176,12 +176,21 @@ class MiddlewareMixin:
         handler = None
         
         print("inputs: ", (_id, method, params))
-        
-        handler = self.rag_registry.get_rag(_id)
+
+        if isinstance(self.rag_registry, dict):
+            handler = self.rag_registry.get(_id)
+        else:
+            handler = self.rag_registry.get_rag(_id)
         if handler is None:
-            handler = self.tool_registry.get_tool(_id)
+            if isinstance(self.tool_registry, dict):
+                handler = self.tool_registry.get(_id)
+            else:
+                handler = self.tool_registry.get_tool(_id)
         if handler is None:
-            handler = self.plugin_registry.get_plugin(_id)
+            if isinstance(self.plugin_registry, dict):
+                handler = self.plugin_registry.get(_id)
+            else:
+                handler = self.plugin_registry.get_plugin(_id)
         
         if handler:
             self._log_event(f"Executing: {_id} - {method}", "info")
