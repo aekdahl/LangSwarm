@@ -564,17 +564,14 @@ class WorkflowExecutor:
                 print(f"🔁 Step {step_id} already done, skipping.")
                 return
     
-        # 1) loop steps
         if "loop" in step:
             return self._start_loop(step)
     
-        # 2) sub-workflow
         if 'invoke_workflow' in step:
             wf_id = step['invoke_workflow']
-            inp   = self._resolve_input(step.get("input"))
+            inp = self._resolve_input(step.get("input"))
             output = self.run_workflow(wf_id, inp)
         else:
-            # 3) agent or function
             try:
                 if 'agent' in step:
                     agent = self.agents[step['agent']]
@@ -592,40 +589,31 @@ class WorkflowExecutor:
                     output = func(**args)
     
                     if output == "__NOT_READY__":
-                        print("Fan-in not ready — requeuing")
                         fan_key = step.get("fan_key", "default")
                         self.context["pending_fanins"][f"{step_id}@{fan_key}"] = step
                         return
-    
                 else:
-                    print(f"⚠️ Step {step_id} missing 'agent' or 'function'")
-                    return
+                    raise ValueError(f"⚠️ Step {step_id} missing 'agent' or 'function'")
     
             except Exception as e:
                 self._handle_step_error(step, step_id, visit_key, e)
     
-        # ——————————————————————————————————————————————————————————————————
-        # 4) Branch-only (pure conditional) steps
+        # Explicitly store outputs regardless of conditional steps:
+        self.context['previous_output'] = output
+        self.context['step_outputs'][step_id] = output
+    
         if "output" in step:
             to_targets = step["output"].get("to", [])
             if not isinstance(to_targets, list):
                 to_targets = [to_targets]
     
-            # if *any* target is a condition, treat this as a branching step
             if any(isinstance(t, dict) and "condition" in t for t in to_targets):
-                # handle the branch, then stop here
                 self._handle_output(step_id, step["output"], output, step)
                 if mark_visited:
                     self.context["visited_steps"].add(visit_key)
-                return
-    
-        # ——————————————————————————————————————————————————————————————————
-        # 5) Normal save + output
-        self.context['previous_output']    = output
-        self.context['step_outputs'][step_id] = output
-    
-        if "output" in step:
-            self._handle_output(step_id, step["output"], output, step)
+                return  # Important: return here explicitly after handling condition
+            else:
+                self._handle_output(step_id, step["output"], output, step)
     
         if mark_visited:
             self.context["visited_steps"].add(visit_key)
@@ -676,16 +664,16 @@ class WorkflowExecutor:
                         fan_key = step.get("fan_key", "default")
                         self.context["pending_fanins"][f"{step_id}@{fan_key}"] = step
                         return
-    
                 else:
-                    print(f"⚠️ Step {step_id} missing 'agent' or 'function'")
-                    return
+                    raise ValueError(f"⚠️ Step {step_id} missing 'agent' or 'function'")
     
             except Exception as e:
                 self._handle_step_error(step, step_id, visit_key, e)
     
-        # ——————————————————————————————————————————————————————————————————
-        # Branch‐only steps
+        # Explicitly store outputs regardless of conditional steps:
+        self.context['previous_output'] = output
+        self.context['step_outputs'][step_id] = output
+    
         if "output" in step:
             to_targets = step["output"].get("to", [])
             if not isinstance(to_targets, list):
@@ -695,15 +683,9 @@ class WorkflowExecutor:
                 await self._handle_output_async(step_id, step["output"], output, step)
                 if mark_visited:
                     self.context["visited_steps"].add(visit_key)
-                return
-    
-        # ——————————————————————————————————————————————————————————————————
-        # Normal save + output
-        self.context['previous_output']    = output
-        self.context['step_outputs'][step_id] = output
-    
-        if "output" in step:
-            await self._handle_output_async(step_id, step["output"], output, step)
+                return  # Important: return here explicitly after handling condition
+            else:
+                await self._handle_output_async(step_id, step["output"], output, step)
     
         if mark_visited:
             self.context["visited_steps"].add(visit_key)
@@ -896,8 +878,11 @@ class WorkflowExecutor:
             await asyncio.gather(*tasks)
 
     def _get_step_by_id(self, step_id: str) -> Dict:
-        return next((s for s in self._get_workflow(self.context["current_workflow_id"])["steps"] if s["id"] == step_id), {})
-
+        step = next((s for s in self._get_workflow(self.context["current_workflow_id"])["steps"] if s["id"] == step_id), None)
+        if not step:
+            raise ValueError(f"Workflow step '{step_id}' not found in current workflow.")
+        return step
+    
     def _execute_by_step_id(self, step_id: str, await_response: bool = True, mark_visited: bool = True, fan_key: Optional[str] = None):
         step = self._get_step_by_id(step_id)
         if step:
