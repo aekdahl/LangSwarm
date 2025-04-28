@@ -1,6 +1,7 @@
 # ToDo: Add field validation!
 
 import os
+import ast
 import sys
 import time
 import json
@@ -15,8 +16,9 @@ import nest_asyncio
 from pathlib import Path
 from jinja2 import Template
 from cerberus import Validator
-from typing import Dict, List, Optional, Union, Any
+from simpleeval import SimpleEval
 from inspect import signature, Parameter
+from typing import Dict, List, Optional, Union, Any
 
 # @v0.0.1
 from langswarm.core.factory.agents import AgentFactory
@@ -915,8 +917,10 @@ class WorkflowExecutor:
             self._execute_by_step_id(return_to)
 
     def _evaluate_condition(self, expr: str) -> bool:
+        s = SimpleEval(names=self.context)
         try:
-            return eval(expr, {}, self.context)
+            result = s.eval(expr)
+            return bool(result)
         except Exception as e:
             print(f"Condition eval error: {e}")
             return False
