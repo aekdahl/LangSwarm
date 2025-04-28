@@ -808,6 +808,9 @@ class WorkflowExecutor:
                         elif isinstance(branch, dict):
                             # It's a nested output → treat it as another output instruction
                             self._handle_output(step_id, {"to": branch}, output, step)
+                    
+                    # ✅ VERY IMPORTANT
+                    return  # STOP here — don't fall through and save 'True/False' as output
 
                 # 2d. {"generate_steps": ...}
                 elif "generate_steps" in target:
@@ -878,6 +881,9 @@ class WorkflowExecutor:
                             await self._execute_step_async(target_step)
                         elif isinstance(branch, dict):
                             await self._handle_output_async(step_id, {"to": branch}, output, step)
+    
+                    # ✅ VERY IMPORTANT
+                    return  # STOP here — don't fall through and save 'True/False' as output
 
                 elif "generate_steps" in target:
                     await self._run_generated_subflow_async(output, limit=target.get("limit"), return_to=target.get("return_to"))
