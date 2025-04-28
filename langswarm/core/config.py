@@ -403,6 +403,14 @@ class WorkflowExecutor:
         request_id = self.context.get("request_id", "")
         return f"{step['id']}@{fan_key}:{request_id}"
 
+    def _resolve_condition_branch(self, condition: dict) -> Optional[Any]:
+        if not isinstance(condition, dict) or "if" not in condition:
+            return None
+        if self._evaluate_condition(condition["if"]):
+            return condition.get("then")
+        else:
+            return condition.get("else")
+    
     def _recheck_pending_fanins(self):
         # ▶ First: figure out which fan‑in steps are now ready
         ready_to_run = []  # list of tuples (fan_key, fanin_id, fanin_step)
@@ -790,9 +798,8 @@ class WorkflowExecutor:
                     )
 
                 # 2c. {"condition": {...}}
-                elif "condition" in target:
-                    cond = target["condition"]
-                    branch = cond["then"] if self._evaluate_condition(cond["if"]) else cond.get("else")
+                elif isinstance(target, dict) and "condition" in target:
+                    branch = self._resolve_condition_branch(target.get("condition"))
                     if branch:
                         self._handle_output(step_id, {"to": branch}, output, step)
 
@@ -857,12 +864,10 @@ class WorkflowExecutor:
                 elif "invoke" in target:
                     await self._run_subflow_async(target['invoke'], output, await_response=target.get("await", False))
 
-                elif "condition" in target:
-                    condition = target["condition"]
-                    if self._evaluate_condition(condition["if"]):
-                        await self._handle_output_async(step_id, {"to": condition["then"]}, output, step)
-                    elif "else" in condition:
-                        await self._handle_output_async(step_id, {"to": condition["else"]}, output, step)
+                elif isinstance(target, dict) and "condition" in target:
+                    branch = self._resolve_condition_branch(target.get("condition"))
+                    if branch:
+                        await self._handle_output_async(step_id, {"to": branch}, output, step)
 
                 elif "generate_steps" in target:
                     await self._run_generated_subflow_async(output, limit=target.get("limit"), return_to=target.get("return_to"))
