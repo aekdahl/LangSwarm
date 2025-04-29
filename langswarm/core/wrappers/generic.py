@@ -345,8 +345,11 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
                             middleware_response, erase_query=erase_query, remove_linebreaks=remove_linebreaks)
                     parsed_json = self.utils.safe_json_loads(response.strip())
 
-                response = (parsed_json.get('response') 
-                            if isinstance(parsed_json, dict) and 'response' in parsed_json else parsed_json)
+                    # This is probably only valid for tool use, e.g. MCP
+                    response = (parsed_json.get('response') 
+                                if isinstance(parsed_json, dict) and 'response' in parsed_json else parsed_json)
+                else:
+                    return parsed_json
 
         return response
     
