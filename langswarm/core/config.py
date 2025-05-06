@@ -91,7 +91,6 @@ class LangSwarmConfigLoader:
         self.config_path = config_path
         self.config_data = {}
         self.agents = {}
-        self.intelligence = WorkflowIntelligence()
         self.retrievers = {}
         self.tools = {}
         self.plugins = {}
@@ -364,7 +363,8 @@ class WorkflowExecutor:
 
         first_step = workflow.get("steps", [])[0]
         return first_step
-    
+
+    @WorkflowIntelligence.track_workflow
     def run_workflow(self, workflow_id: str, user_input: str, tool_deployer = None):
         """Entry‑point that works BOTH in a normal script and in a notebook."""
         self.context['tool_deployer'] = tool_deployer # Used in MCP flows
@@ -996,6 +996,10 @@ class WorkflowExecutor:
 
         if not workflow:
             raise ValueError(f"Workflow '{workflow_id}' not found. Ensure your workflows.yaml file starts with:\n\nworkflows:\n   main_workflow:...")
+
+        # ⬇️ Grab intelligence settings if they exist in the workflow
+        settings = workflow.get("settings", {}).get("intelligence", {})
+        self.intelligence.config.update(settings)
 
         # Map fan_keys to steps
         fan_key_to_steps = {}
