@@ -3,9 +3,33 @@ import json
 import functools
 
 class WorkflowIntelligence:
-    def __init__(self):
-        self.step_data = {}  # step_id → info
-        self.step_order = []  # preserves execution order
+    def __init__(self, config: Optional[Dict] = None):
+        self.logs: List[Dict] = []
+        self.config = config or {}
+
+    @staticmethod
+    def track_workflow(func):
+        """Decorator to track the full workflow and report at the end."""
+    
+        @functools.wraps(func)
+        def sync_wrapper(executor, *args, **kwargs):
+            try:
+                result = func(executor, *args, **kwargs)
+                return result
+            finally:
+                executor.intelligence._maybe_report_and_log()
+                
+        @functools.wraps(func)
+        async def async_wrapper(executor, *args, **kwargs):
+            try:
+                result = await func(executor, *args, **kwargs)
+                return result
+            finally:
+                executor.intelligence._maybe_report_and_log()
+    
+        if asyncio.iscoroutinefunction(func):
+            return async_wrapper
+        return sync_wrapper
 
     @staticmethod
     def track_step(func):
@@ -89,3 +113,9 @@ class WorkflowIntelligence:
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(self.step_data, f, indent=2)
         print(f"📝 Report saved to {filename}")
+
+    def _maybe_report_and_log(self):
+        self.print_report()
+        if self.config.get("log_to_file", False):
+            out_path = self.config.get("log_file_path", "workflow_report.json")
+            self.log_to_file(out_path)
