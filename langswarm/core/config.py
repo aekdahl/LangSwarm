@@ -22,11 +22,9 @@ from typing import Dict, List, Optional, Union, Any
 
 # @v0.0.1
 from langswarm.core.factory.agents import AgentFactory
+from langswarm.core.utils.workflows.intelligence import WorkflowIntelligence
 
 # @v... Later...
-#from langswarm.memory.registry.rags import RAGRegistry
-#from langswarm.synapse.registry.tools import ToolRegistry
-#from langswarm.cortex.registry.plugins import PluginRegistry
 
 #from langswarm.memory.adapters.langswarm import ChromaDBAdapter
 #from langswarm.cortex.plugins.process_toolkit import ProcessToolkit
@@ -93,6 +91,7 @@ class LangSwarmConfigLoader:
         self.config_path = config_path
         self.config_data = {}
         self.agents = {}
+        self.intelligence = WorkflowIntelligence()
         self.retrievers = {}
         self.tools = {}
         self.plugins = {}
@@ -551,6 +550,7 @@ class WorkflowExecutor:
     async def _execute_step_async(self, step: Dict, mark_visited=True):
         return await self._execute_step_inner_async(step, mark_visited)
 
+    @WorkflowIntelligence.track_step
     def _execute_step_inner_sync(self, step: Dict, mark_visited: bool = True):
         if not step:
             return
@@ -623,6 +623,7 @@ class WorkflowExecutor:
         if step.get("fan_key"):
             self._recheck_pending_fanins()
 
+    @WorkflowIntelligence.track_step
     async def _execute_step_inner_async(self, step: Dict, mark_visited: bool = True):
         if not step:
             return
