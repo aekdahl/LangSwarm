@@ -13,6 +13,7 @@ class WorkflowIntelligence:
         self.errors = []              # ✅ <- collect any errors
         self.log_enabled = False
         self.log_path = None
+        self.step_data = {}
 
         # if config comes from workflow YAML, extract log settings
         workflow_settings = self.config.get("settings", {}).get("intelligence", {})
@@ -90,7 +91,7 @@ class WorkflowIntelligence:
             # Defensive: step may not have been registered
             self.start_step(step_id)
         end_time = time.time()
-        start_time = self.step_data[step_id]["start"]
+        start_time = self.step_data[step_id].get("start")
         self.step_data[step_id].update({
             "end": end_time,
             "duration": round(end_time - start_time, 3),
