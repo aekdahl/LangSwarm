@@ -1,6 +1,7 @@
 import time
 import json
 import functools
+from typing import Any, Dict, Optional
 
 class WorkflowIntelligence:
     def __init__(self, config: Optional[Dict] = None):
