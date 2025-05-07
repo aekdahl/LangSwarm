@@ -245,8 +245,9 @@ class LangSwarmConfigLoader:
     def _initialize_retrievers(self):
         for retriever in self.config_data.get("retrievers", []):
             self.retrievers[retriever["id"]] = self._initialize_component(retriever, ChromaDBAdapter)
-
+        
     def _initialize_tools(self):
+        self.tool_metadata = {}  # New dict for storing metadata explicitly
         for tool_cfg in self.config_data.get("tools", []):
             ttype = tool_cfg.get("type", "unknown").lower()
 
@@ -266,6 +267,10 @@ class LangSwarmConfigLoader:
 
             # build the instance
             self.tools[tool_cfg["id"]] = self._initialize_component(tool_cfg, cls)
+    
+            # explicitly store metadata
+            if "metadata" in tool_cfg:
+                self.tool_metadata[tool_cfg["id"]] = tool_cfg["metadata"]
 
     def _initialize_plugins(self):
         for plugin in self.config_data.get("plugins", []):
@@ -545,6 +550,18 @@ class WorkflowExecutor:
         }
         return self._run_loop_iteration(step["id"], step)
 
+    def _build_no_mcp_system_prompt(self, tools_metadata: dict):
+        prompt = "You are the Tool Selector. When you know which function to call, return exactly:\n\n"
+        prompt += '{ "name": "<function_name>", "args": { /* function args */ } }\n\n'
+        prompt += "Available functions:\n\n"
+    
+        for tid, meta in tools_metadata.items():
+            prompt += f"- **{tid}**: {meta['description']}\n"
+            prompt += json.dumps(meta['parameters'], indent=2)
+            prompt += "\n\n"
+    
+        return prompt
+
     def _execute_step(self, step: Dict, mark_visited=True):
         return self._execute_step_inner_sync(step, mark_visited)
 
@@ -573,6 +590,39 @@ class WorkflowExecutor:
             wf_id = step['invoke_workflow']
             inp = self._resolve_input(step.get("input"))
             output = self.run_workflow(wf_id, inp)
+        elif 'no_mcp' in step:
+            tools_to_use = step['no_mcp']['tools']
+            tools_metadata = {tid: self.tools_metadata[tid] for tid in tools_to_use}
+        
+            system_prompt = self._build_no_mcp_system_prompt(tools_metadata)
+        
+            # run agent chat
+            agent = self.agents[step['agent']]
+            agent_input = self._resolve_input(step.get("input"))
+            response = agent.chat(agent_input, system_prompt=system_prompt)
+        
+            # parse and dispatch automatically
+            payload = json.loads(response)
+            tool_name = payload['name']
+            args = payload.get('args', {})
+        
+            if tool_name in self.tools:
+                function = self.tools[tool_name]  # this is the initialized tool instance
+                result = function(**args)
+            else:
+                raise ValueError(f"Unknown tool selected by agent: {tool_name}")
+        
+            self.context['previous_output'] = result
+            self.context['step_outputs'][step['id']] = result
+        
+            if "output" in step:
+                self._handle_output(step['id'], step["output"], result, step)
+        
+            if mark_visited:
+                visit_key = self._get_visit_key(step)
+                self.context["visited_steps"].add(visit_key)
+        
+            return  # explicitly done here
         else:
             try:
                 if 'agent' in step:
@@ -642,6 +692,39 @@ class WorkflowExecutor:
             wf_id = step['invoke_workflow']
             inp   = self._resolve_input(step.get("input"))
             output = await self.run_workflow_async(wf_id, inp)
+        elif 'no_mcp' in step:
+            tools_to_use = step['no_mcp']['tools']
+            tools_metadata = {tid: self.tools_metadata[tid] for tid in tools_to_use}
+        
+            system_prompt = self._build_no_mcp_system_prompt(tools_metadata)
+        
+            # run agent chat
+            agent = self.agents[step['agent']]
+            agent_input = self._resolve_input(step.get("input"))
+            response = agent.chat(agent_input, system_prompt=system_prompt)
+        
+            # parse and dispatch automatically
+            payload = json.loads(response)
+            tool_name = payload['name']
+            args = payload.get('args', {})
+        
+            if tool_name in self.tools:
+                function = self.tools[tool_name]  # this is the initialized tool instance
+                result = function(**args)
+            else:
+                raise ValueError(f"Unknown tool selected by agent: {tool_name}")
+        
+            self.context['previous_output'] = result
+            self.context['step_outputs'][step['id']] = result
+        
+            if "output" in step:
+                self._handle_output(step['id'], step["output"], result, step)
+        
+            if mark_visited:
+                visit_key = self._get_visit_key(step)
+                self.context["visited_steps"].add(visit_key)
+        
+            return  # explicitly done here
         else:
             try:
                 if 'agent' in step:
