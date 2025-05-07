@@ -22,11 +22,9 @@ from typing import Dict, List, Optional, Union, Any
 
 # @v0.0.1
 from langswarm.core.factory.agents import AgentFactory
+from langswarm.core.utils.workflows.intelligence import WorkflowIntelligence
 
 # @v... Later...
-#from langswarm.memory.registry.rags import RAGRegistry
-#from langswarm.synapse.registry.tools import ToolRegistry
-#from langswarm.cortex.registry.plugins import PluginRegistry
 
 #from langswarm.memory.adapters.langswarm import ChromaDBAdapter
 #from langswarm.cortex.plugins.process_toolkit import ProcessToolkit
@@ -370,7 +368,8 @@ class WorkflowExecutor:
 
         first_step = workflow.get("steps", [])[0]
         return first_step
-    
+
+    @WorkflowIntelligence.track_workflow
     def run_workflow(self, workflow_id: str, user_input: str, tool_deployer = None):
         """Entry‑point that works BOTH in a normal script and in a notebook."""
         self.context['tool_deployer'] = tool_deployer # Used in MCP flows
@@ -568,6 +567,7 @@ class WorkflowExecutor:
     async def _execute_step_async(self, step: Dict, mark_visited=True):
         return await self._execute_step_inner_async(step, mark_visited)
 
+    @WorkflowIntelligence.track_step
     def _execute_step_inner_sync(self, step: Dict, mark_visited: bool = True):
         if not step:
             return
@@ -673,6 +673,7 @@ class WorkflowExecutor:
         if step.get("fan_key"):
             self._recheck_pending_fanins()
 
+    @WorkflowIntelligence.track_step
     async def _execute_step_inner_async(self, step: Dict, mark_visited: bool = True):
         if not step:
             return
@@ -1078,6 +1079,10 @@ class WorkflowExecutor:
 
         if not workflow:
             raise ValueError(f"Workflow '{workflow_id}' not found. Ensure your workflows.yaml file starts with:\n\nworkflows:\n   main_workflow:...")
+
+        # ⬇️ Grab intelligence settings if they exist in the workflow
+        settings = workflow.get("settings", {}).get("intelligence", {})
+        self.intelligence.config.update(settings)
 
         # Map fan_keys to steps
         fan_key_to_steps = {}
