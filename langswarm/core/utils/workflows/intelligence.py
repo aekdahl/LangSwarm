@@ -8,6 +8,16 @@ class WorkflowIntelligence:
     def __init__(self, config: Optional[Dict] = None):
         self.logs: List[Dict] = []
         self.config = config or {}
+        self.step_order = []          # ✅ <- initialize list
+        self.step_timings = {}        # ✅ <- e.g., {step_id: seconds}
+        self.errors = []              # ✅ <- collect any errors
+        self.log_enabled = False
+        self.log_path = None
+
+        # if config comes from workflow YAML, extract log settings
+        workflow_settings = self.config.get("settings", {}).get("intelligence", {})
+        self.log_enabled = workflow_settings.get("log_to_file", False)
+        self.log_path = workflow_settings.get("log_file_path", "workflow_report.json")
 
     @staticmethod
     def track_workflow(func):
