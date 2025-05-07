@@ -356,6 +356,8 @@ class WorkflowExecutor:
             'rollback_counters': {},
             'pending_fanins': {}  # 👈 must be initialized!
         }
+        settings = workflows.get("workflow_settings", {}).get("intelligence", {})
+        self.intelligence = WorkflowIntelligence(config=settings)
 
     def _run_workflow_inner(self, workflow_id: str, user_input: str):
         workflow = self._get_workflow(workflow_id)
