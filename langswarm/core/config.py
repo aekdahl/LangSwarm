@@ -652,7 +652,13 @@ Clarifications:
             tool_name = payload.get('tool', payload['name'])
             args = payload.get('args', {})
 
-            if tool_name in tools_metadata:
+            if tool_name in ['clarify', 'chat', 'unknown']:
+                result = args.get('prompt', args)
+                try:
+                    result = str(args.get('prompt', args))
+                except:
+                    result = str(args)
+            elif tool_name in tools_metadata:
                 func = self._resolve_function(tools_metadata[tool_name]['function'])
                 step_args = {k: self._resolve_input(v) for k, v in step.get("args", {}).items()}
                 args = {k: self._resolve_input(v) for k, v in args.items()}
@@ -764,7 +770,13 @@ Clarifications:
             tool_name = payload.get('tool', payload['name'])
             args = payload.get('args', {})
 
-            if tool_name in tools_metadata:
+            if tool_name in ['clarify', 'chat', 'unknown']:
+                result = args.get('prompt', args)
+                try:
+                    result = str(args.get('prompt', args))
+                except:
+                    result = str(args)
+            elif tool_name in tools_metadata:
                 func = self._resolve_function(tools_metadata[tool_name]['function'])
                 step_args = {k: self._resolve_input(v) for k, v in step.get("args", {}).items()}
                 args = {k: self._resolve_input(v) for k, v in args.items()}
