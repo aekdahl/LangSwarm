@@ -607,24 +607,30 @@ class WorkflowExecutor:
             inp = self._resolve_input(step.get("input"))
             output = self.run_workflow(wf_id, inp)
         elif 'no_mcp' in step:
+            print('Running no_mcp')
             tools_to_use = step['no_mcp']['tools']
             tools_metadata = {tid: self.tools_metadata[tid] for tid in tools_to_use}
         
             system_prompt = self._build_no_mcp_system_prompt(tools_metadata)
+            print('System prompt no_mcp:', system_prompt)
         
             # run agent chat
             agent = self.agents[step['agent']]
             agent_input = self._resolve_input(step.get("input"))
             response = agent.chat(agent_input, system_prompt=system_prompt)
+            print('Select no_mcp tool: ', response)
         
             # parse and dispatch automatically
             payload = json.loads(response)
             tool_name = payload['name']
             args = payload.get('args', {})
-        
-            if tool_name in self.tools:
-                function = self.tools[tool_name]  # this is the initialized tool instance
-                result = function(**args)
+
+            if tool_name in tools_metadata:
+                func = self._resolve_function(tools_metadata['function'])
+                args = {k: self._resolve_input(v) for k, v in args.items()}
+                args.setdefault("context", self.context)
+                args = {**args, **step_args}  # step args take precedence
+                result = func(**args)
             else:
                 raise ValueError(f"Unknown tool selected by agent: {tool_name}")
         
@@ -724,10 +730,13 @@ class WorkflowExecutor:
             payload = json.loads(response)
             tool_name = payload['name']
             args = payload.get('args', {})
-        
-            if tool_name in self.tools:
-                function = self.tools[tool_name]  # this is the initialized tool instance
-                result = function(**args)
+
+            if tool_name in tools_metadata:
+                func = self._resolve_function(tools_metadata['function'])
+                args = {k: self._resolve_input(v) for k, v in args.items()}
+                args.setdefault("context", self.context)
+                args = {**args, **step_args}  # step args take precedence
+                result = func(**args)
             else:
                 raise ValueError(f"Unknown tool selected by agent: {tool_name}")
         
