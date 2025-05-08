@@ -636,16 +636,20 @@ Clarifications:
             tools_metadata = {tid: self.tools_metadata[tid] for tid in tools_to_use}
         
             system_prompt = self._build_no_mcp_system_prompt(tools_metadata)
-            print('System prompt no_mcp:', system_prompt)
         
             # run agent chat
             agent = self.agents[step['agent']]
+            agent.update_system_prompt(system_prompt=system_prompt)
             agent_input = self._resolve_input(step.get("input"))
-            response = agent.chat(agent_input, system_prompt=system_prompt)
+            response = agent.chat(agent_input)
             print('Select no_mcp tool: ', response)
         
             # parse and dispatch automatically
-            payload = json.loads(response)
+            try:
+                payload = json.loads(response)
+            except:
+                payload = response
+                
             tool_name = payload['name']
             args = payload.get('args', {})
 
@@ -747,11 +751,16 @@ Clarifications:
         
             # run agent chat
             agent = self.agents[step['agent']]
+            agent.update_system_prompt(system_prompt=system_prompt)
             agent_input = self._resolve_input(step.get("input"))
-            response = agent.chat(agent_input, system_prompt=system_prompt)
+            response = agent.chat(agent_input)
         
             # parse and dispatch automatically
-            payload = json.loads(response)
+            try:
+                payload = json.loads(response)
+            except:
+                payload = response
+                
             tool_name = payload['name']
             args = payload.get('args', {})
 
