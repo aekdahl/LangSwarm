@@ -93,7 +93,7 @@ class LangSwarmConfigLoader:
         self.agents = {}
         self.retrievers = {}
         self.tools = {}
-        self. = {}
+        self.tools_metadata = {}
         self.plugins = {}
         self.brokers = {}
         # this will hold type_name → class mappings
