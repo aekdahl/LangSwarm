@@ -653,7 +653,8 @@ Clarifications:
             args = payload.get('args', {})
 
             if tool_name in tools_metadata:
-                func = self._resolve_function(tools_metadata['function'])
+                func = self._resolve_function(tools_metadata[tool_name]['function'])
+                step_args = {k: self._resolve_input(v) for k, v in step.get("args", {}).items()}
                 args = {k: self._resolve_input(v) for k, v in args.items()}
                 args.setdefault("context", self.context)
                 args = {**args, **step_args}  # step args take precedence
@@ -764,7 +765,8 @@ Clarifications:
             args = payload.get('args', {})
 
             if tool_name in tools_metadata:
-                func = self._resolve_function(tools_metadata['function'])
+                func = self._resolve_function(tools_metadata[tool_name]['function'])
+                step_args = {k: self._resolve_input(v) for k, v in step.get("args", {}).items()}
                 args = {k: self._resolve_input(v) for k, v in args.items()}
                 args.setdefault("context", self.context)
                 args = {**args, **step_args}  # step args take precedence
