@@ -573,15 +573,16 @@ You are TimeBot’s “tool selector” assistant. Your job is solely to decide 
 
 When given a user message, you must:
 1. Map it unambiguously to exactly one of the available tools (see list below).
+2. Pass the tools id as the name parameter in the reply.
 2. Extract and normalize the required parameters for that tool.
 3. Return a single JSON object with fields:
-   - "tool": a string naming the function to call (must match one of the keys below)
+   - "name": a string naming the function to call (must match one of the keys below)
    - "args": an object providing exactly the parameters that function expects
         """
         prompt += '{ "name": "<function_name>", "args": { /* function args */ } }\n\n'
         prompt += """
 If any required parameter is missing or ambiguous, instead return:
-{"tool": "clarify", "args": { "prompt": "<a single, clear follow-up question>" }}
+{"name": "clarify", "args": { "prompt": "<a single, clear follow-up question>" }}
         """
         prompt += "Available functions:\n\n"
     
@@ -631,7 +632,6 @@ Clarifications:
             inp = self._resolve_input(step.get("input"))
             output = self.run_workflow(wf_id, inp)
         elif 'no_mcp' in step:
-            print('Running no_mcp')
             tools_to_use = step['no_mcp']['tools']
             tools_metadata = {tid: self.tools_metadata[tid] for tid in tools_to_use}
         
@@ -642,7 +642,6 @@ Clarifications:
             agent.update_system_prompt(system_prompt=system_prompt)
             agent_input = self._resolve_input(step.get("input"))
             response = agent.chat(agent_input)
-            print('Select no_mcp tool: ', response)
         
             # parse and dispatch automatically
             try:
@@ -650,7 +649,7 @@ Clarifications:
             except:
                 payload = response
                 
-            tool_name = payload['name']
+            tool_name = payload.get('tool', payload['name'])
             args = payload.get('args', {})
 
             if tool_name in tools_metadata:
@@ -761,7 +760,7 @@ Clarifications:
             except:
                 payload = response
                 
-            tool_name = payload['name']
+            tool_name = payload.get('tool', payload['name'])
             args = payload.get('args', {})
 
             if tool_name in tools_metadata:
