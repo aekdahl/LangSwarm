@@ -93,6 +93,7 @@ class LangSwarmConfigLoader:
         self.agents = {}
         self.retrievers = {}
         self.tools = {}
+        self. = {}
         self.plugins = {}
         self.brokers = {}
         # this will hold type_name → class mappings
@@ -123,7 +124,13 @@ class LangSwarmConfigLoader:
         self._initialize_tools()
         self._initialize_plugins()
         self._initialize_agents()
-        return self.config_data.get('workflows', {}), self.agents, self.brokers, self.config_data.get('tools', [])
+        return (
+            self.config_data.get('workflows', {}), 
+            self.agents, 
+            self.brokers, 
+            self.config_data.get('tools', []),
+            self.
+        )
 
     def _load_secrets(self):
         secrets_path = os.path.join(self.config_path, "secrets.yaml")
@@ -245,13 +252,13 @@ class LangSwarmConfigLoader:
             self.retrievers[retriever["id"]] = self._initialize_component(retriever, ChromaDBAdapter)
         
     def _initialize_tools(self):
-        self.tool_metadata = {}  # New dict for storing metadata explicitly
+        self.tools_metadata = {}  # New dict for storing metadata explicitly
         for tool_cfg in self.config_data.get("tools", []):
             ttype = tool_cfg.get("type", "unknown").lower()
 
             # Always store metadata, even if no class is found
             if "metadata" in tool_cfg:
-                self.tool_metadata[tool_cfg["id"]] = tool_cfg["metadata"]
+                self.tools_metadata[tool_cfg["id"]] = tool_cfg["metadata"]
         
             # Skip actual instantiation for function-type
             if ttype == "function":
@@ -364,6 +371,7 @@ class WorkflowExecutor:
         }
         settings = workflows.get("workflow_settings", {}).get("intelligence", {})
         self.intelligence = WorkflowIntelligence(config=settings)
+        self.tools_metadata = tools_metadata or {}
 
     def _run_workflow_inner(self, workflow_id: str, user_input: str):
         workflow = self._get_workflow(workflow_id)
