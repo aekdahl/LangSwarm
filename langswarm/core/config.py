@@ -129,7 +129,7 @@ class LangSwarmConfigLoader:
             self.agents, 
             self.brokers, 
             self.config_data.get('tools', []),
-            self.
+            self.tools_metadata
         )
 
     def _load_secrets(self):
