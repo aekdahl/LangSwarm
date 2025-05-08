@@ -249,6 +249,15 @@ class LangSwarmConfigLoader:
         for tool_cfg in self.config_data.get("tools", []):
             ttype = tool_cfg.get("type", "unknown").lower()
 
+            # Always store metadata, even if no class is found
+            if "metadata" in tool_cfg:
+                self.tool_metadata[tool_cfg["id"]] = tool_cfg["metadata"]
+        
+            # Skip actual instantiation for function-type
+            if ttype == "function":
+                print(f"ℹ️ Skipping '{ttype}' entry — not a tool, only metadata registered.")
+                continue
+
             # 1) see if user explicitly pointed at a class path
             if "class" in tool_cfg:
                 module_path, class_name = tool_cfg["class"].rsplit(".", 1)
@@ -266,9 +275,6 @@ class LangSwarmConfigLoader:
             # build the instance
             self.tools[tool_cfg["id"]] = self._initialize_component(tool_cfg, cls)
     
-            # explicitly store metadata
-            if "metadata" in tool_cfg:
-                self.tool_metadata[tool_cfg["id"]] = tool_cfg["metadata"]
 
     def _initialize_plugins(self):
         for plugin in self.config_data.get("plugins", []):
