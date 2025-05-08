@@ -359,7 +359,7 @@ class LangSwarmConfigLoader:
 
 
 class WorkflowExecutor:
-    def __init__(self, workflows: Dict, agents: Dict):
+    def __init__(self, workflows: Dict, agents: Dict, tools_metadata: Dict = None):
         self.workflows = workflows
         self.agents = agents
         self.context = {
