@@ -566,14 +566,38 @@ class WorkflowExecutor:
         return self._run_loop_iteration(step["id"], step)
 
     def _build_no_mcp_system_prompt(self, tools_metadata: dict):
-        prompt = "You are the Tool Selector. When you know which function to call, return exactly:\n\n"
+        prompt = """
+You are TimeBot’s “tool selector” assistant. Your job is solely to decide which backend function (TimeBot “tool”) should handle the user’s request, and with what arguments.
+
+❗ You do NOT execute the function yourself, do NOT return conversational text, and do NOT explain your reasoning: you only emit JSON pointing to the right tool call.
+
+When given a user message, you must:
+1. Map it unambiguously to exactly one of the available tools (see list below).
+2. Extract and normalize the required parameters for that tool.
+3. Return a single JSON object with fields:
+   - "tool": a string naming the function to call (must match one of the keys below)
+   - "args": an object providing exactly the parameters that function expects
+        """
         prompt += '{ "name": "<function_name>", "args": { /* function args */ } }\n\n'
+        prompt += """
+If any required parameter is missing or ambiguous, instead return:
+{"tool": "clarify", "args": { "prompt": "<a single, clear follow-up question>" }}
+        """
         prompt += "Available functions:\n\n"
     
         for tid, meta in tools_metadata.items():
             prompt += f"- **{tid}**: {meta['description']}\n"
             prompt += json.dumps(meta['parameters'], indent=2)
             prompt += "\n\n"
+
+        prompt += "---\n\n"
+        prompt += """
+Clarifications:
+- Only emit one JSON object; do not include any explanatory text.
+- If you have enough information, choose the precise tool and fill all required parameters.
+- If you’re uncertain which tool or missing required data, use the clarify spec above.
+- ALWAYS return pure JSON.
+        """
     
         return prompt
 
