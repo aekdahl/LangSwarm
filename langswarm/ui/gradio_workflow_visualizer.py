@@ -1,43 +1,37 @@
-# gradio_workflow_visualizer.py
+### gradio_workflow_visualizer.py (Class-based)
 import gradio as gr
-import yaml
 import networkx as nx
 import matplotlib.pyplot as plt
+yaml
 
+class GradioWorkflowVisualizer:
+    def __init__(self, workflow_config):
+        self.workflow_config = workflow_config
+        self.graph = self.build_graph()
 
-def visualize_workflow(yaml_text):
-    workflows = yaml.safe_load(yaml_text)
-    G = nx.DiGraph()
-    
-    main_wf = workflows.get('workflows', {}).get('main_workflow', [])
-    for wf in main_wf:
-        steps = wf.get('steps', [])
+    def build_graph(self):
+        G = nx.DiGraph()
+        steps = self.workflow_config.get('steps', [])
         for step in steps:
-            step_id = step['id']
-            G.add_node(step_id)
+            G.add_node(step['id'])
             outputs = step.get('output', {}).get('to', [])
             if isinstance(outputs, str):
                 outputs = [outputs]
             for target in outputs:
                 if isinstance(target, str):
-                    G.add_edge(step_id, target)
-                elif isinstance(target, dict) and 'step' in target:
-                    G.add_edge(step_id, target['step'])
+                    G.add_edge(step['id'], target)
+        return G
 
-    pos = nx.spring_layout(G)
-    plt.figure(figsize=(12, 8))
-    nx.draw(G, pos, with_labels=True, node_size=2000, node_color='lightgreen', font_size=10, font_weight='bold', arrows=True)
-    plt.savefig("workflow_graph.png")
-    plt.close()
-    return "workflow_graph.png"
+    def plot_graph(self):
+        plt.figure(figsize=(10, 6))
+        pos = nx.spring_layout(self.graph)
+        nx.draw(self.graph, pos, with_labels=True, node_color='lightblue', node_size=2000, font_size=10)
+        plt.show()
 
+    def launch(self):
+        def visualize():
+            self.plot_graph()
+            return "Graph rendered"
 
-demo = gr.Interface(
-    fn=visualize_workflow,
-    inputs=gr.Textbox(lines=20, placeholder="Paste your workflow YAML here..."),
-    outputs=gr.Image(type="filepath"),
-    title="Workflow Visualizer (Gradio)",
-    description="Paste your YAML and visualize the workflow as a graph."
-)
-
-demo.launch()
+        iface = gr.Interface(fn=visualize, inputs=[], outputs="text")
+        iface.launch()
