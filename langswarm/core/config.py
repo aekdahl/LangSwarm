@@ -588,7 +588,7 @@ If any required parameter is missing or ambiguous, instead return:
     
         for tid, meta in tools_metadata.items():
             prompt += f"- **{tid}**: {meta['description']}\n"
-            prompt += json.dumps(meta['parameters'], indent=2)
+            prompt += json.dumps(meta.get('parameters', {}), indent=2)
             prompt += "\n\n"
 
         prompt += "---\n\n"
