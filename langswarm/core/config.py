@@ -338,7 +338,7 @@ class LangSwarmConfigLoader:
     def _render_system_prompt(self, agent):
         template_path = 'templates/system_prompt_template.md'
         if not os.path.exists(template_path):
-            return agent.get("system_prompt", "")
+            return f'{agent.get("prepend_system_prompt", "")}\n\n{agent.get("system_prompt", "")}\n\n{agent.get("append_system_prompt", "")}'
 
         with open(template_path, "r", encoding="utf-8") as f:
             template_str = f.read()
@@ -351,7 +351,9 @@ class LangSwarmConfigLoader:
             ]
 
         return template.render(
-            system_prompt=agent.get("system_prompt"),
+            prepend_system_prompt=agent.get("prepend_system_prompt", ""),
+            system_prompt=agent.get("system_prompt", ""),
+            append_system_prompt=agent.get("append_system_prompt", ""),
             retrievers=_lookup_many(agent.get("retrievers", []), self.retrievers),
             tools=_lookup_many(agent.get("tools", []), self.tools),
             plugins=_lookup_many(agent.get("plugins", []), self.plugins)
