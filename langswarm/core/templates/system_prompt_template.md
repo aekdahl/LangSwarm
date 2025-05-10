@@ -1,5 +1,13 @@
+{% if prepend_system_prompt %}
+{{ prepend_system_prompt }}
+{% endif %}
+
 {% if system_prompt %}
 {{ system_prompt }}
+{% endif %}
+
+{% if append_system_prompt %}
+{{ append_system_prompt }}
 {% endif %}
 
 {% if retrievers %}
