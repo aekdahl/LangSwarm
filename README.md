@@ -1,80 +1,123 @@
 # LangSwarm
 
-LangSwarm is a multi-agent ecosystem that enables collaboration, decision-making, and self-improvement for language models, reinforcement learning (RL), and autonomous systems. Designed to grow with your needs, LangSwarm provides modular tools to tackle complex tasks efficiently and intelligently.
-
-## Key Features
-- **Agent Collaboration**: Lay the groundwork for multi-agent communication and coordination.
-- **Custom Workflows**: Flexible architecture for distributed problem-solving.
-- **Modularity**: Build on LangSwarm-Core and seamlessly integrate upcoming tools like Cortex and Synapse.
-
-## Sub-Packages
-LangSwarm is modular by design. Currently, the ecosystem includes:
-
-### **LangSwarm-Core**
-The foundation of LangSwarm, providing essential features for:
-- Basic agent collaboration.
-- Prototyping multi-agent systems.
-- Preparing for integration with advanced modules.
-
-#### Coming Soon:
-- **LangSwarm-Cortex**: Manage short- and long-term memory, and enable self-reflection for agents.
-- **LangSwarm-Synapse**: Implement consensus, aggregation, voting, and branching for distributed decision-making.
-- **LangSwarm-Profiler**: Analyze and optimize LLMs, agents, and prompts.
-- **LangSwarm-Memory**: Cross-agent centralized memory solutions.
-- **LangSwarm-RL**: Reinforcement learning-based orchestration for workflows and agent selection.
-
-## Installation
-Install the main LangSwarm package to get started:
-```bash
-pip install langswarm
-```
-
-Or install specific sub-packages as they are released (e.g., Cortex, Synapse):
-```bash
-pip install langswarm-core
-```
-
-## Usage
-Here’s a quick example to get started with LangSwarm-Core:
-```python
-from langswarm.core import Agent
-
-# Define a simple agent
-def example_task(data):
-    return f"Processed: {data}"
-
-agent = Agent(name="ExampleAgent", task=example_task)
-
-# Run the agent
-data = "Hello, LangSwarm!"
-result = agent.run(data)
-print(result)  # Output: Processed: Hello, LangSwarm!
-```
-
-Explore detailed examples and documentation on the [LangSwarm GitHub Repository](https://github.com/your-repo/langswarm).
-
-## Roadmap
-LangSwarm is an evolving ecosystem. Here’s what’s next:
-1. **Cortex** – Memory and self-reflection tools for agent autonomy.
-2. **Synapse** – Decision-making and consensus mechanisms.
-3. **Profiler** – Tools for analyzing and optimizing agents and prompts.
-4. **Memory** – Centralized memory management for cross-agent systems.
-5. **RL** – Dynamic orchestration using reinforcement learning.
-
-## Community
-We value your feedback and collaboration! Join the LangSwarm community to:
-- Experiment with LangSwarm-Core.
-- Share your use cases and ideas.
-- Contribute to the development of the ecosystem.
-
-Stay updated and connect with us:
-- [Twitter](https://twitter.com/your-profile)
-- [Discord](https://discord.gg/your-server)
-- [GitHub Issues](https://github.com/your-repo/langswarm/issues)
-
-## License
-LangSwarm is open-source and available under the [MIT License](LICENSE).
+LangSwarm is a modular multi-agent framework designed to coordinate large language model (LLM) agents in structured, goal-oriented workflows. This early-stage release (v0.0.37) offers a lightweight version focused on YAML-driven configuration, agent registration, and core workflow execution across multiple communication channels.
 
 ---
 
-Together, let’s build the future of collaborative, autonomous systems. Welcome to LangSwarm!
+## 🚀 Features
+
+- 🧠 **Agent Management**: Register and instantiate agents from YAML configuration.
+- 🔀 **Workflow Engine**: Fan-in and fan-out orchestration, with support for subflows and output routing.
+- 🛠️ **Tooling System**: Early support for tools and step-level processing in workflows.
+- 📦 **Modular Architecture**:
+  - `core/`: Configuration, agent factory, workflow, utilities
+  - `memory/`: Memory adapters and wrappers (stubbed for future use)
+  - `synapse/`: Tools and MCP
+  - `ui/`: Gateway integrations for Slack, Telegram, Discord, Twilio, and more
+- 🧪 **Extensible by Design**: Clean separation of agent roles, message protocols, memory, and utilities.
+- 🔌 **Multi-Channel Support**: UI gateway code includes integrations for common messaging platforms.
+
+---
+
+## 🗂️ Project Structure
+
+```plaintext
+langswarm/
+├── core/           # Agent loading, workflow engine, registry
+├── memory/         # Placeholder for memory adapters and wrappers
+├── synapse/        # Tools and MCP
+├── ui/             # Multi-platform gateways (Slack, Telegram, Discord, Twilio, etc.)
+tests/              # Pytest-based test suite
+```
+
+## ⚙️ Installation
+```bash
+git clone https://github.com/your-org/langswarm.git
+cd langswarm
+pip install -r requirements.txt
+```
+Python 3.10+ recommended
+
+## 🧪 Usage
+### 1. Define Your Agents and Workflows
+Create or modify YAML configuration files:
+
+- agents.yaml
+- workflows.yaml
+- tools.yaml
+- etc.
+  
+### 2. Run from Python
+```python
+from langswarm.core.config import load_config
+from langswarm.core.factory.agents import create
+
+# Load agents and workflow from YAML
+cfg = load_config("targets/")
+agents = create(cfg.agents)
+```
+
+### 3. Start a Chatbot Gateway (e.g. Telegram)
+```bash
+python langswarm/ui/telegram_gateway.py
+Other gateways:
+
+slack_gateway.py
+discord_gateway.py
+twilio_gateway.py
+dialogflow.py
+...
+
+```
+Ensure the appropriate credentials or API keys are set via environment variables.
+
+## 📄 Example YAML
+agents.yaml:
+```yaml
+agents:
+  - id: summarizer
+    type: openai
+    model: gpt-4
+    system_prompt: "You are a helpful summarizer."
+```
+
+workflows.yaml:
+```yaml
+workflows:
+  - id: summarize_and_reply
+    steps:
+      - agent: summarizer
+        input: user_message
+        output_to: user
+```
+
+## ✅ Current Status (v0.0.37)
+| Component       | Status                                 |
+| --------------- | -------------------------------------- |
+| Agent Registry  | ✅ Stable                               |
+| YAML Support    | ✅ Complete                             |
+| Workflow Engine | ✅ Fan-in/out, Routing                  |
+| UI Gateways     | 🟡 Working (requires manual key setup) |
+| Tools Support   | 🟡 Present but minimal                 |
+| Memory Support  | 🔲 Stub only                           |
+| Web Dashboard   | 🔲 Not included                        |
+
+## 🛠 Developer Setup
+```bash
+pytest tests/
+```
+
+To regenerate requirements:
+```bash
+pip install pipreqs
+pipreqs . --force
+```
+
+To build distributions:
+```bash
+python -m build
+```
+
+## 📄 License
+This project is licensed under the MIT License. See the LICENSE file for more details.
+
