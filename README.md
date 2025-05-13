@@ -47,17 +47,6 @@ LangSwarm is unopinionated:
 LangSwarm includes a global logging system that unifies output across agents, tools, workflows, and gateways. It automatically captures step context, making debugging and monitoring easier — even in distributed, multi-agent flows.
 
 
-## 🗂️ Project Structure
-
-```plaintext
-langswarm/
-├── core/           # Agent loading, workflow engine, registry
-├── memory/         # Placeholder for memory adapters and wrappers
-├── synapse/        # Tools and MCP
-├── ui/             # Multi-platform gateways (Slack, Telegram, Discord, Twilio, etc.)
-tests/              # Pytest-based test suite
-```
-
 ## ⚙️ Installation
 Install from PyPI:
 
