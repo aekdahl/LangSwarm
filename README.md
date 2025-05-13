@@ -1,6 +1,6 @@
 # LangSwarm
 
-LangSwarm is a modular multi-agent framework designed to coordinate large language model (LLM) agents in structured, goal-oriented workflows. This early-stage release (v0.0.37) offers a lightweight version focused on YAML-driven configuration, agent registration, and core workflow execution across multiple communication channels.
+LangSwarm is a modular multi-agent framework designed to coordinate large language model (LLM) agents in structured, goal-oriented workflows. This early-stage release offers a lightweight version focused on YAML-driven configuration, agent registration, and core workflow execution across multiple communication channels.
 
 
 
