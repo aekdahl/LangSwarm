@@ -39,7 +39,7 @@ _You may also use LangSwarm components in LangChain_
 
 LangSwarm is unopinionated:
 
-* Add your own agents using OpenAI, Claude, Hugging Face, LangChain, or anything else
+* Add your own agents using OpenAI, Claude, Hugging Face, LangChain, and more
 * Register custom tools with minimal wrapper logic
 * Use YAML or Python to inject external logic at any point
 
