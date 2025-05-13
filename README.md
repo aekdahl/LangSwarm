@@ -89,13 +89,19 @@ workflows:
         steps:
           - id: summarize_text
             agent: summarizer
-            input: ${context.user_input}
+            input: |
+                  Please summarize the below article and
+                  list the most important key points.
+
+                  Article: {{ context.user_input }}
             output:
                 to: review_summary
 
           - id: review_summary
             agent: reviewer
             input: |
+                  Review the summary and make sure no key points are missed.
+
                   User provided article: {{ context.user_input }}
                   Summary: {{ context.step_outputs.summarize_text }}
             output:
@@ -115,7 +121,7 @@ agents:
     model: gpt-4o-mini-2024-07-18
     system_prompt: |
         You are a summary reviewer.
-        Make sure that no key points are missing from the original article.
+        You are responsible to flag incorrect summaries.
 ```
   
 ### 2. Run from Python
