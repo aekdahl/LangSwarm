@@ -633,54 +633,70 @@ Clarifications:
             wf_id = step['invoke_workflow']
             inp = self._resolve_input(step.get("input"))
             output = self.run_workflow(wf_id, inp)
+
         elif 'no_mcp' in step:
             tools_to_use = step['no_mcp']['tools']
-            tools_metadata = {tid: self.tools_metadata[tid] for tid in tools_to_use}
+        
+            # Normalize to dict format with optional 'to' field
+            tool_entries = [t if isinstance(t, dict) else {"name": t} for t in tools_to_use]
+            tool_ids = [t["name"] for t in tool_entries]
+            tools_metadata = {tid: self.tools_metadata[tid] for tid in tool_ids if tid in self.tools_metadata]
         
             system_prompt = self._build_no_mcp_system_prompt(tools_metadata)
         
-            # run agent chat
             agent = self.agents[step['agent']]
             agent.update_system_prompt(system_prompt=system_prompt)
             agent_input = self._resolve_input(step.get("input"))
             response = agent.chat(agent_input)
         
-            # parse and dispatch automatically
             try:
                 payload = json.loads(response)
             except:
                 payload = response
-                
-            tool_name = payload.get('tool', payload['name'])
-            args = payload.get('args', {})
-
-            if tool_name in ['clarify', 'chat', 'unknown']:
-                result = args.get('prompt', args)
+        
+            tool_name = payload.get("tool", payload.get("name"))
+            args = payload.get("args", {})
+        
+            if tool_name in ["clarify", "chat", "unknown"]:
+                result = args.get("prompt", args)
                 try:
-                    result = str(args.get('prompt', args))
+                    result = str(result)
                 except:
                     result = str(args)
+                output_payload = result
             elif tool_name in tools_metadata:
                 func = self._resolve_function(tools_metadata[tool_name]['function'])
                 step_args = {k: self._resolve_input(v) for k, v in step.get("args", {}).items()}
                 args = {k: self._resolve_input(v) for k, v in args.items()}
                 args.setdefault("context", self.context)
                 args = {**args, **step_args}  # step args take precedence
+        
                 result = func(**args)
+                output_payload = result 
+                #{
+                #    "tool": tool_name,
+                #    "args": args,
+                #    "result": result
+                #}
             else:
                 raise ValueError(f"Unknown tool selected by agent: {tool_name}")
         
-            self.context['previous_output'] = result
-            self.context['step_outputs'][step['id']] = result
+            self.context['previous_output'] = output_payload
+            self.context['step_outputs'][step['id']] = output_payload
         
-            if "output" in step:
-                self._handle_output(step['id'], step["output"], result, step)
+            # Select output override from tool
+            target_override = next((t.get("to") for t in tool_entries if t.get("name") == tool_name and "to" in t), None)
+            output_def = step.get("output", {})
+            if target_override:
+                output_def = {**output_def, "to": target_override}
+        
+            self._handle_output(step['id'], output_def, output_payload, step)
         
             if mark_visited:
                 visit_key = self._get_visit_key(step)
                 self.context["visited_steps"].add(visit_key)
         
-            return  # explicitly done here
+            return  # done
         else:
             try:
                 if 'agent' in step:
@@ -751,54 +767,70 @@ Clarifications:
             wf_id = step['invoke_workflow']
             inp   = self._resolve_input(step.get("input"))
             output = await self.run_workflow_async(wf_id, inp)
+            
         elif 'no_mcp' in step:
             tools_to_use = step['no_mcp']['tools']
-            tools_metadata = {tid: self.tools_metadata[tid] for tid in tools_to_use}
+        
+            # Normalize to dict format with optional 'to' field
+            tool_entries = [t if isinstance(t, dict) else {"name": t} for t in tools_to_use]
+            tool_ids = [t["name"] for t in tool_entries]
+            tools_metadata = {tid: self.tools_metadata[tid] for tid in tool_ids if tid in self.tools_metadata]
         
             system_prompt = self._build_no_mcp_system_prompt(tools_metadata)
         
-            # run agent chat
             agent = self.agents[step['agent']]
             agent.update_system_prompt(system_prompt=system_prompt)
             agent_input = self._resolve_input(step.get("input"))
             response = agent.chat(agent_input)
         
-            # parse and dispatch automatically
             try:
                 payload = json.loads(response)
             except:
                 payload = response
-                
-            tool_name = payload.get('tool', payload['name'])
-            args = payload.get('args', {})
-
-            if tool_name in ['clarify', 'chat', 'unknown']:
-                result = args.get('prompt', args)
+        
+            tool_name = payload.get("tool", payload.get("name"))
+            args = payload.get("args", {})
+        
+            if tool_name in ["clarify", "chat", "unknown"]:
+                result = args.get("prompt", args)
                 try:
-                    result = str(args.get('prompt', args))
+                    result = str(result)
                 except:
                     result = str(args)
+                output_payload = result
             elif tool_name in tools_metadata:
                 func = self._resolve_function(tools_metadata[tool_name]['function'])
                 step_args = {k: self._resolve_input(v) for k, v in step.get("args", {}).items()}
                 args = {k: self._resolve_input(v) for k, v in args.items()}
                 args.setdefault("context", self.context)
                 args = {**args, **step_args}  # step args take precedence
+        
                 result = func(**args)
+                output_payload = result 
+                #{
+                #    "tool": tool_name,
+                #    "args": args,
+                #    "result": result
+                #}
             else:
                 raise ValueError(f"Unknown tool selected by agent: {tool_name}")
         
-            self.context['previous_output'] = result
-            self.context['step_outputs'][step['id']] = result
+            self.context['previous_output'] = output_payload
+            self.context['step_outputs'][step['id']] = output_payload
         
-            if "output" in step:
-                self._handle_output(step['id'], step["output"], result, step)
+            # Select output override from tool
+            target_override = next((t.get("to") for t in tool_entries if t.get("name") == tool_name and "to" in t), None)
+            output_def = step.get("output", {})
+            if target_override:
+                output_def = {**output_def, "to": target_override}
+        
+            self._handle_output(step['id'], output_def, output_payload, step)
         
             if mark_visited:
                 visit_key = self._get_visit_key(step)
                 self.context["visited_steps"].add(visit_key)
         
-            return  # explicitly done here
+            return  # done
         else:
             try:
                 if 'agent' in step:
