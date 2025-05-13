@@ -137,27 +137,28 @@ result = executor.run_workflow("my_workflow_id", user_input=user_message)
 
 LangSwarm is designed to be modular, extensible, and transparent — and we're just getting started.
 
-| Feature                      | Description                                                                      | Status          |
-| ---------------------------- | -------------------------------------------------------------------------------- | --------------- |
-| 🧠 Agent Registry            | Register and configure agents (OpenAI, Claude, Hugging Face, LangChain, custom)  | ✅ Stable        |
-| 🔁 Workflow Engine           | Multi-step orchestration with fan-in/out, retries, async execution, and routing  | ✅ Stable        |
-| 🧩 Subflows & Loops          | Define nested workflows, conditionals, and iterative step logic                  | ✅ Stable        |
-| ⚡ Async Fan-out              | Run agents and tools in parallel using asyncio                                   | ✅ Stable        |
-| 🧠 LangChain Integration     | Use LangChain agents, tools, retrievers, and chains inside workflows             | ✅ Stable        |
-| 📚 LlamaIndex Integration    | Add LlamaIndex agents, RAG pipelines, and retrieval tools                        | ✅ Stable        |
-| 🛠 Tool System               | Register external tools (functions, APIs, scripts) and invoke them as steps      | 🧪 Experimental  |
-| 💬 Messaging Gateways        | Interface with Telegram, Slack, Discord, Twilio, Dialogflow, and more            | 🧪 Experimental  |
-| 📦 Memory Adapters           | Build short- and long-term memory for agents (pluggable backends planned)        | 🧪 Experimental  |
-| 🔌 Bring Your Own Components | Use your own agents, tools, retrievers, and message queues — minimal boilerplate | ✅ Stable        |
-| 📬 Message Broker Layer      | Support for sync/async message brokers (internal, Redis, GCP Pub/Sub planned)    | 🧪 Experimental  |
-| 🧪 Auto-Planners & Reviewers | Use LLMs to dynamically plan workflows, review outputs, or reroute steps         | 🔜 Planned       |
-| 📊 Visual Dashboard (UI)     | A web-based control panel for managing workflows, agents, and logs               | 🔜 Planned       |
-| 📈 Usage Metering & Billing  | Track job usage, credit balance, and enable task pricing for hosted agents       | 🔜 Planned       |
-| ✍️ YAML + Python Hybrid Mode | Combine YAML definitions with inline Python for advanced workflows               | 🔜 Planned       |
-| 📜 Global Logging System     | Centralized logger across all agents, tools, workflows — with debug output       | ✅ Stable        |
+| Feature                      | Description                                                                      | Status   |
+| ---------------------------- | -------------------------------------------------------------------------------- | -------- |
+| 🧠 Agent Registry            | Register and configure agents (OpenAI, Claude, Hugging Face, LangChain, custom)  | ✅        |
+| 🔁 Workflow Engine           | Multi-step orchestration with fan-in/out, retries, async execution, and routing  | ✅        |
+| 🧩 Subflows & Loops          | Define nested workflows, conditionals, and iterative step logic                  | ✅        |
+| ⚡ Async Fan-out              | Run agents and tools in parallel using asyncio                                   | ✅        |
+| 🧠 LangChain Integration     | Use LangChain agents, tools, retrievers, and chains inside workflows             | ✅        |
+| 📚 LlamaIndex Integration    | Add LlamaIndex agents, RAG pipelines, and retrieval tools                        | ✅        |
+| 🛠 Tool System               | Register external tools (functions, APIs, scripts) and invoke them as steps      | 🧪        |
+| 💬 Messaging Gateways        | Interface with Telegram, Slack, Discord, Twilio, Dialogflow, and more            | 🧪        |
+| 📦 Memory Adapters           | Build short- and long-term memory for agents (pluggable backends planned)        | 🧪        |
+| 🔌 Bring Your Own Components | Use your own agents, tools, retrievers, and message queues — minimal boilerplate | ✅        |
+| 📬 Message Broker Layer      | Support for sync/async message brokers (internal, Redis, GCP Pub/Sub planned)    | 🧪        |
+| 🧪 Auto-Planners & Reviewers | Use LLMs to dynamically plan workflows, review outputs, or reroute steps         | 🔜        |
+| 📊 Visual Dashboard (UI)     | A web-based control panel for managing workflows, agents, and logs               | 🔜        |
+| 📈 Usage Metering & Billing  | Track job usage, credit balance, and enable task pricing for hosted agents       | 🔜        |
+| ✍️ YAML + Python Hybrid Mode | Combine YAML definitions with inline Python for advanced workflows               | 🔜        |
+| 📜 Global Logging System     | Centralized logger across all agents, tools, workflows — with debug output       | ✅        |
 
-> 🧪 **Experimental**: These features exist in early form and are evolving.
-> 🔜 **Planned**: These are on the roadmap but not yet included in this release.
+> * ✅ **Implemented**: These features are considered stable (but we are still early-stage).
+> * 🧪 **Experimental**: These features exist in early form and are evolving.
+> * 🔜 **Planned**: These are on the roadmap but not yet included in this release.
 
 
 
