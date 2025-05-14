@@ -1,0 +1,11 @@
+workflows:
+  main_workflow:
+    - id: simple_chat
+      description: "A simple assistant that chats with the user."
+      async: false
+      steps:
+        - id: chat
+          agent: assistant
+          input: "{{ context.user_input }}"
+          output:
+            to: user
