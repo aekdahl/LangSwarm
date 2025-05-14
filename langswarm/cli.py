@@ -4,6 +4,18 @@ import yaml
 import sys
 from langswarm.core.config import LangSwarmConfigLoader, WorkflowExecutor
 
+"""
+from langswarm.core.config import LangSwarmConfigLoader
+from ui.streamlit_workflow_visualizer import StreamlitWorkflowUI
+
+loader = LangSwarmConfigLoader(".")
+workflows, *_ = loader.load()
+workflow = workflows.get("main_workflow", [])[0]
+
+app = StreamlitWorkflowUI(workflow, loader)
+app.run()
+"""
+
 def launch_ui(example_path, ui_type, ui_file):
     if ui_type == "streamlit":
         subprocess.run(["streamlit", "run", os.path.join(example_path, ui_file)])
