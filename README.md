@@ -8,12 +8,13 @@ Use YAML + Python to define structured, multi-agent logic that integrates OpenAI
 
 ## ⚡️ Quickstart (3 minutes)
 
+> 💡 Each named example (like `simple_chat`, `review_text`, or `brainstorm_ideas`) can automatically launch its preferred UI or CLI interface depending on its configuration — no extra flags or setup required.
+
 ```bash
 pip install langswarm
 
 # Run a minimal example
-langswarm init  # (coming soon)
-langswarm run examples/quickstart.yaml
+langswarm demo simple_chat
 ```
 
 Or copy this:
@@ -78,6 +79,8 @@ Requires Python 3.10+
 ---
 
 ## 🧪 Example Workflow (YAML)
+
+> 📁 This YAML structure can live inside a named folder (e.g. `examples/review_text/`), and LangSwarm will automatically run it using the appropriate interface (CLI or UI) based on that configuration.
 
 ```yaml
 workflows:
