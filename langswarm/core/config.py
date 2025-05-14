@@ -55,7 +55,8 @@ except ImportError:
 
 LS_DEFAULT_CONFIG_FILES = [
     "agents.yaml", "tools.yaml", "retrievers.yaml", "plugins.yaml",
-    "registries.yaml", "workflows.yaml", "secrets.yaml", "brokers.yaml"
+    "registries.yaml", "workflows.yaml", "secrets.yaml", "brokers.yaml", 
+    "ui.yaml"
 ]
 
 LS_SCHEMAS = {
@@ -99,6 +100,7 @@ class LangSwarmConfigLoader:
         # this will hold type_name → class mappings
         self.tool_classes: Dict[str, type] = {}
         self._load_builtin_tool_classes()
+        self.uis = {}  # 🆕 ← Add this line
 
     def _load_builtin_tool_classes(self):
         # populate with whatever core tools you know about
@@ -124,6 +126,7 @@ class LangSwarmConfigLoader:
         self._initialize_tools()
         self._initialize_plugins()
         self._initialize_agents()
+        self._initialize_uis()
         return (
             self.config_data.get('workflows', {}), 
             self.agents, 
@@ -137,6 +140,11 @@ class LangSwarmConfigLoader:
         secrets_dict = yaml.safe_load(open(secrets_path)) if os.path.exists(secrets_path) else {}
         yaml.SafeLoader.add_constructor("!secret", self._make_secret_constructor(secrets_dict))
 
+    def _initialize_uis(self):
+        self.uis = {
+            ui_id: ui_def for ui_id, ui_def in self.config_data.get("ui", {}).items()
+        }
+    
     def _initialize_brokers(self):
         for broker in self.config_data.get("brokers", []):
             if broker["type"] in ["internal", "local"]:
@@ -381,6 +389,7 @@ class WorkflowExecutor:
         self.context["current_workflow_id"] = workflow_id
         self.context['pending_fanins'] = {}  # fan_key → set of step_ids
         self.context['completed_fanouts'] = set()  # Tracks completed fan-out steps
+        self.context["ui"] = workflow.get("ui", {})
 
         first_step = workflow.get("steps", [])[0]
         return first_step
@@ -1178,6 +1187,10 @@ Clarifications:
 
             if fan_in_step:
                 fan_in_step["is_fan_in"] = True
+
+        ui_id = workflow.get("ui")
+        if ui_id and hasattr(self, "uis"):
+            workflow["ui"] = self.uis.get(ui_id, {})  # overwrite string with full dict
 
         return workflow
 
