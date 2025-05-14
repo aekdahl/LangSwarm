@@ -1,0 +1,13 @@
+ui:
+  - id: chat_ui
+    type: chat
+    theme: light
+    input_fields:
+      - user_message
+
+  - id: streamlit_test
+    type: custom
+    entry: serve.py
+    input_fields:
+      - user_message
+      - attachments
