@@ -1,0 +1,7 @@
+agents:
+  - id: assistant
+    type: openai
+    model: gpt-4o
+    system_prompt: |
+      You are a helpful and concise assistant.
+      Always answer clearly and keep responses friendly.
