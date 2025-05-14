@@ -1,8 +1,12 @@
-### gradio_workflow_visualizer.py (Class-based)
 import gradio as gr
 import networkx as nx
 import matplotlib.pyplot as plt
-yaml
+from langswarm.core.config import WorkflowExecutor, LangSwarmConfigLoader
+
+
+# ───────────────────────────────────────────────
+# Existing Visualizer (Unchanged)
+# ───────────────────────────────────────────────
 
 class GradioWorkflowVisualizer:
     def __init__(self, workflow_config):
@@ -35,3 +39,32 @@ class GradioWorkflowVisualizer:
 
         iface = gr.Interface(fn=visualize, inputs=[], outputs="text")
         iface.launch()
+
+
+# ───────────────────────────────────────────────
+# New Executable UI
+# ───────────────────────────────────────────────
+
+class GradioWorkflowUI:
+    def __init__(self, workflow_config, loader: LangSwarmConfigLoader):
+        self.workflow_config = workflow_config
+        self.loader = loader
+        self.executor = WorkflowExecutor(
+            workflows=loader.config_data.get("workflows", {}),
+            agents=loader.agents,
+            tools_metadata=loader.tools_metadata
+        )
+        self.visualizer = GradioWorkflowVisualizer(workflow_config)
+
+    def launch(self):
+        def run_workflow(user_input):
+            return self.executor.run_workflow(self.workflow_config["id"], user_input)
+
+        demo = gr.Interface(
+            fn=run_workflow,
+            inputs=gr.Textbox(lines=2, label="Enter a task or question"),
+            outputs=gr.Textbox(label="Workflow Output"),
+            title="LangSwarm Workflow Runner",
+            description=f"Run workflow: {self.workflow_config.get('id', 'unknown')}"
+        )
+        demo.launch()
