@@ -1,0 +1,2 @@
+runner: streamlit
+entry: serve.py
