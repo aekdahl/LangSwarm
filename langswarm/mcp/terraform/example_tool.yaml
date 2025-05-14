@@ -1,0 +1,34 @@
+# tool.yaml
+
+tool_id: summarize_file               # unique identifier, used as Cloud Run service name
+name: File Summarizer                 # human‑readable
+description: |
+  Summarizes a file’s contents to the database.
+type: mcp                              # your tool “type” (doesn’t really affect deploy)
+image: ghcr.io/langswarm/mcp-summarizer:latest
+mode: stdio
+# If image is missing these can be set to create a container and push it.
+github_url: https://github.com/your-org/mcp-summarizer
+build_context_path: docker  # e.g., the Dockerfile is in `repo/docker/`
+to_registry_url: gcr.io/your-project
+
+# what port the container listens on
+port: 4010
+
+# environment variables, resolved at deploy time
+# if you write "env:FOO" it’ll pull from os.environ["FOO"]
+env:
+  LLM_API_KEY:    env:LLM_API_KEY
+  DATABASE_URI:   env:DATABASE_URI
+  TOOL_SECRET:    my‑shared‑secret
+
+# optional override for GCP region & project
+region: us-central1
+project_id: my‑gcp‑project-id
+
+# where to store your Terraform state (GCS bucket)
+# if omitted, state is stored locally in terraform/terraform.tfstate
+state_bucket: langswarm-terraform-state
+
+# secrets.yaml
+GCP_SA_KEY_PATH: "/etc/creds/gcp-sa.json"

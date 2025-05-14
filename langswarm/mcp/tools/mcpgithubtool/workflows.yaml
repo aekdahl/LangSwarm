@@ -1,0 +1,105 @@
+workflows:
+    main_workflow:
+      - id: use_github_mcp_tool
+        description: Fully‑featured workflow for interacting with the GitHub MCP tool
+        inputs:
+          - user_input
+
+        steps:
+          # 1) Decide which tool to call
+          - id: choose_tool
+            agent: github_action_decider
+            input:
+                user_query: ${context.user_input}
+                available_tools:
+                  - name: list_repositories
+                    description: List repositories for a user or organization
+                  - name: get_repository
+                    description: Get details of a repository
+                  - name: list_issues
+                    description: List issues in a repository
+                  - name: get_issue
+                    description: Retrieve a single issue by number
+                  - name: create_issue
+                    description: Create a new issue in a repository
+                  - name: update_issue
+                    description: Edit an existing issue (title, body, state, labels, assignees)
+                  - name: list_pull_requests
+                    description: List pull requests in a repository
+                  - name: get_pull_request
+                    description: Get details of a pull request by number
+                  - name: create_pull_request
+                    description: Open a new pull request
+                  - name: merge_pull_request
+                    description: Merge a pull request
+                  - name: list_commits
+                    description: List commits on a branch
+                  - name: get_commit
+                    description: Get details for a specific commit
+                  - name: list_branches
+                    description: List branches in a repository
+                  - name: get_branch
+                    description: Get details of a branch
+                  - name: create_branch
+                    description: Create a new branch from a commit SHA
+                  - name: get_file_contents
+                    description: Read the contents of a file in a repository
+                  - name: create_file
+                    description: Create a file in a repository
+                  - name: update_file
+                    description: Update an existing file in a repository
+                  - name: delete_file
+                    description: Delete a file from a repository
+                  - name: list_workflows
+                    description: List GitHub Actions workflows configured in a repo
+                  - name: run_workflow
+                    description: Trigger a GitHub Actions workflow
+                  - name: list_workflow_runs
+                    description: List runs of a specific workflow
+                  - name: get_workflow_run
+                    description: Get details of a workflow run
+                  - name: list_comments
+                    description: List comments on an issue or pull request
+                  - name: create_comment
+                    description: Add a comment to an issue or pull request
+                  - name: delete_comment
+                    description: Delete a comment by ID
+            output: 
+                to: fetch_schema
+
+          # 2) Fetch that tool’s schema from your MCP server
+          - id: fetch_schema
+            function: langswarm.core.utils.workflows.functions.mcp_fetch_schema
+            args:
+                mcp_url: "stdio://github_mcp"
+                mode: stdio
+            output: 
+                to: build_input
+
+          # 3) Build the actual call input from the schema + original query
+          - id: build_input
+            agent: github_input_builder
+            input:
+                user_query: ${context.user_input}
+                schema:     ${context.step_outputs.fetch_schema}
+            output: 
+                to: call_tool
+
+          # 4) Call the tool
+          - id: call_tool
+            function: langswarm.core.utils.workflows.functions.mcp_call
+            args:
+                mcp_url: "stdio://github_mcp"
+                mode: stdio
+                payload: ${context.step_outputs.build_input}
+            output: 
+                to: summarize
+            #retry: 2
+
+          # 5) Turn the raw result into a user‑friendly message
+          - id: summarize
+            agent: summarizer
+            input: ${context.step_outputs.call_tool}
+            output: 
+                to: useer
+
