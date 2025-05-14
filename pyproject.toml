@@ -27,7 +27,7 @@ dev = [
   "flake8",
 ]
 
-[project.scripts]
+[tool.poetry.scripts]
 langswarm = "langswarm.cli:main"
 
 [build-system]
