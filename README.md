@@ -1,104 +1,108 @@
-# LangSwarm
+# 🚀 LangSwarm
 
-LangSwarm is a modular multi-agent framework designed to coordinate large language model (LLM) agents in structured, goal-oriented workflows. This early-stage release offers a lightweight version focused on YAML-driven configuration, agent registration, and core workflow execution across multiple communication channels.
+**LangSwarm** is a modular multi-agent framework that lets you build, orchestrate, and run intelligent workflows using LLM agents. It's designed to get you started in under 3 minutes with minimal setup.
 
+Use YAML + Python to define structured, multi-agent logic that integrates OpenAI, LangChain, LlamaIndex, and more.
 
+---
 
-## 🚀 Features
+## ⚡️ Quickstart (3 minutes)
 
-### 🧩 1. **Simple by Design**
+```bash
+pip install langswarm
 
-LangSwarm is built around clarity and minimal configuration. You can launch full multi-agent workflows using just a few YAML files. No complicated setup, no custom DSLs.
+# Run a minimal example
+langswarm init  # (coming soon)
+langswarm run examples/quickstart.yaml
+```
 
-### 🔁 2. **Workflows & Orchestration**
+Or copy this:
 
-LangSwarm's orchestration engine is its core strength.
+```python
+from langswarm.core.config import LangSwarmConfigLoader, WorkflowExecutor
 
-Define intelligent, structured multi-agent workflows that go far beyond simple chaining:
+loader = LangSwarmConfigLoader()
+workflows, agents, *_ = loader.load()
 
-* 🧠 **True multi-agent coordination**: parallel agents, fan-in/fan-out steps, and dynamic routing
-* 🔁 **Subflows and loops**: support for nested logic, iterative steps, and repeated evaluation
-* ⚙️ **Named output routing**: pass outputs between steps with clarity and precision
-* ⏳ **Async and sync support**: fan-out to multiple agents concurrently or step through carefully
-* ♻️ **Retries and await logic**: intelligent control flow that handles errors, re-tries, and wait conditions
-* 🧩 **Tool and agent mix**: steps can invoke tools, agents, or other workflows seamlessly
+executor = WorkflowExecutor(workflows, agents)
+result = executor.run_workflow("my_workflow_id", user_input="Summarize this text...")
+```
 
-No custom DSL, no hardcoded logic — just pure YAML orchestration that stays readable and composable.
+> ☑️ No complex setup. Just install, define YAML, and run.
 
-### 🔗 3. **Plug Into Your Stack**
+---
 
-LangSwarm works with what you're already using:
+## ✨ Why LangSwarm?
 
-* **LangChain**: Use LangChain agents, tools, retrievers, and chains inside LangSwarm workflows.
-* **LlamaIndex**: Easily incorporate LlamaIndex retrieval pipelines as workflow steps or tool wrappers.
-* **Hugging Face**: use any model (Transformer) locally or via the Hugging Face Hub
+### 🧠 Multi-Agent Orchestration (Made Simple)
 
-_You may also use LangSwarm components in LangChain_
+* True multi-agent logic: parallel execution, loops, retries
+* Named step routing: pass data between agents with precision
+* Async fan-out, sync chaining, and subflow support
 
-### 🧠 4. **Bring Your Own Agent (BYOA)**
+### 🔌 Bring Your Stack
 
-LangSwarm is unopinionated:
+* Use OpenAI, Claude, Hugging Face, or LangChain agents
+* Embed tools or functions directly as steps
+* Drop in LangChain or LlamaIndex components
 
-* Add your own agents using OpenAI, Claude, Hugging Face, LangChain, and more
-* Register custom tools with minimal wrapper logic
-* Use YAML or Python to inject external logic at any point
+### 🧩 Modular by Design
 
-### 🔍 5. **Global Logging**
-LangSwarm includes a global logging system that unifies output across agents, tools, workflows, and gateways. It automatically captures step context, making debugging and monitoring easier — even in distributed, multi-agent flows.
+* Define workflows in clean YAML
+* Mix and match agents, tools, and steps
+* Extend easily via Python
 
+### 📃 Unified Logging
 
-## ⚙️ Installation
-Install from PyPI:
+* Automatic step logging and tracing
+* Easy debugging across agents and retries
+
+---
+
+## 🛠️ Installation
 
 ```bash
 pip install langswarm
 ```
 
-Install from source:
+For source builds:
+
 ```bash
 git clone https://github.com/your-org/langswarm.git
 cd langswarm
 pip install -r requirements.txt
 ```
-Python 3.10+ recommended
 
-## 🧪 Usage
-### 1. Define Your Agents and Workflows
-Create or modify YAML configuration files:
+Requires Python 3.10+
+
+---
+
+## 🧪 Example Workflow (YAML)
 
 ```yaml
-# workflows.yaml
 workflows:
-    main_workflow:
-      - id: my_workflow_id
-        description: |
-            Summarize and review articles.
-        async: false
+  my_workflow_id:
+    description: "Summarize and review articles"
+    async: false
+    steps:
+      - id: summarize_text
+        agent: summarizer
+        input: |
+          Please summarize the article:
+          {{ context.user_input }}
+        output:
+          to: review_summary
 
-        steps:
-          - id: summarize_text
-            agent: summarizer
-            input: |
-                  Please summarize the below article and
-                  list the most important key points.
+      - id: review_summary
+        agent: reviewer
+        input: |
+          Review the summary:
+          {{ context.step_outputs.summarize_text }}
+        output:
+          to: user
+```
 
-                  Article: {{ context.user_input }}
-            output:
-                to: review_summary
-
-          - id: review_summary
-            agent: reviewer
-            input: |
-                  Review the summary and make sure no key points are missed.
-
-                  User provided article: {{ context.user_input }}
-                  Summary: {{ context.step_outputs.summarize_text }}
-            output:
-                to: user # Exits the workflow and returns the response.
-
-#---
-
-# agents.yaml (seperate file)
+```yaml
 agents:
   - id: summarizer
     type: openai
@@ -106,82 +110,79 @@ agents:
     system_prompt: "You are a helpful summarizer."
 
   - id: reviewer
-    agent_type: langchain-openai
-    model: gpt-4o-mini-2024-07-18
-    system_prompt: |
-        You are a summary reviewer.
-        You are responsible to flag incorrect summaries.
-```
-  
-### 2. Run from Python
-```python
-from langswarm.core.config import LangSwarmConfigLoader, WorkflowExecutor
-
-# Initialize LangSwarm loader once at start
-loader = LangSwarmConfigLoader()
-workflows, agents, *_ = loader.load()
-
-# 2. Set up LangSwarm context
-executor = WorkflowExecutor(workflows, agents)
-
-# 3. Run LangSwarm workflow
-result = executor.run_workflow("my_workflow_id", user_input=user_message)
+    type: langchain-openai
+    model: gpt-4o-mini
+    system_prompt: "You review summaries and flag missing key points."
 ```
 
-* _Ensure the appropriate credentials or API keys are set via environment variables._
-* _You can of course also use LangSwarm without workflows._
+> 🔍 You can specify the YAML folder using `LangSwarmConfigLoader(config_path="./my_yamls")` if your files are outside the default location.
 
+---
 
+## ☁️ Deployment Considerations
 
-## 🧭 Feature Map & Road Ahead
+LangSwarm is designed to be portable and can run locally, in containers, or in the cloud.
+Some use cases (e.g. caching, logging, secure API handling) may benefit from deployment on platforms like **Google Cloud Run**.
 
-LangSwarm is designed to be modular, extensible, and transparent — and we're just getting started.
+> 📆 Deployment examples and Docker/CI templates are coming soon.
 
-| Feature                      | Description                                                                      | Status | Docs |
-| ---------------------------- | -------------------------------------------------------------------------------- | ------ | ---- |
-| 🧠 Agent Registry            | Register and configure agents (OpenAI, Claude, Hugging Face, LangChain, custom)  | ✅      | ❌   |
-| 🔁 Workflow Engine           | Multi-step orchestration with fan-in/out, retries, async execution, and routing  | ✅      | ❌   |
-| 🧩 Subflows & Loops          | Define nested workflows, conditionals, and iterative step logic                  | ✅      | ❌   |
-| ⚡ Async Fan-out              | Run agents and tools in parallel using asyncio                                   | ✅      | ❌   |
-| 🧠 LangChain Integration     | Use LangChain agents, tools, retrievers, and chains inside workflows             | ✅      | ❌   |
-| 📚 LlamaIndex Integration    | Add LlamaIndex agents, RAG pipelines, and retrieval tools                        | ✅      | ❌   |
-| 🛠 Tool System               | Register external tools (functions, APIs, scripts) and invoke them as steps      | 🧪      | ❌   |
-| 💬 Messaging Gateways        | Interface with Telegram, Slack, Discord, Twilio, Dialogflow, and more            | 🧪      | ❌   |
-| 📦 Memory Adapters           | Build short- and long-term memory for agents (pluggable backends planned)        | 🧪      | ❌   |
-| 🔌 Bring Your Own Components | Use your own agents, tools, retrievers, and message queues — minimal boilerplate | ✅      | ❌   |
-| 📬 Message Broker Layer      | Support for sync/async message brokers (internal, Redis, GCP Pub/Sub planned)    | 🧪      | ❌   |
-| 🧪 Auto-Planners & Reviewers | Use LLMs to dynamically plan workflows, review outputs, or reroute steps         | 🔜      | ❌   |
-| 📊 Visual Dashboard (UI)     | A web-based control panel for managing workflows, agents, and logs               | 🔜      | ❌   |
-| 📈 Usage Metering & Billing  | Track job usage, credit balance, and enable task pricing for hosted agents       | 🔜      | ❌   |
-| ✍️ YAML + Python Hybrid Mode | Combine YAML definitions with inline Python for advanced workflows               | 🔜      | ❌   |
-| 📜 Global Logging System     | Centralized logger across all agents, tools, workflows — with debug output       | ✅      | ❌   |
+---
 
-> * ✅ **Implemented**: These features are considered stable (but we are still early-stage).
-> * 🧪 **Experimental**: These features exist in early form and are evolving.
-> * 🔜 **Planned**: These are on the roadmap but not yet included in this release.
-> * 📚 **Docs status**: 📘 Full | ⚠️ Partial | ❌ Missing
+## 🌱 Branch Strategy
 
+We use a clean, stable Git workflow:
 
-## 🛠 Developer Setup
+| Branch       | Purpose                              |
+| ------------ | ------------------------------------ |
+| `main`       | Acts as the master branch            |
+| `deployment` | For Cloud Run deployment builds      |
+| `feature/*`  | Used for new features or experiments |
+
+> ✅ PRs go from `feature/*` to `main`, and releases come from `main` into `deployment`
+
+---
+
+## 🔭 Roadmap Highlights
+
+| Feature                | Status | Notes                           |
+| ---------------------- | ------ | ------------------------------- |
+| Agent Registry         | ✅      | Works with OpenAI, Claude, etc. |
+| YAML Workflows         | ✅      | Define complex flows in YAML    |
+| LangChain / LlamaIndex | ✅      | Integrated as agents or tools   |
+| Async Fan-out          | ✅      | Run agents concurrently         |
+| Subflows & Loops       | ✅      | Control flow beyond chaining    |
+| Visual UI              | 🔜     | Dashboard to manage agents      |
+| Usage metering         | 🔜     | For hosted / SaaS agents        |
+
+---
+
+## 🧪 Developer Setup
+
+Run tests:
+
 ```bash
 pytest tests/
 ```
 
-To regenerate requirements:
+Regenerate requirements:
+
 ```bash
 pip install pipreqs
 pipreqs . --force
 ```
 
-To build distributions:
+Build package:
+
 ```bash
 python -m build
 ```
 
-## 📄 License
-This project is licensed under the MIT License. See the LICENSE file for more details.
+---
 
---
+## 📄 License
+
+MIT License. See `LICENSE` for full terms.
+
+---
 
 Built with ❤️ by the LangSwarm team.
-
