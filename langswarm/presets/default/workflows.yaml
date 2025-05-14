@@ -1,0 +1,127 @@
+workflows:
+  main_workflow:
+    - id: full_demo_workflow
+      description: >
+        A LangSwarm workflow showcasing sync, async, fire-and-forget,
+        conditional routing, fan-out/fan-in, inline functions,
+        retry/rollback handling, and subflow looping.
+
+      steps:
+        # … in your main_workflow steps …
+        - id: call_aux
+          invoke_workflow: auxiliary_workflow_id      # ← name of the other workflow
+          input: ${context.previous_output}           # ← whatever you want to pass
+          output:
+            to: next_main_step
+
+        - id: step1_plan
+          agent: planner
+          input: "Plan tasks for this project"
+          retry: 2
+          output:
+            to:
+              - user
+              - step2_execute
+
+        - id: step2_execute
+          agent: executor_agent
+          input: "${previous_output}"
+          retry: 2
+          rollback_to: step1_plan
+          rollback_limit: 1
+          output:
+            to:
+              - user
+              - step3_review
+
+        - id: step3_review
+          agent: reviewer_agent
+          input: "${previous_output}"
+          output:
+            to:
+              - condition:
+                  if: "${feedback_approved} == false"
+                  then:
+                    - invoke: iterative_fix_subflow
+                      await: true
+                  else:
+                    - user
+
+        - id: step4_log_async
+          agent: planner
+          input: "Send a copy of this context to async log pipeline"
+          output:
+            to:
+              - invoke: logging_subflow
+                await: false  # fire-and-forget
+
+        - id: step5_decider
+          agent: decider
+          input: "Choose next agent or close loop"
+          output:
+            to:
+              - generate_steps: true
+                limit: 3
+                return_to: planner
+
+        # --- Fan-out step ---
+        - id: step6_fanout
+          agent: planner
+          input: "Split work across three agents"
+          output:
+            to:
+              - { step: step6a_checker_a, await: true }
+              - { step: step6b_checker_b, await: true }
+              - { step: step6c_checker_c, await: true }
+
+        - id: step6a_checker_a
+          agent: checker_a
+          input: "${previous_output}"
+          output:
+            to: step7_fanin
+
+        - id: step6b_checker_b
+          agent: checker_b
+          input: "${previous_output}"
+          output:
+            to: step7_fanin
+
+        - id: step6c_checker_c
+          agent: checker_c
+          input: "${previous_output}"
+          output:
+            to: step7_fanin
+
+        # --- Fan-in step that aggregates above ---
+        - id: step7_fanin
+          agent: aggregator
+          input: |
+            Merged feedback:
+            - A: ${step_outputs.step6a_checker_a}
+            - B: ${step_outputs.step6b_checker_b}
+            - C: ${step_outputs.step6c_checker_c}
+          output:
+            to: user
+
+        # --- Inline function step ---
+        - id: step8_validate
+          function: mymodule.validation.validate_structure
+          input: "${previous_output}"
+          on_fail:
+            rollback: "Validation failed"
+          output:
+            to: user
+
+  subflows:
+    - id: iterative_fix_subflow
+      entrypoint: langgraph.run_iteration_loop
+      input_map:
+        input_text: "${previous_output}"
+      return_to: planner
+      max_steps: 5
+
+    - id: logging_subflow
+      entrypoint: langgraph.async_logger
+      input_map:
+        content: "${previous_output}"
+      return_to: null  # fire-and-forget

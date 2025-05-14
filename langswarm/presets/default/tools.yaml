@@ -1,0 +1,14 @@
+tools:
+  - id: github_langswarm_main
+    type: githubtool
+    settings:
+      repo: aekdahl/LangSwarm
+      key: !secret openai_key
+      private_key: agent-developer-v1.2025-01-15.private-key.pem
+      retriever: code_base
+
+- id: special
+    type: specialtool
+    class:  myproject.tools.special.SpecialTool
+    settings:
+      foo: bar

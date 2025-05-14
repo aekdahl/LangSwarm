@@ -1,0 +1,6 @@
+retrievers:
+  - id: code_base
+    type: chromadb
+    settings:
+      collection_name: github_langswarm
+      persist_directory: default

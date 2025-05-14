@@ -1,0 +1,11 @@
+agents:
+  - id: example_agent
+    agent_type: langchain-openai
+    model: gpt-4o-mini-2024-07-18
+    system_prompt_file: prompts/agent_system.md
+    register_as: agent
+    rag_registry: rag_registry
+    tool_registry: tool_registry
+    plugin_registry: plugin_registry
+    memory_adapter: memory_adapter
+    memory_summary_adapter: memory_summary_adapter

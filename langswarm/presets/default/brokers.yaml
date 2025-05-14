@@ -1,0 +1,23 @@
+brokers:
+  - id: internal_broker
+    type: internal
+    settings:
+      mode: internal
+    
+  - id: default_broker
+    type: local
+    settings:
+      mode: local
+
+  - id: redis_broker
+    type: redis
+    settings:
+      host: localhost
+      port: 6379
+      db: 0
+
+  - id: gcp_pubsub_broker
+    type: gcp_pubsub
+    settings:
+      project_id: your-gcp-project
+      credentials: !secret gcp_keyfile

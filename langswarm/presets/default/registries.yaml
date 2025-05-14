@@ -1,0 +1,12 @@
+registries:
+  tools:
+    - id: tool_registry
+      registry: [github_langswarm_main, github_langswarm_backlog]
+
+  retrievers:
+    - id: rag_registry
+      registry: [adapter, memory_adapter]
+
+  plugins:
+    - id: plugin_registry
+      registry: [process_toolkit]
