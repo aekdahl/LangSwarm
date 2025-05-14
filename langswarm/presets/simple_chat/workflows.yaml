@@ -3,6 +3,7 @@ workflows:
     - id: simple_chat
       description: "A simple assistant that chats with the user."
       async: false
+      ui: streamlit  # NEW: triggers UI launch
       steps:
         - id: chat
           agent: assistant
