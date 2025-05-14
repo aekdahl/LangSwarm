@@ -14,6 +14,18 @@ workflow = workflows.get("main_workflow", [])[0]
 
 app = StreamlitWorkflowUI(workflow, loader)
 app.run()
+
+--
+
+from langswarm.core.config import LangSwarmConfigLoader
+from ui.gradio_workflow_ui import GradioWorkflowUI
+
+loader = LangSwarmConfigLoader(".")
+workflows, *_ = loader.load()
+workflow = workflows.get("main_workflow", [])[0]
+
+ui = GradioWorkflowUI(workflow, loader)
+ui.launch()
 """
 
 def launch_ui(example_path, ui_type, ui_file):
