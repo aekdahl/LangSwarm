@@ -1,15 +1,5 @@
 # ToDo: Add field validation!
 
-""" ADD TO WORKFLOW DOCS AND EXAMPLE
-no_mcp:
-  tools:
-    - name: project_update
-      return_to_agent: true        # 🔁 loop back to same agent
-      repeatable: true             # 🔄 agent can call tool multiple times
-      retry_limit: 5               # ⛔ max times to allow this
-      return_to: user              # 👤 optional override (default is same agent)
-"""
-
 import os
 import ast
 import sys
