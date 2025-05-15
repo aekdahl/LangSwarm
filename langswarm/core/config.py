@@ -1,5 +1,15 @@
 # ToDo: Add field validation!
 
+""" ADD TO WORKFLOW DOCS AND EXAMPLE
+no_mcp:
+  tools:
+    - name: project_update
+      return_to_agent: true        # 🔁 loop back to same agent
+      repeatable: true             # 🔄 agent can call tool multiple times
+      retry_limit: 5               # ⛔ max times to allow this
+      return_to: user              # 👤 optional override (default is same agent)
+"""
+
 import os
 import ast
 import sys
@@ -632,53 +642,78 @@ Clarifications:
             inp = self._resolve_input(step.get("input"))
             output = self.run_workflow(wf_id, inp)
         elif 'no_mcp' in step:
-            tools_to_use = step['no_mcp']['tools']
-            tools_metadata = {tid: self.tools_metadata[tid] for tid in tools_to_use}
+            tools_raw = step['no_mcp']['tools']
+            tool_ids = [t if isinstance(t, str) else t["name"] for t in tools_raw]
+            tool_metadata = {tid: self.tools_metadata[tid] for tid in tool_ids}
+            tool_options = {
+                (t if isinstance(t, str) else t["name"]): ({} if isinstance(t, str) else t)
+                for t in tools_raw
+            }
         
-            system_prompt = self._build_no_mcp_system_prompt(tools_metadata)
+            system_prompt = self._build_no_mcp_system_prompt(tool_metadata)
         
-            # run agent chat
-            agent = self.agents[step['agent']]
+            agent_id = step["agent"]
+            agent = self.agents[agent_id]
             agent.update_system_prompt(system_prompt=system_prompt)
+        
             agent_input = self._resolve_input(step.get("input"))
             response = agent.chat(agent_input)
         
-            # parse and dispatch automatically
             try:
                 payload = json.loads(response)
-            except:
+            except Exception:
                 payload = response
-                
-            tool_name = payload.get('tool', payload['name'])
+        
+            tool_name = payload.get('tool', payload.get('name'))
             args = payload.get('args', {})
-
+        
             if tool_name in ['clarify', 'chat', 'unknown']:
-                result = args.get('prompt', args)
                 try:
                     result = str(args.get('prompt', args))
-                except:
+                except Exception:
                     result = str(args)
-            elif tool_name in tools_metadata:
-                func = self._resolve_function(tools_metadata[tool_name]['function'])
+            elif tool_name in tool_metadata:
+                func = self._resolve_function(tool_metadata[tool_name]['function'])
                 step_args = {k: self._resolve_input(v) for k, v in step.get("args", {}).items()}
                 args = {k: self._resolve_input(v) for k, v in args.items()}
                 args.setdefault("context", self.context)
-                args = {**args, **step_args}  # step args take precedence
+                args.update(step_args)
                 result = func(**args)
+        
+                # 🔁 Optional repeatable history and retry limit
+                opts = tool_options.get(tool_name, {})
+                if opts.get("repeatable"):
+                    agent_history = self.context.setdefault("tool_history", {}).setdefault(agent_id, {})
+                    agent_retries = self.context.setdefault("tool_retries", {}).setdefault(agent_id, {})
+                    agent_history.setdefault(tool_name, []).append(result)
+                    agent_retries[tool_name] = agent_retries.get(tool_name, 0) + 1
+        
+                    max_retry = opts.get("retry_limit", 3)
+                    if agent_retries[tool_name] < max_retry:
+                        history_str = "\n".join(f"- {r}" for r in agent_history[tool_name])
+                        step["input"] = f"{agent_input}\n\nHistory for tool '{tool_name}':\n{history_str}"
+                        self._execute_step(step, mark_visited=False)
+                        return
             else:
                 raise ValueError(f"Unknown tool selected by agent: {tool_name}")
         
             self.context['previous_output'] = result
             self.context['step_outputs'][step['id']] = result
         
-            if "output" in step:
-                self._handle_output(step['id'], step["output"], result, step)
+            # 🧠 Determine dynamic output override
+            opts = tool_options.get(tool_name, {})
+            if opts.get("return_to_agent"):
+                to_target = opts.get("return_to", agent_id)
+                self._handle_output(step['id'], {"to": to_target}, result, step)
+            else:
+                if "output" in step:
+                    self._handle_output(step['id'], step["output"], result, step)
         
             if mark_visited:
                 visit_key = self._get_visit_key(step)
                 self.context["visited_steps"].add(visit_key)
         
-            return  # explicitly done here
+            return
         else:
             try:
                 if 'agent' in step:
@@ -750,53 +785,78 @@ Clarifications:
             inp   = self._resolve_input(step.get("input"))
             output = await self.run_workflow_async(wf_id, inp)
         elif 'no_mcp' in step:
-            tools_to_use = step['no_mcp']['tools']
-            tools_metadata = {tid: self.tools_metadata[tid] for tid in tools_to_use}
+            tools_raw = step['no_mcp']['tools']
+            tool_ids = [t if isinstance(t, str) else t["name"] for t in tools_raw]
+            tool_metadata = {tid: self.tools_metadata[tid] for tid in tool_ids}
+            tool_options = {
+                (t if isinstance(t, str) else t["name"]): ({} if isinstance(t, str) else t)
+                for t in tools_raw
+            }
         
-            system_prompt = self._build_no_mcp_system_prompt(tools_metadata)
+            system_prompt = self._build_no_mcp_system_prompt(tool_metadata)
         
-            # run agent chat
-            agent = self.agents[step['agent']]
+            agent_id = step["agent"]
+            agent = self.agents[agent_id]
             agent.update_system_prompt(system_prompt=system_prompt)
+        
             agent_input = self._resolve_input(step.get("input"))
             response = agent.chat(agent_input)
         
-            # parse and dispatch automatically
             try:
                 payload = json.loads(response)
-            except:
+            except Exception:
                 payload = response
-                
-            tool_name = payload.get('tool', payload['name'])
+        
+            tool_name = payload.get('tool', payload.get('name'))
             args = payload.get('args', {})
-
+        
             if tool_name in ['clarify', 'chat', 'unknown']:
-                result = args.get('prompt', args)
                 try:
                     result = str(args.get('prompt', args))
-                except:
+                except Exception:
                     result = str(args)
-            elif tool_name in tools_metadata:
-                func = self._resolve_function(tools_metadata[tool_name]['function'])
+            elif tool_name in tool_metadata:
+                func = self._resolve_function(tool_metadata[tool_name]['function'])
                 step_args = {k: self._resolve_input(v) for k, v in step.get("args", {}).items()}
                 args = {k: self._resolve_input(v) for k, v in args.items()}
                 args.setdefault("context", self.context)
-                args = {**args, **step_args}  # step args take precedence
-                result = func(**args)
+                args.update(step_args)
+                result = await func(**args)
+        
+                # 🔁 Optional repeatable history and retry limit
+                opts = tool_options.get(tool_name, {})
+                if opts.get("repeatable"):
+                    agent_history = self.context.setdefault("tool_history", {}).setdefault(agent_id, {})
+                    agent_retries = self.context.setdefault("tool_retries", {}).setdefault(agent_id, {})
+                    agent_history.setdefault(tool_name, []).append(result)
+                    agent_retries[tool_name] = agent_retries.get(tool_name, 0) + 1
+        
+                    max_retry = opts.get("retry_limit", 3)
+                    if agent_retries[tool_name] < max_retry:
+                        history_str = "\n".join(f"- {r}" for r in agent_history[tool_name])
+                        step["input"] = f"{agent_input}\n\nHistory for tool '{tool_name}':\n{history_str}"
+                        await self._execute_step_async(step, mark_visited=False)
+                        return
             else:
                 raise ValueError(f"Unknown tool selected by agent: {tool_name}")
         
             self.context['previous_output'] = result
             self.context['step_outputs'][step['id']] = result
         
-            if "output" in step:
-                self._handle_output(step['id'], step["output"], result, step)
+            # 🧠 Determine dynamic output override
+            opts = tool_options.get(tool_name, {})
+            if opts.get("return_to_agent"):
+                to_target = opts.get("return_to", agent_id)
+                self._handle_output(step['id'], {"to": to_target}, result, step)
+            else:
+                if "output" in step:
+                    self._handle_output(step['id'], step["output"], result, step)
         
             if mark_visited:
                 visit_key = self._get_visit_key(step)
                 self.context["visited_steps"].add(visit_key)
         
-            return  # explicitly done here
+            return
         else:
             try:
                 if 'agent' in step:
