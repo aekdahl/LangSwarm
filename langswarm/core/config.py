@@ -367,7 +367,8 @@ class WorkflowExecutor:
             'visited_steps': set(),
             'retry_counters': {},
             'rollback_counters': {},
-            'pending_fanins': {}  # 👈 must be initialized!
+            'pending_fanins': {},
+            'agents': agents
         }
         settings = workflows.get("workflow_settings", {}).get("intelligence", {})
         self.intelligence = WorkflowIntelligence(config=settings)
