@@ -74,6 +74,17 @@ class WorkflowIntelligence:
             return async_wrapper
         return sync_wrapper
 
+    @staticmethod
+    def finalize_step(func):
+        @functools.wraps(func)
+        def wrapper(executor, step_id, *args, **kwargs):
+            result = func(executor, step_id, *args, **kwargs)
+            # Only finalize if it wasn't finalized yet
+            if step_id in executor.intelligence.step_data and executor.intelligence.step_data[step_id]["end"] is None:
+                executor.intelligence.end_step(step_id, status="success", output=executor.context.get("step_outputs", {}).get(step_id))
+            return result
+        return wrapper
+
     def start_step(self, step_id):
         """Mark the start of a step."""
         self.step_order.append(step_id)
