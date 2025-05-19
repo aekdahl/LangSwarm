@@ -1215,10 +1215,14 @@ Clarifications:
     
             for match in matches:
                 try:
-                    resolved = self._safe_resolve(match.split("."), self.context)
+                    keys = match.split(".")
+                    if keys[0] == "context":
+                        keys = keys[1:]
+                    resolved = self._safe_resolve(keys, self.context)
                     value = value.replace(f"${{{match}}}", str(resolved))
                 except Exception as e:
-                    print(f"⚠️ Failed to resolve: ${{{match}}} — {e}")
+                    print(f"⚠️ Failed to resolve: ${{{match}}} in value: {value} — {e}")
+
             return value
     
         elif isinstance(value, dict):
