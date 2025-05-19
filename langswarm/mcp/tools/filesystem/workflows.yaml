@@ -1,0 +1,44 @@
+#executor.run_workflow("use_filesystem_tool", user_input="Show me all files in /tmp")
+
+workflows:
+  main_workflow:
+    - id: use_filesystem_tool
+      inputs:
+        - user_query
+      steps:
+        - id: choose_function
+          agent: tool_decider
+          input: ${user_query}
+          output_key: selected_function
+
+        - id: extract_path
+          agent: path_extractor
+          input: ${user_query}
+          output_key: extracted_path
+
+        - id: fetch_schema
+          function: mcp_fetch_schema
+          args:
+            tool_id: ${selected_function}
+          output_key: tool_schema
+
+        - id: prepare_input
+          agent: input_builder
+          input:
+            path: ${extracted_path}
+            schema: ${tool_schema}
+          output_key: tool_input
+
+        - id: call_tool
+          function: mcp_call
+          args:
+            tool_id: ${selected_function}
+            input: ${tool_input}
+          retry: 2
+          output_key: tool_output
+
+        - id: respond
+          agent: summarizer
+          input: ${tool_output}
+          output:
+            to: user
