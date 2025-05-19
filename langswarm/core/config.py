@@ -943,7 +943,7 @@ Clarifications:
         if step.get("fan_key"):
             await self._recheck_pending_fanins_async()
 
-
+    @WorkflowIntelligence.finalize_step
     def _handle_output(
         self,
         step_id: str,
@@ -992,7 +992,7 @@ Clarifications:
 
                 # 1b. normal step‑id ----------------------------------------------------------------
                     
-                print("target:", target)
+                #print("target:", target)
                 target_step = self._get_step_by_id(target)
 
                 # If it’s a fan‑in we just queue it
@@ -1002,7 +1002,7 @@ Clarifications:
                     )
                     continue
                     
-                print("target_step:", target_step)
+                #print("target_step:", target_step)
 
                 # otherwise execute immediately
                 self._execute_step(target_step)
@@ -1055,6 +1055,7 @@ Clarifications:
                         return_to=target.get("return_to"),
                     )
 
+    @WorkflowIntelligence.finalize_step
     async def _handle_output_async(self, step_id, output_def, output, step):
         targets = output_def.get("to", [])
         if not isinstance(targets, list):
