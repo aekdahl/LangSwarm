@@ -1199,7 +1199,7 @@ Clarifications:
             return f"<error:{expr}>"
 
     def _resolve_input(self, value):
-        # detect wrapped types
+        # Handle special wrapped types first
         if isinstance(value, dict) and "__type__" in value:
             t = value["__type__"]
             if t == "DataFrame":
@@ -1208,11 +1208,19 @@ Clarifications:
                 return pd.Series(value["value"])
             elif t == "ndarray":
                 return np.array(value["value"])
-                
+    
+        # Resolve single variable reference → return native type
         if isinstance(value, str):
             pattern = re.compile(r"\${([^}]+)}")
             matches = pattern.findall(value)
     
+            if len(matches) == 1 and value.strip() == f"${{{matches[0]}}}":
+                keys = matches[0].split(".")
+                if keys[0] == "context":
+                    keys = keys[1:]
+                return self._safe_resolve(keys, self.context)
+    
+            # Otherwise resolve inline substitutions
             for match in matches:
                 try:
                     keys = match.split(".")
@@ -1221,14 +1229,13 @@ Clarifications:
                     resolved = self._safe_resolve(keys, self.context)
                     value = value.replace(f"${{{match}}}", str(resolved))
                 except Exception as e:
-                    print(f"⚠️ Failed to resolve: ${{{match}}} in value: {value} — {e}")
-
+                    print(f"⚠️ Failed to resolve: ${{{match}}} — {e}")
             return value
     
-        elif isinstance(value, dict):
+        # Recursively resolve containers
+        if isinstance(value, dict):
             return {k: self._resolve_input(v) for k, v in value.items()}
-    
-        elif isinstance(value, list):
+        if isinstance(value, list):
             return [self._resolve_input(v) for v in value]
     
         return value
