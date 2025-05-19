@@ -720,6 +720,7 @@ Clarifications:
                 self._handle_output(step['id'], {"to": to_target}, result, step)
             else:
                 if "output" in step:
+                    self.intelligence.end_step(step_id, status="success", output=output)
                     self._handle_output(step['id'], step["output"], result, step)
         
             if mark_visited:
@@ -769,6 +770,7 @@ Clarifications:
         self.context['step_outputs'][step_id] = output
     
         if "output" in step:
+            self.intelligence.end_step(step_id, status="success", output=output)
             to_targets = step["output"].get("to", [])
             if not isinstance(to_targets, list):
                 to_targets = [to_targets]
@@ -873,6 +875,7 @@ Clarifications:
                 self._handle_output(step['id'], {"to": to_target}, result, step)
             else:
                 if "output" in step:
+                    self.intelligence.end_step(step_id, status="success", output=output)
                     self._handle_output(step['id'], step["output"], result, step)
         
             if mark_visited:
@@ -925,6 +928,7 @@ Clarifications:
         self.context['step_outputs'][step_id] = output
     
         if "output" in step:
+            self.intelligence.end_step(step_id, status="success", output=output)
             to_targets = step["output"].get("to", [])
             if not isinstance(to_targets, list):
                 to_targets = [to_targets]
@@ -943,7 +947,6 @@ Clarifications:
         if step.get("fan_key"):
             await self._recheck_pending_fanins_async()
 
-    @WorkflowIntelligence.finalize_step
     def _handle_output(
         self,
         step_id: str,
@@ -1055,7 +1058,6 @@ Clarifications:
                         return_to=target.get("return_to"),
                     )
 
-    @WorkflowIntelligence.finalize_step
     async def _handle_output_async(self, step_id, output_def, output, step):
         targets = output_def.get("to", [])
         if not isinstance(targets, list):
