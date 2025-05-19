@@ -1,6 +1,7 @@
 # ToDo: Add field validation!
 
 import os
+import re
 import ast
 import sys
 import time
@@ -1170,25 +1171,35 @@ Clarifications:
 
     def _resolve_input(self, value):
         if isinstance(value, str):
-            value = value.strip()
-            # Case 1: Full expression like "${context}" or "${context.step_outputs}"
-            if value.startswith("${") and value.endswith("}"):
-                expr = value[2:-1]
-                return self._evaluate_expression(expr)
-
-            # Case 2: Partial substitution inside a string
-            for k, v in self.context.items():
-                if isinstance(v, dict):
-                    for subk, subv in v.items():
-                        placeholder = f"${{{k}.{subk}}}"
-                        if placeholder in value:
-                            value = value.replace(placeholder, str(subv))
-                elif isinstance(v, str):
-                    value = value.replace(f"${{{k}}}", v)
+            pattern = re.compile(r"\${([^}]+)}")
+            matches = pattern.findall(value)
+    
+            for match in matches:
+                try:
+                    resolved = self._safe_resolve(match.split("."), self.context)
+                    value = value.replace(f"${{{match}}}", str(resolved))
+                except Exception as e:
+                    print(f"⚠️ Failed to resolve: ${{{match}}} — {e}")
             return value
-        else:
-            return value  # Return non-str inputs unchanged
+    
+        elif isinstance(value, dict):
+            return {k: self._resolve_input(v) for k, v in value.items()}
+    
+        elif isinstance(value, list):
+            return [self._resolve_input(v) for v in value]
+    
+        return value
 
+    def _safe_resolve(self, path_parts, context):
+        current = context
+        for part in path_parts:
+            # Handle indexed access like [0]
+            if "[" in part and "]" in part:
+                base, index = re.match(r"(.*?)\[(\d+)\]", part).groups()
+                current = current[base][int(index)]
+            else:
+                current = current[part]
+        return current
    
     def _resolve_function(self, path: str, script: Optional[str] = None):
         if script:
