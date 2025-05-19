@@ -606,7 +606,7 @@ Clarifications:
     
         return prompt
 
-    def _make_output_serializable(output):
+    def _make_output_serializable(self, output):
         if isinstance(output, pd.DataFrame):
             return {
                 "__type__": "DataFrame",
@@ -760,7 +760,7 @@ Clarifications:
             except Exception as e:
                 self._handle_step_error(step, step_id, visit_key, e)
 
-        output = _make_output_serializable(output)
+        output = self._make_output_serializable(output)
         if isinstance(output, (pd.DataFrame, pd.Series, np.ndarray)):
             print(f"⚠️ Auto-converted non-serializable output ({type(output).__name__}) to JSON-safe format.")
 
@@ -916,7 +916,7 @@ Clarifications:
             except Exception as e:
                 self._handle_step_error(step, step_id, visit_key, e)
 
-        output = _make_output_serializable(output)
+        output = self._make_output_serializable(output)
         if isinstance(output, (pd.DataFrame, pd.Series, np.ndarray)):
             print(f"⚠️ Auto-converted non-serializable output ({type(output).__name__}) to JSON-safe format.")
             
