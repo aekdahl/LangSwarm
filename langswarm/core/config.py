@@ -13,6 +13,8 @@ import inspect
 import tempfile
 import importlib
 import subprocess
+import numpy as np
+import pandas as pd
 import nest_asyncio
 from pathlib import Path
 from jinja2 import Template
@@ -604,6 +606,25 @@ Clarifications:
     
         return prompt
 
+    def _make_output_serializable(output):
+        if isinstance(output, pd.DataFrame):
+            return {
+                "__type__": "DataFrame",
+                "value": output.to_dict(orient="split")  # safer for roundtrip
+            }
+        elif isinstance(output, pd.Series):
+            return {
+                "__type__": "Series",
+                "value": output.to_dict()
+            }
+        elif isinstance(output, np.ndarray):
+            return {
+                "__type__": "ndarray",
+                "value": output.tolist()
+            }
+        else:
+            return output  # passthrough for everything else
+
     def _execute_step(self, step: Dict, mark_visited=True):
         return self._execute_step_inner_sync(step, mark_visited)
 
@@ -738,7 +759,11 @@ Clarifications:
     
             except Exception as e:
                 self._handle_step_error(step, step_id, visit_key, e)
-    
+
+        output = _make_output_serializable(output)
+        if isinstance(output, (pd.DataFrame, pd.Series, np.ndarray)):
+            print(f"⚠️ Auto-converted non-serializable output ({type(output).__name__}) to JSON-safe format.")
+
         # Explicitly store outputs regardless of conditional steps:
         self.context['previous_output'] = output
         self.context['step_outputs'][step_id] = output
@@ -890,7 +915,11 @@ Clarifications:
     
             except Exception as e:
                 self._handle_step_error(step, step_id, visit_key, e)
-    
+
+        output = _make_output_serializable(output)
+        if isinstance(output, (pd.DataFrame, pd.Series, np.ndarray)):
+            print(f"⚠️ Auto-converted non-serializable output ({type(output).__name__}) to JSON-safe format.")
+            
         # Explicitly store outputs regardless of conditional steps:
         self.context['previous_output'] = output
         self.context['step_outputs'][step_id] = output
@@ -1170,6 +1199,16 @@ Clarifications:
             return f"<error:{expr}>"
 
     def _resolve_input(self, value):
+        # detect wrapped types
+        if isinstance(value, dict) and "__type__" in value:
+            t = value["__type__"]
+            if t == "DataFrame":
+                return pd.DataFrame(**value["value"])
+            elif t == "Series":
+                return pd.Series(value["value"])
+            elif t == "ndarray":
+                return np.array(value["value"])
+                
         if isinstance(value, str):
             pattern = re.compile(r"\${([^}]+)}")
             matches = pattern.findall(value)
