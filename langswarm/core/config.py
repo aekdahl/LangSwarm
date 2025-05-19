@@ -719,7 +719,13 @@ Clarifications:
                     func = self._resolve_function(step['function'], script=step.get('script'))
                     args = {k: self._resolve_input(v) for k, v in step.get("args", {}).items()}
                     args.setdefault("context", self.context)
-                    output = func(**args)
+                    try:
+                        output = func(**args)
+                    except Exception as e:
+                        import traceback
+                        tb = traceback.format_exc()
+                        print(f"\n🚨 Exception in function `{step['function']}`:\n{tb}")
+                        raise  # Re-raise to keep workflow intelligence working
     
                     if output == "__NOT_READY__":
                         fan_key = step.get("fan_key", "default")
@@ -865,7 +871,13 @@ Clarifications:
                     if asyncio.iscoroutinefunction(func):
                         output = await func(**args)
                     else:
-                        output = func(**args)
+                        try:
+                            output = func(**args)
+                        except Exception as e:
+                            import traceback
+                            tb = traceback.format_exc()
+                            print(f"\n🚨 Exception in function `{step['function']}`:\n{tb}")
+                            raise  # Re-raise to keep workflow intelligence working
     
                     if output == "__NOT_READY__":
                         fan_key = step.get("fan_key", "default")
