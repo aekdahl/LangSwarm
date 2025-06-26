@@ -1,3 +1,7 @@
+# PRO-FEATURE: This file contains functionality that is part of LangSwarm Pro.
+# This includes advanced memory management (fading, reinforcement, and summarization), 
+# which should be moved to the Pro repository.
+
 from typing import Any, Optional, List
 
 class MemoryMixin:

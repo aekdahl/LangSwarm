@@ -69,7 +69,7 @@ pip install langswarm
 For source builds:
 
 ```bash
-git clone https://github.com/your-org/langswarm.git
+git clone https://github.com/aekdahl/langswarm.git
 cd langswarm
 pip install -r requirements.txt
 ```

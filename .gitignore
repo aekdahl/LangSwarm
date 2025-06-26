@@ -22,6 +22,9 @@ dist/
 # Checkpoints (e.g., for ML frameworks)
 checkpoints/
 *.ckpt
+*.local
+*.log
+*.jupyter
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/

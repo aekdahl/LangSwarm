@@ -1,3 +1,7 @@
+# PRO-FEATURE: This file contains functionality that is part of LangSwarm Pro.
+# This includes dynamic agent creation and deployment (SpawnAgentTool), 
+# which should be moved to the Pro repository.
+
 import uuid
 import threading
 from typing import Callable, Dict, Any

@@ -1,3 +1,7 @@
+# PRO-FEATURE: This file contains functionality that is part of LangSwarm Pro.
+# This includes dynamic tool deployment via the ToolDeployer class, 
+# which should be moved to the Pro repository.
+
 # ToDo: Add field validation!
 
 import os
@@ -243,7 +247,7 @@ class LangSwarmConfigLoader:
                     env_key = item.split("env:", 1)[1]
                     obj[i] = os.getenv(env_key, "")
                 elif isinstance(item, str) and item.startswith("setenv:"):
-                    # lists have no “key” name, so we can’t set
+                    # lists have no "key" name, so we can't set
                     # os.environ[name] here — skip or log:
                     val = item.split("setenv:", 1)[1]
                     obj[i] = val
@@ -401,7 +405,7 @@ class WorkflowExecutor:
             first = self._run_workflow_inner(workflow_id, user_input)
             # 2) actually execute it
             self._execute_step(first)
-            # 3) return whatever ended up as the “user” output or last output
+            # 3) return whatever ended up as the "user" output or last output
             return self.context.get("user_output", self.context.get("previous_output"))
 
         # ---------- async path ----------
@@ -417,7 +421,7 @@ class WorkflowExecutor:
             loop = asyncio.get_event_loop()
             if inspect.iscoroutine(coro):
                 return loop.run_until_complete(coro)
-            return coro                        # defensive – shouldn’t happen
+            return coro                        # defensive – shouldn't happen
 
     async def run_workflow_async(self, workflow_id: str, user_input: str):
         first_step = self._run_workflow_inner(workflow_id, user_input) 
@@ -571,7 +575,7 @@ class WorkflowExecutor:
 
     def _build_no_mcp_system_prompt(self, tools_metadata: dict):
         prompt = """
-You are TimeBot’s “tool selector” assistant. Your job is solely to decide which backend function (TimeBot “tool”) should handle the user’s request, and with what arguments.
+You are TimeBot's "tool selector" assistant. Your job is solely to decide which backend function (TimeBot "tool") should handle the user's request, and with what arguments.
 
 ❗ You do NOT execute the function yourself, do NOT return conversational text, and do NOT explain your reasoning: you only emit JSON pointing to the right tool call.
 
@@ -600,7 +604,7 @@ If any required parameter is missing or ambiguous, instead return:
 Clarifications:
 - Only emit one JSON object; do not include any explanatory text.
 - If you have enough information, choose the precise tool and fill all required parameters.
-- If you’re uncertain which tool or missing required data, use the clarify spec above.
+- If you're uncertain which tool or missing required data, use the clarify spec above.
 - ALWAYS return pure JSON.
         """
     
@@ -969,8 +973,6 @@ Clarifications:
         if not isinstance(targets, list):
             targets = [targets]
 
-        print(f"\n🗣  Step “{step_id}” produced output:\n{output}\n")
-
         fan_key = step.get("fan_key") if step else None
 
         for target in targets:
@@ -991,14 +993,14 @@ Clarifications:
                     else:                                                # ← fallback
                         self.context["user_output"] = output
                     print("💬  Output was returned to user\n")
-                    continue  # nothing else to do for the “user” pseudo‑step
+                    continue  # nothing else to do for the "user" pseudo‑step
 
                 # 1b. normal step‑id ----------------------------------------------------------------
                     
                 #print("target:", target)
                 target_step = self._get_step_by_id(target)
 
-                # If it’s a fan‑in we just queue it
+                # If it's a fan‑in we just queue it
                 if fan_key and target_step.get("is_fan_in"):
                     self.context["pending_fanins"].setdefault(fan_key, set()).add(
                         target_step["id"]
@@ -1085,7 +1087,7 @@ Clarifications:
                     print("\n💬 Output was returned to user")
                     continue
 
-                # normal “step id”
+                # normal "step id"
                 target_step = self._get_step_by_id(target)
                 if fan_key:
                     target_step["fan_key"] = fan_key
@@ -1435,8 +1437,8 @@ class ToolDeployer:
         
         mode = cfg.get("mode", "http")  # 🔥 NEW: support 'stdio' mode alongside 'http'
 
-        if mode == 'stdio':  # 🔥 NEW: stdio‐mode deployment
-            print(f"🚀 StdIO‐mode tool '{tool_id}' is deployed upon tool call.")
+        if mode == 'stdio':  # 🔥 NEW: stdio‑mode deployment
+            print(f"🚀 StdIO-mode tool '{tool_id}' is deployed upon tool call.")
             return
         
         if cfg.get("deployment_target", None) == 'gcp':
@@ -1491,7 +1493,7 @@ class ToolDeployer:
                     environment=resolved
                 )
 
-                print(f"Started MCP tool: {container.name} (ID: {container.id})")
+                print(f"✅ Container started (id={container.id[:12]})")
 
             else:
                 print("💻 Running natively — falling back to local CLI deploy...")
@@ -1610,7 +1612,7 @@ class ToolDeployer:
         cid = proc.stdout.strip()
         print(f"✅ Container started (id={cid[:12]})")
 
-        # ──── 2) Poll Docker for “running” state ───────────────────────
+        # ──── 2) Poll Docker for "running" state ──────────────────────
         for i in range(5):
             state = subprocess.run(
                 ["docker", "inspect", "--format={{.State.Status}}", name],
