@@ -2,15 +2,32 @@
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import Callable, Dict, Any, Type
+from typing import Callable, Dict, Any, Type, Optional
 import threading
 
 class BaseMCPToolServer:
-    def __init__(self, name: str, description: str):
+    def __init__(self, name: str, description: str, local_mode: bool = False):
         self.name = name
         self.description = description
+        self.local_mode = local_mode  # 🔧 Add local mode flag
         self._tasks: Dict[str, Dict[str, Any]] = {}
         self._lock = threading.Lock()
+        
+        # Register globally for local mode detection
+        if local_mode:
+            self._register_globally()
+
+    def _register_globally(self):
+        """Register this server globally for local mode detection."""
+        if not hasattr(BaseMCPToolServer, '_global_registry'):
+            BaseMCPToolServer._global_registry = {}
+        BaseMCPToolServer._global_registry[self.name] = self
+
+    @classmethod
+    def get_local_server(cls, name: str) -> Optional['BaseMCPToolServer']:
+        """Get a locally registered server by name."""
+        registry = getattr(cls, '_global_registry', {})
+        return registry.get(name)
 
     def add_task(self, name: str, description: str, input_model: Type[BaseModel],
                  output_model: Type[BaseModel], handler: Callable):
@@ -21,7 +38,53 @@ class BaseMCPToolServer:
             "handler": handler
         }
 
-    def build_app(self) -> FastAPI:
+    def get_schema(self) -> Dict[str, Any]:
+        """Get the schema for this tool (local mode)."""
+        return {
+            "tool": self.name,
+            "description": self.description,
+            "tools": [
+                {
+                    "name": task_name,
+                    "description": meta["description"],
+                    "inputSchema": meta["input_model"].schema(),
+                    "outputSchema": meta["output_model"].schema()
+                }
+                for task_name, meta in self._tasks.items()
+            ]
+        }
+
+    def call_task(self, task_name: str, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Call a task directly (local mode)."""
+        if task_name not in self._tasks:
+            raise ValueError(f"Task '{task_name}' not found in {self.name}")
+        
+        meta = self._tasks[task_name]
+        handler = meta["handler"]
+        input_model = meta["input_model"]
+        output_model = meta["output_model"]
+        
+        with self._lock:
+            try:
+                # Validate input
+                validated_input = input_model(**params)
+                
+                # Call handler
+                result = handler(**validated_input.dict())
+                
+                # Validate output
+                validated_output = output_model(**result)
+                return validated_output.dict()
+                
+            except Exception as e:
+                return {"error": str(e)}
+
+    def build_app(self) -> Optional[FastAPI]:
+        """Build FastAPI app - skip for local mode."""
+        if self.local_mode:
+            print(f"🔧 {self.name} running in LOCAL MODE - no HTTP server needed")
+            return None
+        
         app = FastAPI(title=self.name, description=self.description)
 
         @app.get("/schema")

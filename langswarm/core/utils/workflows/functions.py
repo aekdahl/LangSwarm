@@ -160,6 +160,19 @@ def mcp_fetch_schema(
     • stdio:  spin up container, run “<stdio_cmd> schema” over stdio, tear down.
     """
     print("kwargs", kwargs)
+    
+    # 🔧 Check for local:// URLs first
+    if mcp_url.startswith("local://"):
+        tool_name = mcp_url.split("://", 1)[1]
+        from langswarm.mcp.server_base import BaseMCPToolServer
+        local_server = BaseMCPToolServer.get_local_server(tool_name)
+        
+        if local_server:
+            print(f"🔧 Local schema fetch: {tool_name}")
+            return local_server.get_schema()
+        else:
+            raise ValueError(f"Local server '{tool_name}' not found")
+    
     tool_deployer = kwargs.get("context", {}).get("tool_deployer")
     previous_output = kwargs.get("context", {}).get("previous_output")
     
@@ -209,6 +222,36 @@ def mcp_call(
     • stdio:  spin up container, send JSON-RPC over stdio, tear down.
     """
     print("kwargs", kwargs)
+    
+    # 🔧 Check for local:// URLs first
+    if mcp_url.startswith("local://"):
+        tool_name = mcp_url.split("://", 1)[1]
+        from langswarm.mcp.server_base import BaseMCPToolServer
+        local_server = BaseMCPToolServer.get_local_server(tool_name)
+        
+        if local_server:
+            print(f"🔧 Local call: {tool_name}")
+            
+            # Extract task name and parameters from payload
+            if "method" in payload and payload["method"] == "tools/call":
+                # JSON-RPC format
+                params = payload.get("params", {})
+                task_name = params.get("name")
+                task_args = params.get("arguments", {})
+            elif "name" in payload:
+                # Direct format
+                task_name = payload["name"]
+                task_args = payload.get("arguments", payload.get("args", {}))
+            else:
+                raise ValueError("Invalid payload format")
+            
+            # Call the task directly
+            result = local_server.call_task(task_name, task_args)
+            print(f"✅ Local call result keys: {list(result.keys())}")
+            return result
+        else:
+            raise ValueError(f"Local server '{tool_name}' not found")
+    
     tool_deployer = kwargs.get("context", {}).get("tool_deployer")
     is_stdio = (mode == "stdio") or mcp_url.startswith("stdio://")
 

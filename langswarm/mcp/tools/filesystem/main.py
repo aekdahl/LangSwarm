@@ -37,7 +37,8 @@ def read_file(path: str):
 # === Build MCP Server ===
 server = BaseMCPToolServer(
     name="filesystem",
-    description="Read-only access to the local filesystem via MCP."
+    description="Read-only access to the local filesystem via MCP.",
+    local_mode=True  # 🔧 Enable local mode!
 )
 
 server.add_task(
@@ -56,7 +57,13 @@ server.add_task(
     handler=read_file
 )
 
+# Build app (None if local_mode=True)
 app = server.build_app()
 
 if __name__ == "__main__":
-    uvicorn.run("mcp.tools.filesystem.main:app", host="0.0.0.0", port=4020, reload=True)
+    if server.local_mode:
+        print(f"✅ {server.name} ready for local mode usage")
+        # In local mode, server is ready to use - no uvicorn needed
+    else:
+        # Only run uvicorn server if not in local mode
+        uvicorn.run("mcp.tools.filesystem.main:app", host="0.0.0.0", port=4020, reload=True)

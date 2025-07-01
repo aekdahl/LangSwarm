@@ -4,3 +4,4 @@ from langswarm.memory.adapters._langswarm.chromadb.main import ChromaDBAdapter
 from langswarm.memory.adapters._langswarm.gcs.main import GCSAdapter
 from langswarm.memory.adapters._langswarm.elasticsearch.main import ElasticsearchAdapter
 from langswarm.memory.adapters._langswarm.qdrant.main import QdrantAdapter
+from langswarm.memory.adapters._langswarm.bigquery.main import BigQueryAdapter
