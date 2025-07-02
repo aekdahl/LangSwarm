@@ -1,4 +1,3 @@
-
 import os
 import re
 import sys
@@ -47,7 +46,13 @@ class MiddlewareMixin:
         
         # assume you can get the raw tools list from your loader or registry
         from langswarm.core.config import ToolDeployer
-        self.tool_deployer = ToolDeployer(self.tool_registry.tools)
+        try:
+            # Try to get tools list from registry
+            tools_list = getattr(self.tool_registry, 'tools', [])
+            self.tool_deployer = ToolDeployer(tools_list)
+        except Exception:
+            # Fallback for test environments or incomplete registries
+            self.tool_deployer = None
         
         self.ask_to_continue_regex = r"\[AGENT_REQUEST:PROCEED_WITH_INTERNAL_STEP\]"
     
@@ -64,7 +69,7 @@ class MiddlewareMixin:
         mod_name = handler.__class__.__module__
         pkg_name = mod_name.rsplit('.', 1)[0]   # drop the class name
 
-        # 2a) Try importlib.resources (Python 3.9+)
+        # 2a) Try importlib.resources (Python 3.9+)
         try:
             pkg = importlib.import_module(pkg_name)
             # this gives a Traversable object pointing at the package dir
@@ -85,8 +90,98 @@ class MiddlewareMixin:
 
         raise FileNotFoundError(f"No workflows.yaml found in package {pkg_name!r}")
 
+    def use_mcp_workflow(self, tool_id: str, intent: str, context: str = "") -> Dict:
+        """
+        Intent-based MCP tool invocation.
+        Uses the tool's orchestration workflow to interpret natural language intent.
+        """
+        from langswarm.core.config import LangSwarmConfigLoader, WorkflowExecutor
+        
+        # Get tool handler
+        handler = None
+        if isinstance(self.tool_registry, dict):
+            handler = self.tool_registry.get(tool_id)
+        else:
+            handler = self.tool_registry.get_tool(tool_id)
+            
+        if not handler:
+            raise ValueError(f"Tool '{tool_id}' not found in registry")
+        
+        # Find and load workflow
+        config_path, workflow_path = self._find_workflow_path(handler)
+        
+        if not os.path.exists(workflow_path):
+            raise FileNotFoundError(f"No workflow found for tool: {tool_id} at {workflow_path}")
+
+        loader = LangSwarmConfigLoader(config_path=config_path)
+        workflows, agents, brokers, tools = loader.load()
+        
+        executor = WorkflowExecutor(workflows, agents)
+        executor.context["request_id"] = str(uuid.uuid4())
+        
+        # Format input for intent-based processing
+        user_input = f"Intent: {intent}"
+        if context:
+            user_input += f"\nContext: {context}"
+        
+        # Pass tool_deployer if available, otherwise let executor handle defaults
+        kwargs = {"user_input": user_input}
+        if self.tool_deployer:
+            kwargs["tool_deployer"] = self.tool_deployer
+            
+        output = executor.run_workflow(handler.main_workflow, **kwargs)
+        
+        print("MCP Intent-based output:", output)
+        return output
+
+    def use_mcp_direct(self, tool_id: str, method: str, params: Dict) -> Dict:
+        """
+        Direct MCP tool invocation.
+        Bypasses orchestration workflow for simple method calls.
+        """
+        from langswarm.core.utils.workflows.functions import mcp_call
+        
+        # Get tool handler to determine MCP URL/mode
+        handler = None
+        if isinstance(self.tool_registry, dict):
+            handler = self.tool_registry.get(tool_id)
+        else:
+            handler = self.tool_registry.get_tool(tool_id)
+            
+        if not handler:
+            raise ValueError(f"Tool '{tool_id}' not found in registry")
+        
+        # Build MCP URL based on tool configuration
+        if getattr(handler, 'local_mode', False):
+            mcp_url = f"local://{tool_id}"
+        elif hasattr(handler, 'mcp_url'):
+            mcp_url = handler.mcp_url
+        else:
+            raise ValueError(f"Tool '{tool_id}' has no MCP URL configuration")
+        
+        # Make direct MCP call
+        payload = {
+            "name": method,
+            "arguments": params
+        }
+        
+        # Build context with tool_deployer if available
+        context = {}
+        if self.tool_deployer:
+            context["tool_deployer"] = self.tool_deployer
+            
+        result = mcp_call(
+            mcp_url=mcp_url,
+            payload=payload,
+            context=context
+        )
+        
+        print("MCP Direct output:", result)
+        return result
+
     def use_mcp_tool(self, tool, tool_id: str, tool_type: str, workflow_id: str, input_data: str) -> Dict:
         """
+        Legacy method for backward compatibility.
         High-level entrypoint to call an MCP tool via its associated workflow.
         - Loads workflow from langswarm/mcp/tools/{tool_id}/workflows.yaml
         - Injects input_data into the workflow
@@ -110,16 +205,24 @@ class MiddlewareMixin:
         executor.context["request_id"] = str(uuid.uuid4())  # Unique per request
         
         #print("input_data:", input_data)
-        output = executor.run_workflow(workflow_id, user_input=input_data, tool_deployer = self.tool_deployer)
+        # Pass tool_deployer if available
+        kwargs = {"user_input": input_data}
+        if self.tool_deployer:
+            kwargs["tool_deployer"] = self.tool_deployer
+            
+        output = executor.run_workflow(workflow_id, **kwargs)
 
         print("MCP output", output)
         return output
 
     def to_middleware(self, agent_input):
         """
-        Process agent input and route it appropriately.
+        Enhanced middleware that supports both intent-based and direct MCP tool patterns.
+        
+        Intent-based: {"mcp": {"tool": "github_mcp", "intent": "create issue", "context": "..."}}
+        Direct: {"mcp": {"tool": "filesystem", "method": "read_file", "params": {"path": "/tmp/file"}}}
 
-        :param agent_input: str - The agent's input.
+        :param agent_input: dict - The agent's structured input.
         :return: Tuple[int, str] - (status_code, result).
         """
         
@@ -132,7 +235,43 @@ class MiddlewareMixin:
             self._log_event("No action detected, forwarding input", "info")
             return 200, agent_input
 
-        # Detect action type
+        # Handle MCP-specific routing
+        if 'mcp' in agent_input:
+            mcp_data = agent_input['mcp']
+            tool_id = mcp_data.get('tool')
+            
+            if not tool_id:
+                return 400, "MCP request missing 'tool' field"
+            
+            try:
+                if 'intent' in mcp_data:
+                    # Intent-based pattern: Use tool's orchestration workflow
+                    self._log_event(f"Using intent-based MCP: {tool_id}", "info")
+                    result = self.use_mcp_workflow(
+                        tool_id=tool_id,
+                        intent=mcp_data['intent'],
+                        context=mcp_data.get('context', '')
+                    )
+                    return 201, json.dumps(result, indent=2)
+                    
+                elif 'method' in mcp_data:
+                    # Direct pattern: Call specific method
+                    self._log_event(f"Using direct MCP: {tool_id}.{mcp_data['method']}", "info")
+                    result = self.use_mcp_direct(
+                        tool_id=tool_id,
+                        method=mcp_data['method'],
+                        params=mcp_data.get('params', {})
+                    )
+                    return 201, json.dumps(result, indent=2)
+                    
+                else:
+                    return 400, "MCP request must have either 'intent' or 'method' field"
+                    
+            except Exception as e:
+                self._log_event(f"MCP tool {tool_id} error: {e}", "error")
+                return 500, f"[ERROR] {str(e)}"
+
+        # Detect action type for legacy tools
         actions = [{"_id": key, **value} for key, value in agent_input.items()]
         
         print("Actions:", actions)
@@ -233,7 +372,7 @@ class MiddlewareMixin:
 
         try:
             start_time = time.time()
-            if handler.type.lower().startswith('mcp'):
+            if hasattr(handler, 'type') and handler.type.lower().startswith('mcp'):
                 result = self.use_mcp_tool(handler, handler.id, handler.type, handler.main_workflow, f"Tool use input: {method} and {params}")
             else:
                 result = handler.run({"method": method, "params": params})

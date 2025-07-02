@@ -104,13 +104,14 @@ class LangSwarmConfigLoader:
         self._load_builtin_tool_classes()
 
     def _load_builtin_tool_classes(self):
+        """Not needed for anything other than Remote and external MCP tools"""
         # populate with whatever core tools you know about
         ##from langswarm.mcp.tools.mcpgithubtool.main import MCPGitHubTool
-        #from langswarm.synapse.tools.files.main  import FilesystemTool
+        #from langswarm.mcp.tools.filesystem.main  import FilesystemTool
         # …etc…
         self.tool_classes = {
-            ##"mcpgithubtool":   MCPGitHubTool,
-        #    "filesystemtool": FilesystemTool,
+            #"mcpgithubtool":   MCPGitHubTool,
+            #"filesystemtool": FilesystemTool,
         #    # add more here (or via register_tool_class below)
         }
         pass
@@ -279,7 +280,9 @@ class LangSwarmConfigLoader:
                 cls = self.tool_classes.get(ttype)
 
             if not cls:
-                print(f"⚠️  Unknown tool type '{ttype}', skipping initialization.")
+                print(f"⚠️  Unknown tool type '{ttype}' in tool '{tool_cfg.get('id', 'unnamed')}', skipping initialization.")
+                print(f"   Available tool types: {list(self.tool_classes.keys())}")
+                print(f"   Tip: Use 'type: function' for metadata-only tools or register custom tool classes.")
                 continue
 
             # build the instance
@@ -571,7 +574,7 @@ class WorkflowExecutor:
 
     def _build_no_mcp_system_prompt(self, tools_metadata: dict):
         prompt = """
-You are TimeBot’s “tool selector” assistant. Your job is solely to decide which backend function (TimeBot “tool”) should handle the user’s request, and with what arguments.
+Your job is solely to decide which backend function should handle the user’s request, and with what arguments.
 
 ❗ You do NOT execute the function yourself, do NOT return conversational text, and do NOT explain your reasoning: you only emit JSON pointing to the right tool call.
 
