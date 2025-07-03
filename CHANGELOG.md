@@ -5,7 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.0.46] - 2024-12-XX
+## [0.0.48]
+
+### Fixed
+- **Critical Workflow Intelligence Bug**: Fixed `TypeError: unhashable type: 'slice'` error in workflow reporting
+  - **Issue**: Line 116 in `intelligence.py` was incorrectly attempting to slice a dictionary
+  - **Root Cause**: `self.step_data[step_id][:20]` tried to slice dict instead of using it directly
+  - **Impact**: Prevented workflow completion and integration tests from running
+  - **Fix**: Removed incorrect slice operation, now uses `self.step_data[step_id]` directly
+  - **Testing**: Verified fix resolves error and maintains report functionality
+
+### Enhanced
+- **MCP Tool Architecture**: Continued improvements to BaseTool inheritance pattern
+  - **FilesystemMCPTool**: Simplified from 63 lines to 21 lines (67% reduction)
+  - **MCPGitHubTool**: Updated to use new simplified architecture
+  - **Universal Pattern**: Both tools now leverage common MCP functionality in BaseTool
+  - **Scalability**: Template established for easy creation of new MCP tools
+
+## [0.0.47]
+
+### Added  
+- **Simplified MCP Tool Architecture**: Revolutionary BaseTool enhancement for MCP tool development
+  - **Automatic Pydantic Bypass**: `_is_mcp_tool = True` flag enables validation bypass via `__init_subclass__`
+  - **Common MCP Methods**: Built-in `invoke()`, `_run()`, `_handle_mcp_structured_input()` for all MCP tools
+  - **Intelligent Attribute Setup**: Automatic configuration of MCP-specific attributes (id, type, workflows)
+  - **Pattern Support**: Unified handling of both direct and intent-based MCP patterns
+
+### Fixed
+- **MCP Tool Registration**: Resolved "Unknown tool type 'mcpfilesystem'" error
+  - **Root Cause**: MCP tool classes weren't registered in `LangSwarmConfigLoader`
+  - **Solution**: Proper BaseTool inheritance with Pydantic validation bypass
+  - **Impact**: Both `mcpfilesystem` and `mcpgithubtool` now work seamlessly
+
+## [0.0.46]
 
 ### Added
 - **Enhanced MCP Patterns**: Revolutionary new architecture for MCP tool integration

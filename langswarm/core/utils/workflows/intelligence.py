@@ -2,7 +2,7 @@ import time
 import json
 import asyncio
 import functools
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 class WorkflowIntelligence:
     def __init__(self, config: Optional[Dict] = None):
@@ -113,7 +113,7 @@ class WorkflowIntelligence:
         print(header)
         print("──────────────────────────────────────────────────────────────────────────────────────────────────────────")
         for idx, step_id in enumerate(self.step_order, start=1):
-            data = self.step_data[step_id][:20]
+            data = self.step_data[step_id]
             duration = f"{data.get('duration', 0):.3f}s" if data.get("duration") else "-"
             status = data.get("status", "unknown")[:7]
             output_preview = (data.get("output_summary") or "").replace("\n", " ")[:40]
