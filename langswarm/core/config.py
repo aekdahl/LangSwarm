@@ -104,17 +104,16 @@ class LangSwarmConfigLoader:
         self._load_builtin_tool_classes()
 
     def _load_builtin_tool_classes(self):
-        """Not needed for anything other than Remote and external MCP tools"""
-        # populate with whatever core tools you know about
-        ##from langswarm.mcp.tools.mcpgithubtool.main import MCPGitHubTool
-        #from langswarm.mcp.tools.filesystem.main  import FilesystemTool
-        # …etc…
+        """Load builtin MCP tool classes"""
+        # Import MCP tool wrapper classes
+        from langswarm.mcp.tools.filesystem.main import FilesystemMCPTool
+        from langswarm.mcp.tools.mcpgithubtool.main import MCPGitHubTool
+        
         self.tool_classes = {
-            #"mcpgithubtool":   MCPGitHubTool,
-            #"filesystemtool": FilesystemTool,
-        #    # add more here (or via register_tool_class below)
+            "mcpfilesystem": FilesystemMCPTool,
+            "mcpgithubtool": MCPGitHubTool,
+            # add more here (or via register_tool_class below)
         }
-        pass
 
     def register_tool_class(self, _type: str, cls: type):
         """Allow adding new tool classes at runtime."""
@@ -132,7 +131,8 @@ class LangSwarmConfigLoader:
             self.config_data.get('workflows', {}), 
             self.agents, 
             self.brokers, 
-            self.config_data.get('tools', []),
+            # self.config_data.get('tools', []),
+            list(self.tools.values()),  # Return instantiated tools, not raw config
             self.tools_metadata
         )
 
@@ -295,7 +295,19 @@ class LangSwarmConfigLoader:
                 self.plugins[plugin["id"]] = self._initialize_component(plugin, ProcessToolkit)
 
     def _initialize_component(self, config, cls):
-        config_args = {"identifier": config["id"], "name": config["type"], **config.get("settings", {})}
+        # For MCP tools, ensure all required fields are provided
+        if config["type"].startswith("mcp"):
+            config_args = {
+                "identifier": config["id"], 
+                "name": config["type"],
+                "description": config.get("description", f"MCP tool: {config['type']}"),
+                "instruction": config.get("instruction", f"Use the {config['type']} MCP tool"),
+                "brief": config.get("brief", f"{config['type']} tool"),
+                **{k: v for k, v in config.items() if k not in ["id", "type", "description", "instruction", "brief"]},
+                **config.get("settings", {})
+            }
+        else:
+            config_args = {"identifier": config["id"], "name": config["type"], **config.get("settings", {})}
         return self._call_with_valid_args(cls, config_args)
 
     def _call_with_valid_args(self, func, config):
