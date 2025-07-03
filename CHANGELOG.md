@@ -5,6 +5,65 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.50] - 2025-01-07
+
+### 🚀 Major Enhancements
+- **Revolutionary Structured JSON Response Format**: Agents can now provide both user communication AND tool calls in a single response
+  - **Problem Solved**: Previous forced choice between human-readable responses OR tool calls
+  - **New Format**: `{"response": "I'll check that file", "mcp": {"tool": "filesystem", "method": "read_file", "params": {"path": "/tmp/file"}}}`
+  - **Backward Compatibility**: Still supports plain text responses and legacy tool-only formats
+  - **Enhanced UX**: Agents can explain actions while executing them
+
+- **Smart Response Modes**: Configurable handling of combined responses
+  - **Integrated Mode** (default): Tool results combined with user explanation for seamless final response
+  - **Streaming Mode**: Immediate user feedback while tools execute in parallel
+  - **User Experience**: Choose between immediate responses or comprehensive combined results
+
+### 🔧 Critical Bug Fixes
+- **Fixed `pkg_dir` Reference Error**: Resolved critical MCP filesystem tool failure
+  - **Issue**: `local variable 'pkg_dir' referenced before assignment` in `middleware.py:_find_workflow_path()`
+  - **Root Cause**: Variable only defined in fallback code path, not in importlib.resources path
+  - **Impact**: Prevented filesystem MCP tool from working at all
+  - **Solution**: Properly defined `pkg_dir` in both code paths
+  - **Verification**: All existing MCP patterns now work correctly
+
+### 🎨 System Prompt Improvements  
+- **Enhanced Agent Instructions**: Updated system prompt templates with clear JSON format guidelines
+  - **Structured Format Rules**: Never mix plain text with JSON, always use structured format
+  - **Multiple Examples**: Pure conversation, tool usage, and combined response patterns
+  - **Best Practices**: Guidelines for when to use each response type
+
+- **Workflow System Integration**: Updated no_mcp workflows to use new structured format
+  - **Consistent Experience**: Both MCP and non-MCP tools use same response structure
+  - **Better Parsing**: Improved tool argument extraction and normalization
+
+### 📚 Documentation & Examples
+- **Comprehensive Response Modes Guide**: New `RESPONSE_MODES_GUIDE.md` documenting all usage patterns
+  - **Clear Examples**: Shows both integrated and streaming modes with real scenarios
+  - **Implementation Details**: How to configure agents for different response behaviors
+  - **Use Case Guidelines**: When to choose each mode for optimal user experience
+
+- **Enhanced Example Configurations**: Updated `example_mcp_config/` with new response format examples
+  - **Working Agents**: Practical examples using structured JSON responses
+  - **Configuration Templates**: Ready-to-use agent configurations
+  - **Progressive Examples**: From simple to advanced usage patterns
+
+### 🧪 Testing & Validation
+- **Comprehensive Test Coverage**: All fixes verified through extensive testing
+  - **pkg_dir Fix**: No more MCP filesystem errors
+  - **Structured Parsing**: All response format combinations work correctly  
+  - **Response Modes**: Both integrated and streaming modes function properly
+  - **Backward Compatibility**: Legacy formats still supported
+
+### 💡 Developer Experience
+- **Cleaner Architecture**: Agent wrapper code simplified and more maintainable
+- **Better Error Handling**: Improved error messages and graceful degradation
+- **Flexible Configuration**: Easy to switch between response modes per agent
+- **Forward Compatible**: Architecture supports future response enhancements
+
+### 🎯 Impact
+This release fundamentally improves the agent communication experience by eliminating the artificial constraint of choosing between explanation OR action. Agents can now be both helpful AND functional in a single response, dramatically improving the natural feel of agent interactions.
+
 ## [0.0.49]
 
 ### Fixed

@@ -75,6 +75,7 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
         memory_adapter: Optional[Type[DatabaseAdapter]] = None,
         memory_summary_adapter: Optional[Type[DatabaseAdapter]] = None,
         broker: Optional[MessageBroker] = None,
+        response_mode="integrated",  # New: "integrated" or "streaming"
         **kwargs
     ):
         kwargs.pop("provider", None)  # Remove `provider` if it exists
@@ -122,6 +123,8 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
         if self.broker:
             # Subscribe agent to relevant channels
             self.broker.subscribe(f"{self.agent.identifier}_incoming", self.handle_push_message)
+
+        self.response_mode = response_mode
 
     def handle_push_message(self, payload):
         """Handles incoming messages for the agent if a broker is active."""
@@ -323,33 +326,78 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
                 self.memory.clear()
 
         if q:
-            #q = "\n\nINITIAL QUERY\n\n"+q
-            #print("q", q)
-            
             response = self._call_agent(q, erase_query=erase_query, remove_linebreaks=remove_linebreaks)
 
             print("response", response)
             
-            # Could check for tool call already here now.
+            # Enhanced JSON parsing for structured responses
             parsed_json = self.utils.safe_json_loads(response.strip())
             
             print("parsed_json", parsed_json)
             
             if parsed_json and isinstance(parsed_json, dict):
+                # Handle structured response format: {"response": "text", "mcp": {...}, ...}
+                user_response = parsed_json.get('response', '')
+                
                 if self.__allow_middleware and parsed_json.get('mcp'):
-                    # MIDDLEWARE IMPLEMENTATION
-                    middleware_status, middleware_response = self.to_middleware(parsed_json)
-                    if middleware_status == 201:  # Middleware used tool successfully
-                        #middleware_response = "\n\nTOOL OR CAPABILITY OUTPUT\n\n"+middleware_response
-                        response = self._call_agent(
-                            middleware_response, erase_query=erase_query, remove_linebreaks=remove_linebreaks)
-                    parsed_json = self.utils.safe_json_loads(response.strip())
-
-                    # This is probably only valid for tool use, e.g. MCP
-                    response = (parsed_json.get('response') 
-                                if isinstance(parsed_json, dict) and 'response' in parsed_json else parsed_json)
+                    # Process tool call while preserving user response
+                    
+                    # Check response mode to determine behavior
+                    if self.response_mode == "streaming" and user_response:
+                        # Mode 1: Show immediate response, then tool results
+                        print(f"[Streaming Mode] Immediate response: {user_response}")
+                        
+                        # Store the immediate response for potential callback/streaming
+                        immediate_response = user_response
+                        
+                        # Execute tool
+                        middleware_status, middleware_response = self.to_middleware(parsed_json)
+                        
+                        if middleware_status == 201:  # Tool executed successfully
+                            # In streaming mode, we could return both parts
+                            # For now, we'll combine them with a clear separator
+                            return f"{immediate_response}\n\n[Tool executed successfully]\n{middleware_response}"
+                        else:
+                            # Tool failed, return immediate response with error
+                            return f"{immediate_response}\n\n[Tool error]: {middleware_response}"
+                    
+                    else:
+                        # Mode 2: Integrated response (default behavior)
+                        middleware_status, middleware_response = self.to_middleware(parsed_json)
+                        
+                        if middleware_status == 201:  # Tool executed successfully
+                            # Combine user response with tool output for context
+                            tool_context = f"\n\nTool result: {middleware_response}"
+                            
+                            # Ask agent to provide final response incorporating tool results
+                            final_prompt = f"{user_response}{tool_context}"
+                            final_response = self._call_agent(
+                                final_prompt, erase_query=erase_query, remove_linebreaks=remove_linebreaks)
+                            
+                            # Parse final response (might also be structured JSON)
+                            final_parsed = self.utils.safe_json_loads(final_response.strip())
+                            
+                            if final_parsed and isinstance(final_parsed, dict):
+                                # Return the response field or full JSON if no response field
+                                return final_parsed.get('response', final_parsed)
+                            else:
+                                # Return plain text response
+                                return final_response
+                        else:
+                            # Tool failed, return user response with error context
+                            return f"{user_response}\n\nTool error: {middleware_response}"
+                
+                elif parsed_json.get('mcp'):
+                    # MCP call present but middleware disabled
+                    return user_response or "Tool call attempted but middleware is disabled."
+                
                 else:
-                    return parsed_json
+                    # Pure response without tool calls
+                    return user_response or str(parsed_json)
+            
+            else:
+                # Fallback for non-JSON responses (backward compatibility)
+                return response
 
         return response
     

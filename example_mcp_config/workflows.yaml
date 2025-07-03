@@ -1,0 +1,9 @@
+workflows:
+  simple_filesystem_workflow:
+    - id: filesystem_step
+      steps:
+        - id: agent_call
+          agent: filesystem_agent
+          input: ${context.user_input}
+          output:
+            to: user 

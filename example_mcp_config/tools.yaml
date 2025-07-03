@@ -1,0 +1,9 @@
+tools:
+  - id: filesystem
+    type: mcpfilesystem
+    description: "Local filesystem MCP tool for reading files and listing directories"
+    local_mode: true
+    pattern: "direct"
+    methods:
+      - read_file: "Read file contents"
+      - list_directory: "List directory contents" 

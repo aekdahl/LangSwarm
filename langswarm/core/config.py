@@ -244,7 +244,7 @@ class LangSwarmConfigLoader:
                     env_key = item.split("env:", 1)[1]
                     obj[i] = os.getenv(env_key, "")
                 elif isinstance(item, str) and item.startswith("setenv:"):
-                    # lists have no “key” name, so we can’t set
+                    # lists have no "key" name, so we can't set
                     # os.environ[name] here — skip or log:
                     val = item.split("setenv:", 1)[1]
                     obj[i] = val
@@ -416,7 +416,7 @@ class WorkflowExecutor:
             first = self._run_workflow_inner(workflow_id, user_input)
             # 2) actually execute it
             self._execute_step(first)
-            # 3) return whatever ended up as the “user” output or last output
+            # 3) return whatever ended up as the "user" output or last output
             return self.context.get("user_output", self.context.get("previous_output"))
 
         # ---------- async path ----------
@@ -432,7 +432,7 @@ class WorkflowExecutor:
             loop = asyncio.get_event_loop()
             if inspect.iscoroutine(coro):
                 return loop.run_until_complete(coro)
-            return coro                        # defensive – shouldn’t happen
+            return coro                        # defensive – shouldn't happen
 
     async def run_workflow_async(self, workflow_id: str, user_input: str):
         first_step = self._run_workflow_inner(workflow_id, user_input) 
@@ -586,22 +586,30 @@ class WorkflowExecutor:
 
     def _build_no_mcp_system_prompt(self, tools_metadata: dict):
         prompt = """
-Your job is solely to decide which backend function should handle the user’s request, and with what arguments.
+Your job is to decide which backend function should handle the user's request, and with what arguments.
 
-❗ You do NOT execute the function yourself, do NOT return conversational text, and do NOT explain your reasoning: you only emit JSON pointing to the right tool call.
+**IMPORTANT**: You must respond using this exact structured JSON format:
+
+{
+  "response": "Brief explanation of what you're doing for the user",
+  "tool": "function_name",
+  "args": {"param": "value"}
+}
 
 When given a user message, you must:
 1. Map it unambiguously to exactly one of the available tools (see list below).
-2. Pass the tools id as the name parameter in the reply.
-2. Extract and normalize the required parameters for that tool.
-3. Return a single JSON object with fields:
-   - "name": a string naming the function to call (must match one of the keys below)
-   - "args": an object providing exactly the parameters that function expects
+2. Include a brief explanation in the "response" field about what you're doing
+3. Pass the tool id as the "tool" parameter in the reply.
+4. Extract and normalize the required parameters for that tool in the "args" field.
+
         """
-        prompt += '{ "name": "<function_name>", "args": { /* function args */ } }\n\n'
         prompt += """
 If any required parameter is missing or ambiguous, instead return:
-{"name": "clarify", "args": { "prompt": "<a single, clear follow-up question>" }}
+{
+  "response": "I need more information to help you with that.",
+  "tool": "clarify",
+  "args": {"prompt": "a single, clear follow-up question"}
+}
         """
         prompt += "Available functions:\n\n"
     
@@ -612,11 +620,12 @@ If any required parameter is missing or ambiguous, instead return:
 
         prompt += "---\n\n"
         prompt += """
-Clarifications:
-- Only emit one JSON object; do not include any explanatory text.
-- If you have enough information, choose the precise tool and fill all required parameters.
-- If you’re uncertain which tool or missing required data, use the clarify spec above.
-- ALWAYS return pure JSON.
+**Response Requirements:**
+- Always return valid JSON with "response", "tool", and "args" fields
+- Include a user-friendly explanation in the "response" field
+- Choose the precise tool based on the user's request
+- Fill all required parameters or ask for clarification
+- NEVER return plain text - always use the JSON structure
         """
     
         return prompt
@@ -692,8 +701,21 @@ Clarifications:
             except Exception:
                 payload = response
         
-            tool_name = payload.get('tool', payload.get('name'))
-            args = payload.get('args', {})
+            # Handle both old and new response formats
+            if isinstance(payload, dict):
+                # New structured format: {"response": "text", "tool": "name", "args": {...}}
+                user_response = payload.get('response', '')
+                tool_name = payload.get('tool', payload.get('name'))  # Support both 'tool' and 'name' for backward compatibility
+                args = payload.get('args', {})
+                
+                # Log user response if present
+                if user_response:
+                    print(f"Agent response: {user_response}")
+            else:
+                # Fallback for plain text responses
+                tool_name = None
+                args = {}
+                print(f"Agent response (non-JSON): {payload}")
         
             if tool_name in ['clarify', 'chat', 'unknown']:
                 try:
@@ -722,8 +744,11 @@ Clarifications:
                         step["input"] = f"{agent_input}\n\nHistory for tool '{tool_name}':\n{history_str}"
                         self._execute_step(step, mark_visited=False)
                         return
-            else:
+            elif tool_name:
                 raise ValueError(f"Unknown tool selected by agent: {tool_name}")
+            else:
+                # No tool call, just return the response text
+                result = user_response or str(payload)
         
             self.context['previous_output'] = result
             self.context['step_outputs'][step['id']] = result
@@ -735,7 +760,7 @@ Clarifications:
                 self._handle_output(step['id'], {"to": to_target}, result, step)
             else:
                 if "output" in step:
-                    self.intelligence.end_step(step_id, status="success", output=output)
+                    self.intelligence.end_step(step_id, status="success", output=result)
                     self._handle_output(step['id'], step["output"], result, step)
         
             if mark_visited:
@@ -847,8 +872,21 @@ Clarifications:
             except Exception:
                 payload = response
         
-            tool_name = payload.get('tool', payload.get('name'))
-            args = payload.get('args', {})
+            # Handle both old and new response formats
+            if isinstance(payload, dict):
+                # New structured format: {"response": "text", "tool": "name", "args": {...}}
+                user_response = payload.get('response', '')
+                tool_name = payload.get('tool', payload.get('name'))  # Support both 'tool' and 'name' for backward compatibility
+                args = payload.get('args', {})
+                
+                # Log user response if present
+                if user_response:
+                    print(f"Agent response: {user_response}")
+            else:
+                # Fallback for plain text responses
+                tool_name = None
+                args = {}
+                print(f"Agent response (non-JSON): {payload}")
         
             if tool_name in ['clarify', 'chat', 'unknown']:
                 try:
@@ -877,8 +915,11 @@ Clarifications:
                         step["input"] = f"{agent_input}\n\nHistory for tool '{tool_name}':\n{history_str}"
                         await self._execute_step_async(step, mark_visited=False)
                         return
-            else:
+            elif tool_name:
                 raise ValueError(f"Unknown tool selected by agent: {tool_name}")
+            else:
+                # No tool call, just return the response text
+                result = user_response or str(payload)
         
             self.context['previous_output'] = result
             self.context['step_outputs'][step['id']] = result
@@ -890,7 +931,7 @@ Clarifications:
                 self._handle_output(step['id'], {"to": to_target}, result, step)
             else:
                 if "output" in step:
-                    self.intelligence.end_step(step_id, status="success", output=output)
+                    self.intelligence.end_step(step_id, status="success", output=result)
                     self._handle_output(step['id'], step["output"], result, step)
         
             if mark_visited:
@@ -984,7 +1025,7 @@ Clarifications:
         if not isinstance(targets, list):
             targets = [targets]
 
-        print(f"\n🗣  Step “{step_id}” produced output:\n{output}\n")
+        print(f"\n🗣  Step \"{step_id}\" produced output:\n{output}\n")
 
         fan_key = step.get("fan_key") if step else None
 
@@ -1006,14 +1047,14 @@ Clarifications:
                     else:                                                # ← fallback
                         self.context["user_output"] = output
                     print("💬  Output was returned to user\n")
-                    continue  # nothing else to do for the “user” pseudo‑step
+                    continue  # nothing else to do for the "user" pseudo‑step
 
                 # 1b. normal step‑id ----------------------------------------------------------------
                     
                 #print("target:", target)
                 target_step = self._get_step_by_id(target)
 
-                # If it’s a fan‑in we just queue it
+                # If it's a fan‑in we just queue it
                 if fan_key and target_step.get("is_fan_in"):
                     self.context["pending_fanins"].setdefault(fan_key, set()).add(
                         target_step["id"]
@@ -1100,7 +1141,7 @@ Clarifications:
                     print("\n💬 Output was returned to user")
                     continue
 
-                # normal “step id”
+                # normal "step id"
                 target_step = self._get_step_by_id(target)
                 if fan_key:
                     target_step["fan_key"] = fan_key
@@ -1450,8 +1491,8 @@ class ToolDeployer:
         
         mode = cfg.get("mode", "http")  # 🔥 NEW: support 'stdio' mode alongside 'http'
 
-        if mode == 'stdio':  # 🔥 NEW: stdio‐mode deployment
-            print(f"🚀 StdIO‐mode tool '{tool_id}' is deployed upon tool call.")
+        if mode == 'stdio':  # 🔥 NEW: stdio‑mode deployment
+            print(f"🔥 StdIO‑mode tool '{tool_id}' is deployed upon tool call.")
             return
         
         if cfg.get("deployment_target", None) == 'gcp':
@@ -1625,7 +1666,7 @@ class ToolDeployer:
         cid = proc.stdout.strip()
         print(f"✅ Container started (id={cid[:12]})")
 
-        # ──── 2) Poll Docker for “running” state ───────────────────────
+        # ──── 2) Poll Docker for "running" state ───────────────────────
         for i in range(5):
             state = subprocess.run(
                 ["docker", "inspect", "--format={{.State.Status}}", name],

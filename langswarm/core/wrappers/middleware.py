@@ -72,6 +72,14 @@ class MiddlewareMixin:
         # 2a) Try importlib.resources (Python 3.9+)
         try:
             pkg = importlib.import_module(pkg_name)
+            # Get the package directory path for importlib.resources
+            pkg_module_file = inspect.getsourcefile(pkg)
+            if pkg_module_file:
+                pkg_dir = os.path.dirname(os.path.abspath(pkg_module_file))
+            else:
+                # Fallback: use the package __path__ if available
+                pkg_dir = getattr(pkg, '__path__', [None])[0] or '.'
+            
             # this gives a Traversable object pointing at the package dir
             candidate = resources.files(pkg).joinpath(filename)
             if candidate.is_file():

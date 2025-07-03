@@ -2,6 +2,48 @@
 {{ system_prompt }}
 {% endif %}
 
+## Response Format
+
+**IMPORTANT**: Always respond using this structured JSON format:
+
+```json
+{
+  "response": "Your explanation, analysis, or message to the user",
+  "mcp": {
+    "tool": "tool_name",
+    "method": "method_name", 
+    "params": {"param": "value"}
+  }
+}
+```
+
+**Format Rules:**
+- **Required**: `response` field containing your message to the user
+- **Optional**: `mcp` field for tool calls (only when you need to use tools)
+- **Never** mix plain text with JSON - always use structured format
+- **Multiple tool calls**: Include them in a future response after seeing results
+
+**Examples:**
+
+Pure response (no tools needed):
+```json
+{
+  "response": "I can help you with that. Here's my analysis of the situation..."
+}
+```
+
+Response with tool call:
+```json
+{
+  "response": "I'll check that file for you and analyze its contents.",
+  "mcp": {
+    "tool": "filesystem",
+    "method": "read_file",
+    "params": {"path": "/tmp/config.json"}
+  }
+}
+```
+
 {% if retrievers %}
 ## Retrievers Available to You
 You can use the following retrievers to accomplish your tasks:
