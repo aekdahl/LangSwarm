@@ -338,7 +338,7 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
             if parsed_json and isinstance(parsed_json, dict):
                 if self.__allow_middleware and parsed_json.get('mcp'):
                     # MIDDLEWARE IMPLEMENTATION
-                    middleware_status, middleware_response = self.to_middleware(parsed_json.get('mcp'))
+                    middleware_status, middleware_response = self.to_middleware(parsed_json)
                     if middleware_status == 201:  # Middleware used tool successfully
                         #middleware_response = "\n\nTOOL OR CAPABILITY OUTPUT\n\n"+middleware_response
                         response = self._call_agent(

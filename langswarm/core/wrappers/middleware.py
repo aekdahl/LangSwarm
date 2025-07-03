@@ -234,6 +234,11 @@ class MiddlewareMixin:
             # If no action is detected, return input unchanged
             self._log_event("No action detected, forwarding input", "info")
             return 200, agent_input
+            
+        # Ensure agent_input is a dictionary
+        if not isinstance(agent_input, dict):
+            self._log_event(f"Invalid agent_input type: {type(agent_input)}, expected dict", "error")
+            return 400, f"Invalid input type: {type(agent_input)}, expected dict"
 
         # Handle MCP-specific routing
         if 'mcp' in agent_input:
@@ -272,7 +277,11 @@ class MiddlewareMixin:
                 return 500, f"[ERROR] {str(e)}"
 
         # Detect action type for legacy tools
-        actions = [{"_id": key, **value} for key, value in agent_input.items()]
+        try:
+            actions = [{"_id": key, **value} for key, value in agent_input.items()]
+        except AttributeError as e:
+            self._log_event(f"Error processing legacy actions: {e}, agent_input: {agent_input}", "error")
+            return 400, f"Unable to process input: {agent_input}"
         
         print("Actions:", actions)
         

@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.0.48]
+## [0.0.49]
 
 ### Fixed
 - **Critical Workflow Intelligence Bug**: Fixed `TypeError: unhashable type: 'slice'` error in workflow reporting
@@ -15,12 +15,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Fix**: Removed incorrect slice operation, now uses `self.step_data[step_id]` directly
   - **Testing**: Verified fix resolves error and maintains report functionality
 
+- **Critical Middleware Bug**: Fixed `TypeError: 'str' object is not a mapping` error in MCP handling
+  - **Issue**: MCP data was being passed incorrectly to middleware, causing type mismatch
+  - **Root Cause**: `parsed_json.get('mcp')` passed partial data instead of full structure
+  - **Impact**: Prevented MCP tool calls from working in agent workflows
+  - **Fix**: Pass complete `parsed_json` to middleware and added defensive type checking
+  - **Testing**: Verified MCP intent-based and direct patterns work correctly
+
 ### Enhanced
 - **MCP Tool Architecture**: Continued improvements to BaseTool inheritance pattern
   - **FilesystemMCPTool**: Simplified from 63 lines to 21 lines (67% reduction)
   - **MCPGitHubTool**: Updated to use new simplified architecture
   - **Universal Pattern**: Both tools now leverage common MCP functionality in BaseTool
   - **Scalability**: Template established for easy creation of new MCP tools
+
+- **Error Handling**: Added comprehensive defensive checks in middleware
+  - **Type Validation**: Ensure agent_input is dictionary before processing
+  - **Graceful Degradation**: Better error messages for invalid input types
+  - **Legacy Compatibility**: Protected legacy action handling with try/catch
+
+## [0.0.48]
+- **MCP Tool Fixes**
 
 ## [0.0.47]
 
