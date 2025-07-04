@@ -4,6 +4,23 @@
 
 ## 🆕 Latest Updates
 
+### 🚀 **Revolutionary Structured JSON Responses** (v0.0.50+)
+- **Breakthrough Design**: Agents can now provide BOTH user responses AND tool calls simultaneously
+- **No More Forced Choice**: Previously agents chose between communication OR tool usage - now they do both
+- **Dual Response Modes**: Integrated (polished final answer) or Streaming (immediate feedback + tool results)
+- **Natural Interactions**: Users see what agents are doing while tools execute
+
+```json
+{
+  "response": "I'll check that configuration file for you to analyze its contents",
+  "mcp": {
+    "tool": "filesystem",
+    "method": "read_file", 
+    "params": {"path": "/tmp/config.json"}
+  }
+}
+```
+
 ### 🔥 **Local MCP Mode** - Zero Latency Tools
 - **1000x Faster**: Direct function calls vs HTTP (0ms vs 50-100ms)
 - **Zero Setup**: No containers, no external servers
@@ -26,6 +43,12 @@
 - **Parallel Execution**: Fan-out/fan-in patterns with async support
 - **Intelligent Tool Selection**: Agents automatically choose the right tools
 - **Memory Integration**: Persistent conversation and context storage
+
+### 🔄 **Dual Response Modes**
+- **Streaming Mode**: Show immediate response, then tool results (conversational)
+- **Integrated Mode**: Combine user explanation with tool results (polished)
+- **Transparent AI**: Users see what agents are doing while tools execute
+- **Configurable**: Set `response_mode: "streaming"` or `"integrated"` per agent
 
 ### 🔧 **Local MCP Tools (Zero Latency)**
 - **Filesystem Access**: Read files, list directories with `local://filesystem`
@@ -67,7 +90,8 @@ result = executor.run_workflow("simple_chat", "Hello, world!")
 print(result)
 ```
 
-> ☑️ No complex setup. Just install, define YAML, and run.
+> ☑️ No complex setup. Just install, define YAML, and run.  
+> 💡 **New**: Configure `response_mode: "streaming"` for immediate feedback or `"integrated"` for polished responses!
 
 ---
 
@@ -200,6 +224,36 @@ agents:
         db_path: "./memory.db"
 ```
 
+### Structured JSON Response Agents
+```yaml
+agents:
+  # Streaming Mode: Immediate response, then tool results
+  - id: streaming_assistant
+    type: langchain-openai
+    model: gpt-4o-mini-2024-07-18
+    response_mode: "streaming"  # Key setting for immediate feedback
+    system_prompt: |
+      Always respond with immediate feedback before using tools:
+      {
+        "response": "I'll help you with that right now. Let me check...",
+        "mcp": {"tool": "filesystem", "method": "read_file", "params": {...}}
+      }
+    tools: [filesystem]
+
+  # Integrated Mode: Polished final response (default)
+  - id: integrated_assistant  
+    type: langchain-openai
+    model: gpt-4o-mini-2024-07-18
+    response_mode: "integrated"  # Combines explanation with tool results
+    system_prompt: |
+      Provide both explanations and tool calls:
+      {
+        "response": "I'll analyze that configuration file for you",
+        "mcp": {"tool": "filesystem", "method": "read_file", "params": {...}}
+      }
+    tools: [filesystem]
+```
+
 ### LangChain Integration
 ```yaml
 agents:
@@ -221,6 +275,39 @@ class CustomAgent(Bot):
 
 # Register in config
 loader.register_agent_class("custom", CustomAgent)
+```
+
+---
+
+## 🔄 Response Mode Examples
+
+### Streaming Mode User Experience
+**User:** "Check my config file"
+
+**Agent Response (Immediate):**
+```
+"I'll check that configuration file for you to analyze its contents"
+```
+
+**Tool Results (After execution):**
+```
+[Tool executed successfully]
+
+Found your config.json file. It contains:
+- Database connection settings
+- API endpoint configurations  
+- Authentication tokens
+```
+
+### Integrated Mode User Experience  
+**User:** "Check my config file"
+
+**Agent Response (Final):**
+```
+"I analyzed your configuration file and found it contains database connection 
+settings for PostgreSQL on localhost:5432, API endpoints for your production 
+environment, and properly formatted authentication tokens. The configuration 
+appears valid and ready for deployment."
 ```
 
 ---

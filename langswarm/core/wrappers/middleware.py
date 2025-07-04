@@ -122,7 +122,7 @@ class MiddlewareMixin:
             raise FileNotFoundError(f"No workflow found for tool: {tool_id} at {workflow_path}")
 
         loader = LangSwarmConfigLoader(config_path=config_path)
-        workflows, agents, brokers, tools = loader.load()
+        workflows, agents, brokers, tools, tools_metadata = loader.load()
         
         executor = WorkflowExecutor(workflows, agents)
         executor.context["request_id"] = str(uuid.uuid4())
@@ -206,7 +206,7 @@ class MiddlewareMixin:
 
         #print('Load Config...', config_path)
         loader = LangSwarmConfigLoader(config_path=config_path)
-        workflows, agents, brokers, tools = loader.load()
+        workflows, agents, brokers, tools, tools_metadata = loader.load()
         
         #print('Load Workflow...', workflows)
         executor = WorkflowExecutor(workflows, agents)

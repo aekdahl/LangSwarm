@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "langswarm"
-version = "0.0.50"
+version = "0.0.51"
 description = "A multi-agent ecosystem for large language models (LLMs) and autonomous systems."
 readme = "README.md"
 authors = ["Alexander Ekdahl <alexander.ekdahl@gmail.com>"]

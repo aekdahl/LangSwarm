@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.51] - 2025-01-07
+
+### 🐛 Critical Bug Fixes
+- **Fixed Intent-Based MCP Tool Calls**: Resolved "too many values to unpack (expected 4)" error that was blocking intent-based MCP patterns
+  - **Root Cause**: `loader.load()` returns 5 values but code was unpacking only 4
+  - **Solution**: Updated all instances to correctly unpack `workflows, agents, brokers, tools, tools_metadata = loader.load()`
+  - **Files Fixed**: `middleware.py` (2 instances), `test_filesystem_example.py`, `test_enhanced_mcp_integration.py` (6 instances)
+- **Fixed pkg_dir Reference Bug**: Resolved variable reference error in MCP workflow path discovery
+  - **Impact**: MCP tools can now properly locate their workflow files
+  - **Files Fixed**: `langswarm/core/wrappers/middleware.py:_find_workflow_path()` method
+
+### ✅ Verification
+- **31/32 unit tests passing** (1 unrelated LangSmith test failure)
+- **MCP filesystem tool fully functional** with both direct and intent patterns
+- **Configuration loading working** without tuple unpacking errors
+
+---
+
 ## [0.0.50] - 2025-01-07
 
 ### 🚀 Major Enhancements

@@ -119,7 +119,7 @@ class TestEnhancedMCPIntegration:
     def test_config_loading_with_enhanced_patterns(self, temp_config_dir):
         """Test that enhanced pattern configurations load correctly"""
         loader = LangSwarmConfigLoader(config_path=str(temp_config_dir))
-        workflows, agents, tools, brokers = loader.load()
+        workflows, agents, brokers, tools, tools_metadata = loader.load()
         
         # Verify tools were loaded with enhanced pattern attributes
         assert len(tools) == 2
@@ -155,7 +155,7 @@ class TestEnhancedMCPIntegration:
         # Skipped in CI but useful for manual testing
         
         loader = LangSwarmConfigLoader(config_path=str(temp_config_dir))
-        workflows, agents, tools, brokers = loader.load()
+        workflows, agents, brokers, tools, tools_metadata = loader.load()
         
         executor = WorkflowExecutor(workflows, agents)
         
@@ -175,7 +175,7 @@ class TestEnhancedMCPIntegration:
         # Skipped in CI but useful for manual testing
         
         loader = LangSwarmConfigLoader(config_path=str(temp_config_dir))
-        workflows, agents, tools, brokers = loader.load()
+        workflows, agents, brokers, tools, tools_metadata = loader.load()
         
         executor = WorkflowExecutor(workflows, agents)
         
@@ -191,7 +191,7 @@ class TestEnhancedMCPIntegration:
     def test_agent_wrapper_with_enhanced_patterns(self, temp_config_dir):
         """Test AgentWrapper with enhanced MCP patterns"""
         loader = LangSwarmConfigLoader(config_path=str(temp_config_dir))
-        workflows, agents, tools, brokers = loader.load()
+        workflows, agents, brokers, tools, tools_metadata = loader.load()
         
         # Create agent wrapper with middleware enabled
         agent = AgentWrapper(
@@ -239,7 +239,7 @@ class TestConfigurationValidation:
         # This tests the robustness of the configuration system
         loader = LangSwarmConfigLoader(config_path=str(temp_config_dir))
         # Should not raise exception during loading
-        workflows, agents, tools, brokers = loader.load()
+        workflows, agents, brokers, tools, tools_metadata = loader.load()
     
     def test_mixed_local_remote_configuration(self, temp_config_dir):
         """Test configuration with mixed local and remote tools"""
@@ -266,7 +266,7 @@ class TestConfigurationValidation:
             yaml.dump(mixed_tools_config, f)
         
         loader = LangSwarmConfigLoader(config_path=str(temp_config_dir))
-        workflows, agents, tools, brokers = loader.load()
+        workflows, agents, brokers, tools, tools_metadata = loader.load()
         
         # Verify both tools loaded correctly
         local_tool = next((t for t in tools if t.id == "local_tool"), None)

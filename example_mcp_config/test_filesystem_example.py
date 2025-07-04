@@ -43,7 +43,7 @@ def test_yaml_configuration():
     try:
         print("🔧 Loading configuration from YAML files...")
         loader = LangSwarmConfigLoader(config_path=config_path)
-        workflows, agents, brokers, tools = loader.load()
+        workflows, agents, brokers, tools, tools_metadata = loader.load()
         
         print(f"✅ Loaded {len(tools)} tools")
         print(f"✅ Loaded {len(agents)} agents")
