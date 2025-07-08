@@ -1,4 +1,6 @@
+import os
 from langswarm.synapse.tools.base import BaseTool
+from langswarm.mcp.tools.template_loader import get_cached_tool_template
 
 
 class MCPGitHubTool(BaseTool):
@@ -23,10 +25,14 @@ class MCPGitHubTool(BaseTool):
         **kwargs
     ):
         """Initialize GitHub MCP tool with simplified architecture"""
-        # Set defaults for GitHub MCP tool
-        description = description or "GitHub repository management via MCP with full API access"
-        instruction = instruction or "Use this tool for GitHub operations like creating issues, managing PRs, and repository management"
-        brief = brief or "GitHub MCP tool"
+        # Load template values for defaults
+        current_dir = os.path.dirname(__file__)
+        template_values = get_cached_tool_template(current_dir)
+        
+        # Set defaults from template if not provided
+        description = description or template_values.get('description', 'GitHub repository management via MCP with full API access')
+        instruction = instruction or template_values.get('instruction', 'Use this tool for GitHub operations like creating issues, managing PRs, and repository management')
+        brief = brief or template_values.get('brief', 'GitHub MCP tool')
         
         # GitHub MCP tools are typically intent-based with workflows
         # Set default pattern and workflow if not specified

@@ -1,0 +1,416 @@
+# Zero-Config Agents Examples
+# 
+# This file demonstrates the different levels of zero-config agent creation,
+# from absolute minimum (1 line) to progressive enhancement.
+
+# =============================================================================
+# LEVEL 0: ABSOLUTE MINIMUM (1 line)
+# =============================================================================
+# The simplest possible configuration - everything auto-detected
+
+version: "1.0"
+agents: ["assistant"]
+
+# This single line creates:
+# - Agent ID: "assistant"
+# - Name: "Helpful Assistant" (auto-generated)
+# - Model: Best available (gpt-4o, claude-3-5-sonnet, etc.)
+# - Behavior: "helpful" (default)
+# - Tools: ["filesystem"] (safe default)
+# - Memory: Auto-configured based on system resources
+# - Streaming: true (for better UX)
+# - Temperature: 0.7 (optimal for helpful behavior)
+# - Max tokens: 4000 (balanced default)
+
+---
+
+# =============================================================================
+# LEVEL 1: BEHAVIOR-DRIVEN (2-3 lines)
+# =============================================================================
+# Specify behavior to get optimized configurations
+
+version: "1.0"
+agents:
+  - id: "coder"
+    behavior: "coding"
+
+# This generates:
+# - Model: Best coding model (gpt-4o, claude-3-5-sonnet)
+# - Tools: ["filesystem", "github", "codebase_indexer"]
+# - Memory: High memory allocation for code context
+# - Temperature: 0.1 (precise for coding)
+# - Max tokens: 8000 (longer code completions)
+# - Streaming: true
+
+---
+
+# =============================================================================
+# LEVEL 2: MULTIPLE SPECIALIZED AGENTS
+# =============================================================================
+# Different behaviors for different use cases
+
+version: "1.0"
+agents:
+  - id: "coding-assistant"
+    behavior: "coding"
+    
+  - id: "research-assistant"
+    behavior: "research"
+    
+  - id: "support-agent"
+    behavior: "support"
+
+# Each agent gets optimized configuration:
+# 
+# coding-assistant:
+#   - Model: gpt-4o (best for complex reasoning)
+#   - Tools: ["filesystem", "github", "codebase_indexer"]
+#   - Temperature: 0.1, Max tokens: 8000
+#
+# research-assistant:
+#   - Model: gpt-4o or claude-3-5-sonnet (best for analysis)
+#   - Tools: ["filesystem", "github", "aggregation", "consensus"]
+#   - Temperature: 0.3, Max tokens: 6000
+#
+# support-agent:
+#   - Model: gpt-4o-mini (fast and cost-effective)
+#   - Tools: ["filesystem", "files"]
+#   - Temperature: 0.5, Max tokens: 3000
+
+---
+
+# =============================================================================
+# LEVEL 3: CAPABILITY-BASED CONFIGURATION
+# =============================================================================
+# Use high-level capabilities that expand to specific tools
+
+version: "1.0"
+agents:
+  - id: "researcher"
+    behavior: "research"
+    capabilities: ["files", "web", "memory", "analysis"]
+
+# capabilities expand to:
+# - "files" → ["filesystem", "files"]
+# - "web" → ["github", "aggregation"]
+# - "memory" → (enables persistent memory backend)
+# - "analysis" → ["aggregation", "consensus", "multi_agent_reranking"]
+#
+# Final tools: ["filesystem", "files", "github", "aggregation", "consensus"]
+# Memory: Persistent memory backend for research continuity
+
+---
+
+# =============================================================================
+# LEVEL 4: PROGRESSIVE ENHANCEMENT
+# =============================================================================
+# Start simple, add specific overrides as needed
+
+version: "1.0"
+agents:
+  - id: "assistant"
+    behavior: "helpful"
+    # Override specific settings while keeping smart defaults
+    model: "gpt-4o-mini"  # Force cost-effective model
+    max_tokens: 2000      # Shorter responses
+    capabilities: ["files"]
+
+# This combines:
+# - Smart defaults for "helpful" behavior
+# - Explicit model choice (cost optimization)
+# - Custom token limit (response length control)
+# - Capability-based tool selection
+
+---
+
+# =============================================================================
+# LEVEL 5: ENVIRONMENT-ADAPTIVE CONFIGURATION
+# =============================================================================
+# Same config works differently in dev vs production
+
+version: "1.0"
+project_name: "adaptive-example"
+
+agents:
+  - id: "dev-assistant"
+    behavior: "coding"
+  
+  - id: "prod-assistant"
+    behavior: "helpful"
+
+# Environment adaptation:
+#
+# DEVELOPMENT environment (detected automatically):
+# - Uses all available tools and models
+# - Higher memory allocation
+# - More verbose logging
+# - Larger context windows
+#
+# PRODUCTION environment (detected automatically):
+# - Uses cost-effective models (gpt-4o-mini, claude-3-haiku)
+# - Optimized memory usage
+# - Essential tools only
+# - Faster response times
+
+---
+
+# =============================================================================
+# LEVEL 6: MIXED CONFIGURATION STYLES
+# =============================================================================
+# Combine zero-config with traditional detailed configuration
+
+version: "1.0"
+agents:
+  # Zero-config agents
+  - id: "quick-helper"
+    behavior: "helpful"
+  
+  - id: "coder"
+    behavior: "coding"
+    
+  # Traditional detailed configuration (still supported)
+  - id: "custom-agent"
+    name: "Custom Specialized Agent"
+    model: "claude-3-5-sonnet-20241022"
+    system_prompt: |
+      You are a specialized agent for custom tasks.
+      Follow these specific guidelines...
+    tools: ["filesystem", "dynamic_forms"]
+    memory: 
+      enabled: true
+      backend: "chromadb"
+      settings:
+        max_memory_size: "200MB"
+    streaming: false
+    max_tokens: 5000
+    temperature: 0.4
+
+# This shows 100% backward compatibility:
+# - Zero-config agents get smart defaults
+# - Traditional config continues to work exactly as before
+# - Mix and match as needed
+
+---
+
+# =============================================================================
+# LEVEL 7: CAPABILITY DISCOVERY EXAMPLES
+# =============================================================================
+# Show different capability combinations
+
+version: "1.0"
+agents:
+  # File-focused agent
+  - id: "file-manager"
+    behavior: "helpful"
+    capabilities: ["files"]
+    # → Tools: ["filesystem", "files"]
+  
+  # Web-enabled agent
+  - id: "web-researcher"
+    behavior: "research"  
+    capabilities: ["web", "analysis"]
+    # → Tools: ["github", "aggregation", "consensus", "multi_agent_reranking"]
+  
+  # Full-stack developer agent
+  - id: "fullstack-dev"
+    behavior: "coding"
+    capabilities: ["files", "code", "web"]
+    # → Tools: ["filesystem", "files", "github", "codebase_indexer", "aggregation"]
+  
+  # UI/form agent
+  - id: "form-builder"
+    behavior: "helpful"
+    capabilities: ["forms", "files"]
+    # → Tools: ["dynamic_forms", "filesystem", "files"]
+
+---
+
+# =============================================================================
+# LEVEL 8: RESOURCE-AWARE EXAMPLES
+# =============================================================================
+# Configuration adapts to available system resources
+
+version: "1.0"
+agents:
+  # Memory-intensive agent (auto-scales based on available RAM)
+  - id: "analyzer"
+    behavior: "analytical"
+    # High-memory system (16GB+):
+    #   - Memory: 500MB persistent storage
+    #   - Tools: All analysis tools enabled
+    #   - Concurrency: 8 requests
+    #
+    # Low-memory system (4GB):
+    #   - Memory: 50MB basic memory
+    #   - Tools: Essential tools only
+    #   - Concurrency: 2 requests
+
+  # Network-aware agent (adapts to internet connectivity)
+  - id: "helper"
+    behavior: "helpful"
+    # Internet available:
+    #   - Tools: ["filesystem", "github", "aggregation"]
+    #   - Model: Best cloud model (gpt-4o)
+    #
+    # No internet:
+    #   - Tools: ["filesystem"] only
+    #   - Model: Local model if available (ollama/llama2)
+
+---
+
+# =============================================================================
+# CONFIGURATION EXAMPLES BY USE CASE
+# =============================================================================
+
+# Personal Assistant
+personal_assistant:
+  version: "1.0"
+  agents: ["assistant"]
+  # Auto-detects: gpt-4o-mini, filesystem, basic memory
+
+# Development Team
+development_team:
+  version: "1.0"
+  agents:
+    - id: "backend-dev"
+      behavior: "coding"
+      capabilities: ["code", "analysis"]
+    
+    - id: "frontend-dev"
+      behavior: "coding"
+      capabilities: ["files", "forms"]
+    
+    - id: "devops"
+      behavior: "analytical"
+      capabilities: ["files", "analysis"]
+
+# Research Lab
+research_lab:
+  version: "1.0"
+  agents:
+    - id: "primary-researcher"
+      behavior: "research"
+      capabilities: ["web", "analysis", "memory"]
+    
+    - id: "data-analyst"
+      behavior: "analytical"
+      capabilities: ["files", "analysis"]
+    
+    - id: "report-writer"
+      behavior: "creative"
+      capabilities: ["files", "memory"]
+
+# Customer Support
+customer_support:
+  version: "1.0"
+  agents:
+    - id: "tier1-support"
+      behavior: "support"
+      # Auto-optimizes for: fast responses, patient tone, cost-effectiveness
+    
+    - id: "technical-support"
+      behavior: "analytical"
+      capabilities: ["files", "analysis"]
+      # Auto-optimizes for: detailed analysis, troubleshooting
+
+---
+
+# =============================================================================
+# MIGRATION EXAMPLES
+# =============================================================================
+
+# BEFORE: Traditional Multi-File Configuration (8 files, 160+ lines)
+# 
+# agents.yaml:
+# agents:
+#   - id: "coding-assistant"
+#     name: "Coding Assistant"
+#     model: "gpt-4o"
+#     agent_type: "generic"
+#     tools: ["filesystem", "github"]
+#     memory: true
+#     streaming: true
+#     max_tokens: 8000
+#     temperature: 0.1
+#     system_prompt_file: "prompts/coding.md"
+#
+# tools.yaml:
+# tools:
+#   filesystem:
+#     type: "mcpfilesystem"
+#     local_mode: true
+#     settings:
+#       allowed_paths: ["."]
+#   github:
+#     type: "mcpgithubtool"
+#     settings:
+#       default_branch: "main"
+#
+# workflows.yaml, brokers.yaml, queues.yaml, registries.yaml, etc...
+
+# AFTER: Zero-Config (1 file, 3 lines)
+after_migration:
+  version: "1.0"
+  agents:
+    - id: "coding-assistant"
+      behavior: "coding"
+
+# Dramatic simplification:
+# - Files: 8 → 1 (87.5% reduction)
+# - Lines: 160+ → 3 (98% reduction)
+# - Setup time: 2 hours → 30 seconds
+# - Same functionality, optimal configuration
+
+---
+
+# =============================================================================
+# TESTING AND VALIDATION EXAMPLES
+# =============================================================================
+
+# Development Testing
+dev_testing:
+  version: "1.0"
+  langswarm:
+    debug: true
+    log_level: "DEBUG"
+  agents:
+    - id: "test-assistant"
+      behavior: "helpful"
+    # Debug mode shows:
+    # - Detected environment capabilities
+    # - Selected models and reasoning
+    # - Generated configuration details
+    # - Performance metrics
+
+# Production Validation
+prod_validation:
+  version: "1.0"
+  langswarm:
+    environment: "production"
+  agents:
+    - id: "prod-assistant"
+      behavior: "helpful"
+    # Production mode optimizes for:
+    # - Cost-effective model selection
+    # - Minimal resource usage
+    # - Fast response times
+    # - Error resilience
+
+# =============================================================================
+# ENVIRONMENT VARIABLE EXAMPLES
+# =============================================================================
+
+# These environment variables influence zero-config behavior:
+
+# API Keys (auto-detected):
+# export OPENAI_API_KEY="sk-..."
+# export ANTHROPIC_API_KEY="sk-ant-..."
+# export GOOGLE_API_KEY="..."
+
+# Override defaults:
+# export LANGSWARM_DEFAULT_MODEL="gpt-4o-mini"  # Force model choice
+# export LANGSWARM_MAX_MEMORY="100MB"           # Limit memory usage
+# export LANGSWARM_ENVIRONMENT="production"     # Force environment type
+
+# Custom behavior:
+# export LANGSWARM_CUSTOM_BEHAVIOR="{"name": "custom", "temperature": 0.9}" 

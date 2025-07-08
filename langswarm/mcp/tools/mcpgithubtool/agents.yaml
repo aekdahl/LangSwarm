@@ -1,4 +1,17 @@
 agents:
+  - id: input_normalizer
+    agent_type: langchain-openai
+    model: gpt-4o-mini-2024-07-18
+    system_prompt: |
+      You are an input normalizer that handles multiple input variable formats.
+      You will receive both user_input and user_query variables. One or both may be provided:
+      - If user_input is provided and user_query is empty/null, use user_input
+      - If user_query is provided and user_input is empty/null, use user_query  
+      - If both are provided, prefer user_input
+      - If neither is provided, return "No input provided"
+      
+      Simply return the chosen input value exactly as provided, without any additional formatting or explanation.
+
   - id: github_action_decider
     agent_type: langchain-openai
     model: gpt-4o-mini-2024-07-18

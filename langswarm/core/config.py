@@ -22,10 +22,12 @@ from cerberus import Validator
 from simpleeval import SimpleEval
 from inspect import signature, Parameter
 from typing import Dict, List, Optional, Union, Any
+from dataclasses import dataclass, field
 
 # @v0.0.1
-from langswarm.core.factory.agents import AgentFactory
+# AgentFactory import moved to lazy loading to prevent circular imports
 from langswarm.core.utils.workflows.intelligence import WorkflowIntelligence
+from langswarm.core.utils.subutilities.formatting import Formatting
 
 # @v... Later...
 
@@ -54,7 +56,177 @@ try:
     from langswarm.memory.registry.rags import RAGRegistry
 except ImportError:
     RAGRegistry = {}
+
+# Zero-config imports
+try:
+    from .detection import EnvironmentDetector, auto_discover_tools, detect_available_tools
+    from .defaults import SmartDefaults
+    ZERO_CONFIG_AVAILABLE = True
+    import logging
+    logging.info("✅ Zero-config functionality available")
+except ImportError as e:
+    ZERO_CONFIG_AVAILABLE = False
+    import logging
+    logging.warning(f"Zero-config functionality not available: {e}. Install required dependencies: psutil, requests")
+
+
+# ===== UNIFIED CONFIGURATION SCHEMA =====
+# New unified configuration schema for single-file configuration support
+
+@dataclass
+class LangSwarmCoreConfig:
+    """Core LangSwarm framework settings"""
+    debug: bool = False
+    log_level: str = "INFO"
+    config_validation: bool = True
     
+@dataclass
+class AgentConfig:
+    """Unified agent configuration"""
+    id: str
+    name: Optional[str] = None
+    model: str = "gpt-4o"
+    behavior: Optional[str] = None  # New simplified behavior system
+    system_prompt: Optional[str] = None
+    agent_type: str = "generic"
+    tools: List[str] = field(default_factory=list)
+    memory: Union[bool, Dict[str, Any]] = False
+    streaming: bool = False
+    max_tokens: Optional[int] = None
+    temperature: Optional[float] = None
+    response_format: Optional[str] = None
+    
+@dataclass
+class ToolConfig:
+    """Unified tool configuration"""
+    id: Optional[str] = None
+    type: Optional[str] = None
+    settings: Dict[str, Any] = field(default_factory=dict)
+    auto_configure: bool = False
+    local_mode: bool = True
+    
+@dataclass
+class WorkflowConfig:
+    """Unified workflow configuration"""
+    id: str
+    name: Optional[str] = None
+    steps: List[Dict[str, Any]] = field(default_factory=list)
+    
+@dataclass
+class MemoryConfig:
+    """Unified memory configuration"""
+    enabled: bool = False
+    backend: str = "auto"  # auto, sqlite, redis, chromadb, etc.
+    settings: Dict[str, Any] = field(default_factory=dict)
+    
+@dataclass
+class BrokerConfig:
+    """Message broker configuration"""
+    id: str
+    type: str = "internal"
+    settings: Dict[str, Any] = field(default_factory=dict)
+    
+@dataclass
+class AdvancedConfig:
+    """Advanced configuration for complex setups"""
+    brokers: List[BrokerConfig] = field(default_factory=list)
+    queues: List[Dict[str, Any]] = field(default_factory=list)
+    registries: List[Dict[str, Any]] = field(default_factory=list)
+    plugins: List[Dict[str, Any]] = field(default_factory=list)
+    retrievers: List[Dict[str, Any]] = field(default_factory=list)
+    
+@dataclass
+class ValidationError:
+    """Configuration validation error"""
+    field: str
+    message: str
+    section: Optional[str] = None
+    
+@dataclass
+class LangSwarmConfig:
+    """Unified configuration schema for LangSwarm"""
+    version: str = "1.0"
+    project_name: Optional[str] = None
+    langswarm: LangSwarmCoreConfig = field(default_factory=LangSwarmCoreConfig)
+    agents: List[AgentConfig] = field(default_factory=list)
+    tools: Dict[str, ToolConfig] = field(default_factory=dict)
+    workflows: List[WorkflowConfig] = field(default_factory=list)
+    memory: MemoryConfig = field(default_factory=MemoryConfig)
+    advanced: AdvancedConfig = field(default_factory=AdvancedConfig)
+    
+    # Include directive for advanced users who want to split configs
+    include: Optional[List[str]] = None
+    
+    def validate(self) -> List[ValidationError]:
+        """Validate configuration and return any errors"""
+        errors = []
+        
+        # Validate agents
+        agent_ids = set()
+        for agent in self.agents:
+            if agent.id in agent_ids:
+                errors.append(ValidationError("id", f"Duplicate agent ID: {agent.id}", "agents"))
+            agent_ids.add(agent.id)
+            
+            # Validate tools exist
+            for tool_id in agent.tools:
+                if tool_id not in self.tools:
+                    errors.append(ValidationError("tools", f"Agent {agent.id} references unknown tool: {tool_id}", "agents"))
+        
+        # Validate workflows reference existing agents
+        for workflow in self.workflows:
+            for step in workflow.steps:
+                if "agent" in step and step["agent"] not in agent_ids:
+                    errors.append(ValidationError("agent", f"Workflow {workflow.id} references unknown agent: {step['agent']}", "workflows"))
+        
+        return errors
+    
+    def to_legacy_format(self) -> Dict[str, Any]:
+        """Convert unified config to legacy multi-file format for backward compatibility"""
+        legacy_config = {
+            "agents": [
+                {
+                    "id": agent.id,
+                    "name": agent.name,
+                    "model": agent.model,
+                    "agent_type": agent.agent_type,
+                    "system_prompt": agent.system_prompt,
+                    "tools": agent.tools,
+                    "max_tokens": agent.max_tokens,
+                    "temperature": agent.temperature,
+                    "response_format": agent.response_format,
+                } for agent in self.agents
+            ],
+            "tools": [
+                {
+                    "id": tool_id,
+                    "type": tool_config.type,
+                    "settings": tool_config.settings,
+                } for tool_id, tool_config in self.tools.items()
+            ],
+            "workflows": [
+                {
+                    "id": workflow.id,
+                    "name": workflow.name,
+                    "steps": workflow.steps,
+                } for workflow in self.workflows
+            ],
+            "brokers": [
+                {
+                    "id": broker.id,
+                    "type": broker.type,
+                    "settings": broker.settings,
+                } for broker in self.advanced.brokers
+            ],
+            "queues": self.advanced.queues,
+            "registries": self.advanced.registries,
+            "plugins": self.advanced.plugins,
+            "retrievers": self.advanced.retrievers,
+        }
+        return legacy_config
+
+# ===== END UNIFIED CONFIGURATION SCHEMA =====
+
 
 LS_DEFAULT_CONFIG_FILES = [
     "agents.yaml", "tools.yaml", "retrievers.yaml", "plugins.yaml",
@@ -102,6 +274,15 @@ class LangSwarmConfigLoader:
         # this will hold type_name → class mappings
         self.tool_classes: Dict[str, type] = {}
         self._load_builtin_tool_classes()
+        
+        # For unified configuration
+        self.unified_config: Optional[LangSwarmConfig] = None
+        self.is_unified = False
+        
+        # Zero-config components (lazy-loaded)
+        self.environment_detector = None
+        self.capabilities = None
+        self.smart_defaults = None
 
     def _load_builtin_tool_classes(self):
         """Load builtin MCP tool classes"""
@@ -118,15 +299,640 @@ class LangSwarmConfigLoader:
     def register_tool_class(self, _type: str, cls: type):
         """Allow adding new tool classes at runtime."""
         self.tool_classes[_type.lower()] = cls
+    
+    def _detect_config_type(self) -> str:
+        """Auto-detect configuration approach"""
+        # If config_path is a file (not directory), check if it's a unified config
+        if os.path.isfile(self.config_path):
+            return self.config_path if self._is_file_unified_config(self.config_path) else "multi-file"
+        
+        # Check for unified configuration file in directory
+        unified_candidates = ["langswarm.yaml", "langswarm.yml", "config.yaml", "config.yml"]
+        
+        for candidate in unified_candidates:
+            candidate_path = os.path.join(self.config_path, candidate)
+            if os.path.exists(candidate_path) and self._is_file_unified_config(candidate_path):
+                return candidate_path
+        
+        # Check for multi-file configuration
+        if os.path.exists(os.path.join(self.config_path, "agents.yaml")):
+            return "multi-file"
+        
+        raise FileNotFoundError("No configuration found. Expected 'langswarm.yaml' or 'agents.yaml'")
+    
+    def _is_file_unified_config(self, file_path: str) -> bool:
+        """Check if a specific file is a unified configuration"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = yaml.safe_load(f) or {}
+            
+            # A unified config typically has:
+            # 1. A version field
+            # 2. An agents section (which can be a list or contain agents)
+            # 3. Does NOT have the structure of legacy multi-file configs
+            
+            has_version = "version" in data
+            has_agents = "agents" in data
+            
+            # Check if it looks like a legacy agents.yaml (which would have agents but no version)
+            if has_agents and not has_version:
+                # Could be legacy agents.yaml - check if agents is a simple list of agent dicts
+                agents = data.get("agents", [])
+                if isinstance(agents, list) and len(agents) > 0:
+                    # If all agents have traditional fields and no behavior, likely legacy
+                    for agent in agents[:3]:  # Check first 3 agents
+                        if isinstance(agent, dict) and "behavior" not in agent:
+                            return False  # Looks like legacy format
+            
+            # If it has version OR agents (including simplified syntax), consider it unified
+            return has_version or has_agents
+            
+        except Exception:
+            return False
+    
+    def _is_unified_config(self) -> bool:
+        """Check if using unified configuration"""
+        try:
+            config_type = self._detect_config_type()
+            return config_type != "multi-file"
+        except FileNotFoundError:
+            return False
+    
+    def _load_unified_config(self) -> LangSwarmConfig:
+        """Load unified configuration from single file"""
+        config_file = self._detect_config_type()
+        
+        with open(config_file, 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f) or {}
+        
+        # Process includes if specified
+        if "include" in data:
+            data = self._process_includes(data, os.path.dirname(config_file))
+        
+        # Resolve environment variables and prompts
+        self._resolve_env_vars(data)
+        if "agents" in data:
+            self._resolve_prompts(data["agents"], os.path.dirname(config_file))
+        
+        # Convert to unified config format
+        unified_config = self._dict_to_unified_config(data)
+        
+        # Validate configuration
+        errors = unified_config.validate()
+        if errors:
+            print("❌ Configuration validation errors:")
+            for error in errors:
+                print(f"  - {error.section or 'general'}.{error.field}: {error.message}")
+        
+        return unified_config
+    
+    def _process_includes(self, data: Dict[str, Any], base_path: str) -> Dict[str, Any]:
+        """Process include directives in configuration"""
+        includes = data.pop("include", [])
+        
+        for include_file in includes:
+            include_path = os.path.join(base_path, include_file)
+            if os.path.exists(include_path):
+                with open(include_path, 'r', encoding='utf-8') as f:
+                    include_data = yaml.safe_load(f) or {}
+                
+                # Merge included data (includes override main config)
+                for key, value in include_data.items():
+                    if key in data and isinstance(data[key], list) and isinstance(value, list):
+                        data[key].extend(value)
+                    elif key in data and isinstance(data[key], dict) and isinstance(value, dict):
+                        data[key].update(value)
+                    else:
+                        data[key] = value
+        
+        return data
+    
+    def _dict_to_unified_config(self, data: Dict[str, Any]) -> LangSwarmConfig:
+        """Convert dictionary to unified configuration object"""
+        # Handle agents with zero-config support
+        agents_data = data.get("agents", [])
+        if ZERO_CONFIG_AVAILABLE:
+            agents = self._process_zero_config_agents(agents_data)
+        else:
+            agents = self._process_standard_agents(agents_data)
+        
+        # Handle tools
+        tools = {}
+        for tool_id, tool_data in data.get("tools", {}).items():
+            if isinstance(tool_data, dict):
+                tool_config = ToolConfig(
+                    id=tool_id,
+                    type=tool_data.get("type"),
+                    settings=tool_data.get("settings", {}),
+                    auto_configure=tool_data.get("auto_configure", False),
+                    local_mode=tool_data.get("local_mode", True)
+                )
+                tools[tool_id] = tool_config
+        
+        # Handle workflows
+        workflows = []
+        for workflow_data in data.get("workflows", []):
+            workflow_config = WorkflowConfig(
+                id=workflow_data["id"],
+                name=workflow_data.get("name"),
+                steps=workflow_data.get("steps", [])
+            )
+            workflows.append(workflow_config)
+        
+        # Handle memory
+        memory_data = data.get("memory", {})
+        if isinstance(memory_data, bool):
+            memory_config = MemoryConfig(enabled=memory_data)
+        else:
+            memory_config = MemoryConfig(
+                enabled=memory_data.get("enabled", False),
+                backend=memory_data.get("backend", "auto"),
+                settings=memory_data.get("settings", {})
+            )
+        
+        # Handle advanced configuration
+        advanced_data = data.get("advanced", {})
+        brokers = []
+        for broker_data in advanced_data.get("brokers", []):
+            broker_config = BrokerConfig(
+                id=broker_data["id"],
+                type=broker_data.get("type", "internal"),
+                settings=broker_data.get("settings", {})
+            )
+            brokers.append(broker_config)
+        
+        advanced_config = AdvancedConfig(
+            brokers=brokers,
+            queues=advanced_data.get("queues", []),
+            registries=advanced_data.get("registries", []),
+            plugins=advanced_data.get("plugins", []),
+            retrievers=advanced_data.get("retrievers", [])
+        )
+        
+        # Handle core langswarm settings
+        langswarm_data = data.get("langswarm", {})
+        langswarm_config = LangSwarmCoreConfig(
+            debug=langswarm_data.get("debug", False),
+            log_level=langswarm_data.get("log_level", "INFO"),
+            config_validation=langswarm_data.get("config_validation", True)
+        )
+        
+        return LangSwarmConfig(
+            version=data.get("version", "1.0"),
+            project_name=data.get("project_name"),
+            langswarm=langswarm_config,
+            agents=agents,
+            tools=tools,
+            workflows=workflows,
+            memory=memory_config,
+            advanced=advanced_config
+        )
+    
+    def _unified_to_legacy_data(self, unified_config: LangSwarmConfig) -> Dict[str, Any]:
+        """Convert unified config to legacy format for existing processing"""
+        legacy_data = unified_config.to_legacy_format()
+        
+        # Convert workflows to expected format
+        workflows_dict = {}
+        for workflow in legacy_data["workflows"]:
+            workflows_dict[workflow["id"]] = workflow
+        
+        return {
+            "agents": legacy_data["agents"],
+            "tools": legacy_data["tools"],
+            "workflows": workflows_dict,
+            "brokers": legacy_data["brokers"],
+            "queues": legacy_data["queues"],
+            "registries": legacy_data["registries"],
+            "plugins": legacy_data["plugins"],
+            "retrievers": legacy_data["retrievers"]
+        }
+    
+    def load_single_config(self, config_path: str = "langswarm.yaml") -> LangSwarmConfig:
+        """Load configuration from single unified file"""
+        original_path = self.config_path
+        self.config_path = config_path
+        
+        try:
+            unified_config = self._load_unified_config()
+            return unified_config
+        finally:
+            self.config_path = original_path
+    
+    # ===== ZERO-CONFIG AGENT SUPPORT =====
+    
+    def _ensure_zero_config_initialized(self):
+        """Lazy-initialize zero-config components"""
+        if not ZERO_CONFIG_AVAILABLE:
+            return False
+        
+        if self.environment_detector is None:
+            self.environment_detector = EnvironmentDetector()
+            
+        if self.capabilities is None:
+            self.capabilities = self.environment_detector.detect_capabilities()
+            
+        if self.smart_defaults is None:
+            self.smart_defaults = SmartDefaults(self.capabilities)
+            
+        return True
+    
+    def _process_zero_config_agents(self, agents_config: List[Any]) -> List[AgentConfig]:
+        """Process agents with zero-config enhancement"""
+        if not self._ensure_zero_config_initialized():
+            # Fallback to standard processing
+            return self._process_standard_agents(agents_config)
+        
+        processed_agents = []
+        
+        for agent_spec in agents_config:
+            if isinstance(agent_spec, str):
+                # Minimal syntax: agents: ["assistant"]
+                agent_config = self.smart_defaults.generate_agent_config(
+                    agent_id=agent_spec,
+                    behavior="helpful"
+                )
+                processed_agents.append(agent_config)
+                
+            elif isinstance(agent_spec, dict):
+                agent_id = agent_spec.get("id")
+                if not agent_id:
+                    continue
+                
+                behavior = agent_spec.get("behavior", "helpful")
+                
+                # Generate smart defaults first
+                agent_config = self.smart_defaults.generate_agent_config(agent_id, behavior)
+                
+                # Override with any explicitly provided values
+                for key, value in agent_spec.items():
+                    if hasattr(agent_config, key) and value is not None:
+                        setattr(agent_config, key, value)
+                
+                # Handle capability-based tool selection
+                if "capabilities" in agent_spec:
+                    expanded_tools = self.smart_defaults.expand_capabilities(agent_spec["capabilities"])
+                    agent_config.tools = expanded_tools
+                
+                processed_agents.append(agent_config)
+        
+        logging.info(f"🤖 Zero-config: Processed {len(processed_agents)} agents with smart defaults")
+        
+        return processed_agents
+    
+    def _process_standard_agents(self, agents_config: List[Any]) -> List[AgentConfig]:
+        """Fallback standard agent processing when zero-config unavailable"""
+        agents = []
+        
+        for agent_data in agents_config:
+            if isinstance(agent_data, str):
+                # Convert string to minimal dict
+                agent_data = {"id": agent_data}
+            
+            if isinstance(agent_data, dict) and "id" in agent_data:
+                agent_config = AgentConfig(
+                    id=agent_data["id"],
+                    name=agent_data.get("name"),
+                    model=agent_data.get("model", "gpt-4o"),
+                    behavior=agent_data.get("behavior"),
+                    system_prompt=agent_data.get("system_prompt"),
+                    agent_type=agent_data.get("agent_type", "generic"),
+                    tools=agent_data.get("tools", []),
+                    memory=agent_data.get("memory", False),
+                    streaming=agent_data.get("streaming", False),
+                    max_tokens=agent_data.get("max_tokens"),
+                    temperature=agent_data.get("temperature"),
+                    response_format=agent_data.get("response_format")
+                )
+                agents.append(agent_config)
+        
+        return agents
+    
+    def create_zero_config_agent(self, agent_id: str, behavior: str = "helpful", **overrides) -> AgentConfig:
+        """Create a zero-config agent programmatically"""
+        if not self._ensure_zero_config_initialized():
+            raise RuntimeError("Zero-config functionality not available. Install required dependencies: psutil, requests")
+        
+        return self.smart_defaults.generate_agent_config(agent_id, behavior, **overrides)
+    
+    def get_environment_info(self) -> Optional[Dict[str, Any]]:
+        """Get detected environment information"""
+        if not self._ensure_zero_config_initialized():
+            return None
+        
+        return self.capabilities.to_dict()
+    
+    def suggest_behavior_for_description(self, description: str) -> str:
+        """Suggest optimal behavior based on description"""
+        if not self._ensure_zero_config_initialized():
+            return "helpful"
+        
+        return self.smart_defaults.suggest_behavior(description)
+    
+    def get_available_behaviors(self) -> List[str]:
+        """Get list of all available behavior presets"""
+        return [
+            "helpful", "coding", "research", "creative", 
+            "analytical", "support", "conversational", "educational"
+        ]
+    
+    # ========== ZERO-CONFIG AGENT CREATION HELPERS ==========
+    
+    def create_simple_agent(
+        self, 
+        agent_id: str, 
+        behavior: str = "helpful",
+        model: str = "gpt-4o",
+        tools: Optional[List[str]] = None,
+        **kwargs
+    ) -> AgentConfig:
+        """
+        Create a simple agent with behavior-driven configuration.
+        
+        Args:
+            agent_id: Unique identifier for the agent
+            behavior: Behavior preset (helpful, coding, research, creative, analytical, support, conversational, educational)
+            model: LLM model to use (defaults to gpt-4o)
+            tools: List of tool names to enable
+            **kwargs: Additional agent configuration options
+            
+        Returns:
+            AgentConfig: Ready-to-use agent configuration
+            
+        Example:
+            # Create a coding assistant with filesystem access
+            agent = config_loader.create_simple_agent(
+                agent_id="code_helper",
+                behavior="coding", 
+                tools=["filesystem", "github"]
+            )
+        """
+        # Validate behavior
+        available_behaviors = self.get_available_behaviors()
+        if behavior not in available_behaviors:
+            print(f"⚠️  Unknown behavior '{behavior}'. Available: {', '.join(available_behaviors)}")
+            print(f"   Using 'helpful' as fallback.")
+            behavior = "helpful"
+        
+        # Create agent configuration
+        agent_config = AgentConfig(
+            id=agent_id,
+            name=kwargs.get("name", agent_id.replace("_", " ").title()),
+            model=model,
+            behavior=behavior,
+            agent_type=kwargs.get("agent_type", "generic"),
+            tools=tools or [],
+            memory=kwargs.get("memory", False),
+            streaming=kwargs.get("streaming", False),
+            max_tokens=kwargs.get("max_tokens"),
+            temperature=kwargs.get("temperature"),
+            response_format=kwargs.get("response_format")
+        )
+        
+        # Generate system prompt if not provided
+        if not kwargs.get("system_prompt"):
+            agent_config.system_prompt = self._generate_behavior_prompt(behavior, tools or [])
+        else:
+            agent_config.system_prompt = kwargs["system_prompt"]
+        
+        return agent_config
+    
+    def create_coding_assistant(
+        self,
+        agent_id: str = "coding_assistant",
+        model: str = "gpt-4o",
+        tools: Optional[List[str]] = None,
+        **kwargs
+    ) -> AgentConfig:
+        """
+        Create a specialized coding assistant with filesystem and GitHub tools.
+        
+        Args:
+            agent_id: Agent identifier (defaults to 'coding_assistant')
+            model: LLM model (defaults to gpt-4o for best coding performance)
+            tools: Additional tools beyond default filesystem and github
+            **kwargs: Additional configuration options
+            
+        Returns:
+            AgentConfig: Coding assistant ready for development tasks
+        """
+        default_tools = ["filesystem", "github"]
+        if tools:
+            # Merge with defaults, avoiding duplicates
+            all_tools = list(dict.fromkeys(default_tools + tools))
+        else:
+            all_tools = default_tools
+            
+        return self.create_simple_agent(
+            agent_id=agent_id,
+            behavior="coding",
+            model=model,
+            tools=all_tools,
+            **kwargs
+        )
+    
+    def create_research_assistant(
+        self,
+        agent_id: str = "research_assistant", 
+        model: str = "gpt-4o",
+        tools: Optional[List[str]] = None,
+        **kwargs
+    ) -> AgentConfig:
+        """
+        Create a research assistant with web search and analysis tools.
+        
+        Args:
+            agent_id: Agent identifier (defaults to 'research_assistant')
+            model: LLM model (defaults to gpt-4o for best analysis)
+            tools: Additional tools beyond default web_search
+            **kwargs: Additional configuration options
+            
+        Returns:
+            AgentConfig: Research assistant ready for information gathering
+        """
+        default_tools = ["web_search", "filesystem"]
+        if tools:
+            all_tools = list(dict.fromkeys(default_tools + tools))
+        else:
+            all_tools = default_tools
+            
+        return self.create_simple_agent(
+            agent_id=agent_id,
+            behavior="research",
+            model=model,
+            tools=all_tools,
+            **kwargs
+        )
+    
+    def create_support_agent(
+        self,
+        agent_id: str = "support_agent",
+        model: str = "gpt-4o-mini",
+        tools: Optional[List[str]] = None,
+        **kwargs
+    ) -> AgentConfig:
+        """
+        Create a customer support agent with helpful tools.
+        
+        Args:
+            agent_id: Agent identifier (defaults to 'support_agent')
+            model: LLM model (defaults to gpt-4o-mini for cost efficiency)
+            tools: Additional tools beyond defaults
+            **kwargs: Additional configuration options
+            
+        Returns:
+            AgentConfig: Support agent ready for customer assistance
+        """
+        default_tools = ["dynamic-forms", "filesystem"]
+        if tools:
+            all_tools = list(dict.fromkeys(default_tools + tools))
+        else:
+            all_tools = default_tools
+            
+        return self.create_simple_agent(
+            agent_id=agent_id,
+            behavior="support",
+            model=model,
+            tools=all_tools,
+            **kwargs
+        )
+    
+    def create_conversational_agent(
+        self,
+        agent_id: str = "chat_agent",
+        model: str = "gpt-4o-mini",
+        tools: Optional[List[str]] = None,
+        **kwargs
+    ) -> AgentConfig:
+        """
+        Create a conversational agent optimized for natural dialogue.
+        
+        Args:
+            agent_id: Agent identifier (defaults to 'chat_agent')
+            model: LLM model (defaults to gpt-4o-mini for responsiveness)
+            tools: Tools to enable (minimal by default for faster responses)
+            **kwargs: Additional configuration options
+            
+        Returns:
+            AgentConfig: Conversational agent ready for natural chat
+        """
+        return self.create_simple_agent(
+            agent_id=agent_id,
+            behavior="conversational",
+            model=model,
+            tools=tools or [],
+            **kwargs
+        )
+    
+    def create_multi_behavior_agent(
+        self,
+        agent_id: str,
+        primary_behavior: str,
+        secondary_behaviors: List[str],
+        model: str = "gpt-4o",
+        tools: Optional[List[str]] = None,
+        **kwargs
+    ) -> AgentConfig:
+        """
+        Create an agent that combines multiple behavior patterns.
+        
+        Args:
+            agent_id: Agent identifier
+            primary_behavior: Main behavior pattern
+            secondary_behaviors: Additional behavior aspects to incorporate
+            model: LLM model to use
+            tools: Tools to enable
+            **kwargs: Additional configuration options
+            
+        Returns:
+            AgentConfig: Multi-behavior agent configuration
+        """
+        # Generate combined behavior prompt
+        available_behaviors = self.get_available_behaviors()
+        
+        # Validate behaviors
+        all_behaviors = [primary_behavior] + secondary_behaviors
+        for behavior in all_behaviors:
+            if behavior not in available_behaviors:
+                print(f"⚠️  Unknown behavior '{behavior}'. Available: {', '.join(available_behaviors)}")
+        
+        # Create custom behavior description
+        custom_behavior = f"""You are a versatile assistant combining multiple expertise areas:
+
+**Primary Focus**: {primary_behavior.title()} - {self._get_behavior_description(primary_behavior)}
+
+**Additional Capabilities**:"""
+        
+        for behavior in secondary_behaviors:
+            if behavior in available_behaviors:
+                custom_behavior += f"\n- {behavior.title()}: {self._get_behavior_description(behavior)}"
+        
+        custom_behavior += """
+
+Adapt your approach based on the user's needs, drawing from your combined expertise to provide the most helpful response."""
+        
+        # Create agent with custom system prompt
+        system_prompt = custom_behavior + self._generate_behavior_prompt(primary_behavior, tools or []).split("## Response Format", 1)[1] if "## Response Format" in self._generate_behavior_prompt(primary_behavior, tools or []) else self._generate_behavior_prompt(primary_behavior, tools or [])
+        
+        return AgentConfig(
+            id=agent_id,
+            name=kwargs.get("name", agent_id.replace("_", " ").title()),
+            model=model,
+            behavior=primary_behavior,  # Store primary for reference
+            system_prompt=system_prompt,
+            agent_type=kwargs.get("agent_type", "generic"),
+            tools=tools or [],
+            memory=kwargs.get("memory", False),
+            streaming=kwargs.get("streaming", False),
+            max_tokens=kwargs.get("max_tokens"),
+            temperature=kwargs.get("temperature"),
+            response_format=kwargs.get("response_format")
+        )
+    
+    def _get_behavior_description(self, behavior: str) -> str:
+        """Get short description of a behavior for multi-behavior agents"""
+        descriptions = {
+            "helpful": "General assistance and problem-solving",
+            "coding": "Programming, debugging, and technical guidance",
+            "research": "Information gathering and analysis",
+            "creative": "Idea generation and creative problem-solving",
+            "analytical": "Data analysis and logical reasoning",
+            "support": "Customer service and issue resolution",
+            "conversational": "Natural dialogue and engagement", 
+            "educational": "Teaching and learning facilitation"
+        }
+        return descriptions.get(behavior, f"{behavior} assistance")
 
     def load(self):
-        self._load_secrets()
-        self._load_config_files()
-        self._initialize_brokers()
-        self._initialize_retrievers()
-        self._initialize_tools()
-        self._initialize_plugins()
-        self._initialize_agents()
+        # Detect configuration type and handle accordingly
+        if self._is_unified_config():
+            self.is_unified = True
+            self.unified_config = self._load_unified_config()
+            
+            # Convert unified config to legacy format for existing processing
+            legacy_data = self._unified_to_legacy_data(self.unified_config)
+            self.config_data = legacy_data
+            
+            # Apply behavior-driven system prompt generation if needed
+            self._apply_behavior_system_prompts()
+            
+            # Continue with existing initialization logic
+            self._load_secrets()
+            self._initialize_brokers()
+            self._initialize_retrievers()
+            self._initialize_tools()
+            self._initialize_plugins()
+            self._initialize_agents()
+        else:
+            # Use existing multi-file configuration logic
+            self._load_secrets()
+            self._load_config_files()
+            self._initialize_brokers()
+            self._initialize_retrievers()
+            self._initialize_tools()
+            self._initialize_plugins()
+            self._initialize_agents()
+        
         return (
             self.config_data.get('workflows', {}), 
             self.agents, 
@@ -135,6 +941,261 @@ class LangSwarmConfigLoader:
             list(self.tools.values()),  # Return instantiated tools, not raw config
             self.tools_metadata
         )
+    
+    def _apply_behavior_system_prompts(self):
+        """Apply behavior-driven system prompt generation for unified configs"""
+        if not self.unified_config:
+            return
+        
+        # Generate system prompts based on behavior for agents that don't have explicit prompts
+        for agent_data in self.config_data.get('agents', []):
+            if not agent_data.get('system_prompt') and agent_data.get('behavior'):
+                behavior = agent_data['behavior']
+                generated_prompt = self._generate_behavior_prompt(behavior, agent_data.get('tools', []))
+                agent_data['system_prompt'] = generated_prompt
+    
+    def _generate_behavior_prompt(self, behavior: str, tools: List[str]) -> str:
+        """Generate comprehensive system prompt based on behavior and available tools"""
+        
+        # Enhanced behavior prompts with professional, detailed personalities
+        behavior_prompts = {
+            "helpful": """You are a helpful and intelligent assistant. Your core principles:
+- Always be polite, respectful, and considerate in your responses
+- Provide accurate, well-researched information when possible
+- If uncertain, clearly state limitations and suggest next steps
+- Break down complex topics into understandable explanations
+- Anticipate follow-up questions and provide comprehensive context
+- Maintain a friendly but professional tone""",
+            
+            "coding": """You are an expert programming assistant with deep technical knowledge. Your expertise includes:
+- Writing clean, efficient, and well-documented code
+- Debugging complex issues and explaining root causes
+- Code review with constructive feedback and best practices
+- Architecture design and technical decision guidance
+- Multiple programming languages, frameworks, and development tools
+- Security considerations and performance optimization
+- Always explain your reasoning and provide examples when helpful""",
+            
+            "research": """You are a thorough research assistant specialized in information analysis. Your approach:
+- Systematically gather information from multiple angles
+- Critically evaluate sources and evidence quality
+- Present findings in a clear, structured format
+- Identify patterns, trends, and key insights
+- Distinguish between facts, opinions, and speculation
+- Provide comprehensive context and background information
+- Suggest additional research directions when relevant""",
+            
+            "creative": """You are a creative assistant focused on inspiration and innovation. Your strengths:
+- Generating original ideas and unique perspectives
+- Brainstorming solutions from unconventional angles
+- Supporting creative writing, storytelling, and content creation
+- Helping with artistic and design challenges
+- Encouraging experimentation and creative risk-taking
+- Building upon ideas to develop them further
+- Balancing creativity with practical considerations""",
+            
+            "analytical": """You are an analytical assistant specializing in logical reasoning and data interpretation. Your methodology:
+- Approach problems systematically using structured analysis
+- Break down complex issues into manageable components
+- Apply logical frameworks and analytical methods
+- Identify patterns, correlations, and causal relationships
+- Present findings with clear evidence and reasoning
+- Consider multiple perspectives and potential biases
+- Provide actionable insights based on thorough analysis""",
+            
+            "support": """You are a customer support assistant focused on resolution and satisfaction. Your approach:
+- Listen carefully and acknowledge user concerns with empathy
+- Ask clarifying questions to fully understand issues
+- Provide step-by-step guidance with clear instructions
+- Anticipate common follow-up questions and address them proactively
+- Escalate complex issues appropriately when needed
+- Follow up to ensure problems are fully resolved
+- Maintain patience and professionalism even in challenging situations""",
+            
+            "conversational": """You are a conversational assistant designed for natural, engaging dialogue. Your style:
+- Maintain a warm, friendly, and approachable personality
+- Ask thoughtful questions to keep conversations flowing
+- Show genuine interest in topics and user perspectives
+- Share relevant insights and experiences when appropriate
+- Adapt your communication style to match the user's tone
+- Remember context from earlier in the conversation
+- Balance being informative with being entertaining""",
+            
+            "educational": """You are an educational assistant focused on teaching and learning. Your teaching philosophy:
+- Adapt explanations to the learner's level and background
+- Use examples, analogies, and visual aids when helpful
+- Break complex concepts into progressive learning steps
+- Encourage questions and provide patient, thorough answers
+- Check for understanding before moving to advanced topics
+- Provide practice opportunities and real-world applications
+- Foster critical thinking and independent problem-solving skills"""
+        }
+        
+        # Use exact match or fallback to helpful behavior
+        if behavior in behavior_prompts:
+            base_prompt = behavior_prompts[behavior]
+        else:
+            # For custom behaviors, create a basic prompt
+            base_prompt = f"You are a {behavior} assistant. {behavior_prompts['helpful']}"
+        
+        # Add comprehensive JSON format instructions
+        json_format_instructions = """
+
+## Response Format
+
+**CRITICAL**: You must always respond using this exact JSON structure:
+
+```json
+{
+  "response": "Your message to the user explaining what you're doing or responding to their query",
+  "mcp": {
+    "tool": "tool_name",
+    "method": "method_name",
+    "params": {"param1": "value1", "param2": "value2"}
+  }
+}
+```
+
+**Format Rules:**
+- **REQUIRED**: `response` field containing your message to the user
+- **OPTIONAL**: `mcp` field for tool calls (only when you need to use tools)
+- **Never mix plain text with JSON** - always use this structured format
+- **Multiple tool calls**: Make one call, see results, then make another in next response
+
+**Response Patterns:**
+
+**Conversation only** (no tools needed):
+```json
+{
+  "response": "I understand your question about data analysis. Based on the information provided, here are the key insights..."
+}
+```
+
+**Tool usage** (when you need to perform an action):
+```json
+{
+  "response": "I'll read that configuration file to understand the current settings and help troubleshoot the issue.",
+  "mcp": {
+    "tool": "filesystem",
+    "method": "read_file",
+    "params": {"path": "/config/app.json"}
+  }
+}
+```
+
+**Intent-based tool usage** (when expressing what you want to accomplish):
+```json
+{
+  "response": "Let me search the codebase for similar error patterns to help diagnose this issue.",
+  "mcp": {
+    "tool": "github",
+    "intent": "search for error patterns related to authentication failures",
+    "context": "user experiencing login issues after recent security update - need debugging analysis"
+  }
+}
+```"""
+
+        # Add tool-specific instructions based on available tools
+        if tools:
+            tool_instructions = "\n\n## Available Tools\n\nYou have access to the following tools to help users:"
+            
+            tool_descriptions = {
+                "filesystem": {
+                    "description": "File and directory operations",
+                    "capabilities": [
+                        "Read file contents to analyze configurations, logs, or code",
+                        "List directory contents to understand project structure",
+                        "Help with file-related troubleshooting and analysis"
+                    ],
+                    "examples": [
+                        'Read config: `{"tool": "filesystem", "method": "read_file", "params": {"path": "/config/app.json"}}`',
+                        'List directory: `{"tool": "filesystem", "method": "list_directory", "params": {"path": "/src"}}`'
+                    ]
+                },
+                "github": {
+                    "description": "GitHub repository management and development workflow",
+                    "capabilities": [
+                        "Create and manage issues for bug reports and feature requests",
+                        "Search repositories for code patterns and documentation",
+                        "Manage pull requests and code reviews",
+                        "Access repository information and statistics"
+                    ],
+                    "examples": [
+                        'Create issue: `{"tool": "github", "intent": "create issue for authentication bug", "context": "critical login failure"}`',
+                        'Search code: `{"tool": "github", "intent": "find error handling patterns", "context": "need examples of exception handling"}`'
+                    ]
+                },
+                "dynamic-forms": {
+                    "description": "Interactive form generation for configuration and data collection",
+                    "capabilities": [
+                        "Generate configuration forms based on user context",
+                        "Create interactive interfaces for complex setup processes",
+                        "Provide structured data collection for user preferences"
+                    ],
+                    "examples": [
+                        'Generate form: `{"tool": "dynamic-forms", "method": "generate_interactive_response", "params": {"context": "user wants to configure AI preferences"}}`'
+                    ]
+                },
+                "calculator": {
+                    "description": "Mathematical calculations and computations",
+                    "capabilities": [
+                        "Perform complex mathematical calculations",
+                        "Handle algebraic expressions and equations",
+                        "Process statistical and financial computations"
+                    ],
+                    "examples": [
+                        'Calculate: `{"tool": "calculator", "method": "calculate", "params": {"expression": "sqrt(25) + 10 * 2"}}`'
+                    ]
+                },
+                "web_search": {
+                    "description": "Web search and information retrieval",
+                    "capabilities": [
+                        "Search the web for current information and updates",
+                        "Find recent news, documentation, and resources",
+                        "Verify facts and gather external information"
+                    ],
+                    "examples": [
+                        'Search web: `{"tool": "web_search", "method": "search", "params": {"query": "latest Python security updates 2024"}}`'
+                    ]
+                }
+            }
+            
+            for tool in tools:
+                if tool in tool_descriptions:
+                    info = tool_descriptions[tool]
+                    tool_instructions += f"""
+
+### {tool.title()} Tool
+**Purpose**: {info['description']}
+
+**Capabilities**:
+{chr(10).join(f"- {cap}" for cap in info['capabilities'])}
+
+**Usage Examples**:
+{chr(10).join(f"- {example}" for example in info['examples'])}"""
+                else:
+                    # Generic tool description for unknown tools
+                    tool_instructions += f"""
+
+### {tool.title()} Tool
+**Purpose**: {tool} functionality for enhanced capabilities
+**Usage**: Use intent-based calls to describe what you want to accomplish with this tool"""
+            
+            tool_instructions += """
+
+**Tool Usage Guidelines**:
+- Use tools when they can provide better assistance than conversation alone
+- Always explain what you're going to do before using a tool
+- For complex operations, prefer intent-based calls that describe your goal
+- For simple, well-defined operations, use direct method calls
+- Wait for tool results before proceeding with additional tool calls"""
+        
+        # Combine all parts
+        full_prompt = base_prompt + json_format_instructions
+        if tools:
+            full_prompt += tool_instructions
+        
+        return full_prompt
 
     def _load_secrets(self):
         secrets_path = os.path.join(self.config_path, "secrets.yaml")
@@ -257,7 +1318,29 @@ class LangSwarmConfigLoader:
         
     def _initialize_tools(self):
         self.tools_metadata = {}  # New dict for storing metadata explicitly
-        for tool_cfg in self.config_data.get("tools", []):
+        
+        # **SMART TOOL AUTO-DISCOVERY**
+        # Check if tools should be auto-discovered
+        tools_config = self.config_data.get("tools", [])
+        
+        # If no tools.yaml exists or tools list is empty, try auto-discovery
+        if not tools_config and ZERO_CONFIG_AVAILABLE:
+            print("🔍 No tools configuration found. Attempting Smart Tool Auto-Discovery...")
+            auto_discovered = self._auto_discover_tools()
+            if auto_discovered:
+                tools_config = auto_discovered
+                self.config_data["tools"] = tools_config
+                print(f"   ✅ Auto-discovered {len(auto_discovered)} tools")
+        
+        # Process each tool configuration (supports both full config and simplified syntax)
+        for tool_cfg in tools_config:
+            # **SIMPLIFIED TOOL SYNTAX SUPPORT**
+            # Convert simplified syntax (just tool names) to full configuration
+            if isinstance(tool_cfg, str):
+                tool_cfg = self._expand_simplified_tool_syntax(tool_cfg)
+                if not tool_cfg:
+                    continue  # Skip if tool couldn't be auto-configured
+            
             ttype = tool_cfg.get("type", "unknown").lower()
 
             # Always store metadata, even if no class is found
@@ -288,6 +1371,200 @@ class LangSwarmConfigLoader:
             # build the instance
             self.tools[tool_cfg["id"]] = self._initialize_component(tool_cfg, cls)
     
+    def _auto_discover_tools(self) -> List[Dict[str, Any]]:
+        """Auto-discover available tools based on environment detection"""
+        if not ZERO_CONFIG_AVAILABLE:
+            return []
+        
+        try:
+            # Initialize environment detector if not already done
+            if not hasattr(self, '_environment_detector'):
+                self._environment_detector = EnvironmentDetector()
+            
+            # Discover all available tools
+            detected_tools = self._environment_detector.auto_discover_tools()
+            
+            # Convert to tool configuration format
+            tool_configs = []
+            for tool_info in detected_tools:
+                if "preset" in tool_info:
+                    # Built-in tool with preset
+                    preset = tool_info["preset"]
+                    config = {
+                        "id": preset.id,
+                        "type": preset.type,
+                        "description": preset.description,
+                        "local_mode": preset.local_mode,
+                        "pattern": preset.pattern,
+                        "methods": preset.methods,
+                    }
+                    
+                    # Add preset settings
+                    if preset.settings:
+                        config.update(preset.settings)
+                    
+                    # Add custom config
+                    if preset.custom_config:
+                        config.update(preset.custom_config)
+                        
+                else:
+                    # Custom tool
+                    config = {
+                        "id": tool_info["id"],
+                        "type": tool_info["type"],
+                        "description": tool_info["description"],
+                        "local_mode": tool_info.get("local_mode", True),
+                        "pattern": tool_info.get("pattern", "direct"),
+                    }
+                    
+                    if "path" in tool_info:
+                        config["path"] = tool_info["path"]
+                
+                tool_configs.append(config)
+            
+            return tool_configs
+            
+        except Exception as e:
+            print(f"   ⚠️  Auto-discovery failed: {e}")
+            return []
+    
+    def _expand_simplified_tool_syntax(self, tool_name: str) -> Optional[Dict[str, Any]]:
+        """
+        Expand simplified tool syntax (just tool name) to full configuration.
+        
+        Args:
+            tool_name: Simple tool name like "filesystem" or "github"
+            
+        Returns:
+            Full tool configuration dict or None if tool not available
+        """
+        if not ZERO_CONFIG_AVAILABLE:
+            print(f"   ⚠️  Cannot expand '{tool_name}': Zero-config not available")
+            return None
+        
+        try:
+            # Initialize environment detector if not already done
+            if not hasattr(self, '_environment_detector'):
+                self._environment_detector = EnvironmentDetector()
+            
+            # Get preset for this tool
+            preset = self._environment_detector.get_tool_preset(tool_name)
+            if not preset:
+                print(f"   ⚠️  Unknown tool preset: '{tool_name}'")
+                return None
+            
+            # Check if tool is available in current environment
+            status = self._environment_detector._check_tool_availability(preset)
+            if not status["available"]:
+                missing_items = []
+                if status["missing_env_vars"]:
+                    missing_items.extend(status["missing_env_vars"])
+                if status["missing_dependencies"]:
+                    missing_items.extend(status["missing_dependencies"])
+                
+                print(f"   ⚠️  Tool '{tool_name}' not available: Missing {', '.join(missing_items)}")
+                return None
+            
+            # Create full configuration from preset
+            config = {
+                "id": preset.id,
+                "type": preset.type,
+                "description": preset.description,
+                "local_mode": preset.local_mode,
+                "pattern": preset.pattern,
+                "methods": preset.methods,
+            }
+            
+            # Add preset settings
+            if preset.settings:
+                config.update(preset.settings)
+            
+            # Add custom config
+            if preset.custom_config:
+                config.update(preset.custom_config)
+            
+            print(f"   ✅ Expanded '{tool_name}' to {preset.type} with {len(preset.methods)} methods")
+            return config
+            
+        except Exception as e:
+            print(f"   ⚠️  Failed to expand '{tool_name}': {e}")
+            return None
+    
+    def get_available_tools_info(self) -> Dict[str, Any]:
+        """Get information about available tools for user guidance"""
+        if not ZERO_CONFIG_AVAILABLE:
+            return {"error": "Zero-config functionality not available"}
+        
+        # Initialize environment detector if not already done
+        if not hasattr(self, '_environment_detector'):
+            self._environment_detector = EnvironmentDetector()
+        
+        return self._environment_detector.detect_environment()
+    
+    def suggest_tools_for_behavior(self, behavior: str) -> List[str]:
+        """Suggest tools based on agent behavior"""
+        if not ZERO_CONFIG_AVAILABLE:
+            return []
+        
+        # Initialize environment detector if not already done
+        if not hasattr(self, '_environment_detector'):
+            self._environment_detector = EnvironmentDetector()
+        
+        behavior_tool_map = {
+            "coding": ["filesystem", "github"],
+            "research": ["filesystem", "github"],
+            "helpful": ["filesystem"],
+            "analytical": ["filesystem"],
+            "creative": ["filesystem"],
+            "support": ["dynamic_forms"],
+            "conversational": [],
+            "educational": ["filesystem"]
+        }
+        
+        # Get base suggestions for behavior
+        suggested_tools = behavior_tool_map.get(behavior, ["filesystem"])
+        
+        # Filter to only available tools
+        available_tool_ids = self._environment_detector.get_available_tool_ids()
+        available_suggestions = [tool for tool in suggested_tools if tool in available_tool_ids]
+        
+        return available_suggestions
+    
+    def _process_simplified_agent_tools(self, agent_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Process simplified tool syntax in agent configurations"""
+        tools = agent_config.get("tools", [])
+        if not tools:
+            return agent_config
+        
+        # Check if any tools are in simplified format (just strings)
+        has_simplified = any(isinstance(tool, str) for tool in tools)
+        
+        if has_simplified and ZERO_CONFIG_AVAILABLE:
+            # Initialize environment detector if not already done
+            if not hasattr(self, '_environment_detector'):
+                self._environment_detector = EnvironmentDetector()
+            
+            expanded_tools = []
+            for tool in tools:
+                if isinstance(tool, str):
+                    # Check if this tool is available
+                    preset = self._environment_detector.get_tool_preset(tool)
+                    if preset:
+                        status = self._environment_detector._check_tool_availability(preset)
+                        if status["available"]:
+                            expanded_tools.append(tool)
+                        else:
+                            missing = status.get("missing_env_vars", []) + status.get("missing_dependencies", [])
+                            print(f"   ⚠️  Skipping tool '{tool}' for agent '{agent_config.get('id', 'unnamed')}': Missing {', '.join(missing)}")
+                    else:
+                        print(f"   ⚠️  Unknown tool '{tool}' for agent '{agent_config.get('id', 'unnamed')}'")
+                else:
+                    # Tool is already in full format
+                    expanded_tools.append(tool)
+            
+            agent_config["tools"] = expanded_tools
+        
+        return agent_config
 
     def _initialize_plugins(self):
         for plugin in self.config_data.get("plugins", []):
@@ -321,10 +1598,17 @@ class LangSwarmConfigLoader:
     def _initialize_agents(self):
         for agent in self.config_data.get("agents", []):
             agent_type = agent.get("register_as", "agent")
+            
+            # **SMART TOOL AUTO-DISCOVERY FOR AGENTS**
+            # Process simplified tool syntax before registry assignment
+            agent = self._process_simplified_agent_tools(agent)
+            
             agent = self._assign_registries(agent)
             agent = self._setup_memory(agent)
             agent["system_prompt"] = self._render_system_prompt(agent)
 
+            # Lazy import to prevent circular imports
+            from langswarm.core.factory.agents import AgentFactory
             creator = getattr(AgentFactory, f"create_{agent_type}", AgentFactory.create)
             self.agents[agent["id"]] = self._call_with_valid_args(creator, {"name": agent["id"], **agent})
 
@@ -361,6 +1645,13 @@ class LangSwarmConfigLoader:
         with open(template_path, "r", encoding="utf-8") as f:
             template_str = f.read()
 
+        # Load and conditionally include fragment templates
+        fragment_content = self._load_prompt_fragments(agent)
+        
+        # Append fragments to main template
+        if fragment_content:
+            template_str += "\n\n" + fragment_content
+
         template = Template(template_str)
         def _lookup_many(ids, source):
             return [
@@ -374,146 +1665,170 @@ class LangSwarmConfigLoader:
             tools=_lookup_many(agent.get("tools", []), self.tools),
             plugins=_lookup_many(agent.get("plugins", []), self.plugins)
         )
-
-
-class WorkflowExecutor:
-    def __init__(self, workflows: Dict, agents: Dict, tools_metadata: Dict = None):
-        self.workflows = workflows
-        self.agents = agents
-        self.context = {
-            'step_outputs': {},
-            'visited_steps': set(),
-            'retry_counters': {},
-            'rollback_counters': {},
-            'pending_fanins': {},
-            'agents': agents
-        }
-        settings = workflows.get("workflow_settings", {}).get("intelligence", {})
-        self.intelligence = WorkflowIntelligence(config=settings)
-        self.tools_metadata = tools_metadata or {}
-
-    def _run_workflow_inner(self, workflow_id: str, user_input: str):
-        workflow = self._get_workflow(workflow_id)
-        self.context['user_input'] = user_input
-        self.context['previous_output'] = user_input
-        self.context['request_id'] = f"req_{os.urandom(4).hex()}"
-        self.context["current_workflow_id"] = workflow_id
-        self.context['pending_fanins'] = {}  # fan_key → set of step_ids
-        self.context['completed_fanouts'] = set()  # Tracks completed fan-out steps
-
-        first_step = workflow.get("steps", [])[0]
-        return first_step
-
-    @WorkflowIntelligence.track_workflow
-    def run_workflow(self, workflow_id: str, user_input: str, tool_deployer = None):
-        """Entry‑point that works BOTH in a normal script and in a notebook."""
-        self.context['tool_deployer'] = tool_deployer # Used in MCP flows
-        wf = self._get_workflow(workflow_id)
-        is_async = wf.get("async", False)
-
-        if not is_async:                       # ◀── sync workflow – nothing fancy
-            # 1) initialize and get the very first step
-            first = self._run_workflow_inner(workflow_id, user_input)
-            # 2) actually execute it
-            self._execute_step(first)
-            # 3) return whatever ended up as the "user" output or last output
-            return self.context.get("user_output", self.context.get("previous_output"))
-
-        # ---------- async path ----------
-        coro = self.run_workflow_async(workflow_id, user_input)
-
-        try:                                   # 1️⃣ regular python process
-            return asyncio.run(coro)
-        except RuntimeError as re:             # 2️⃣ already running loop (Jupyter)
-            if "cannot be called from a running event loop" not in str(re):
-                raise
-            print("⏳ Detected running event loop — using nest_asyncio fallback")
-            nest_asyncio.apply()
-            loop = asyncio.get_event_loop()
-            if inspect.iscoroutine(coro):
-                return loop.run_until_complete(coro)
-            return coro                        # defensive – shouldn't happen
-
-    async def run_workflow_async(self, workflow_id: str, user_input: str):
-        first_step = self._run_workflow_inner(workflow_id, user_input) 
-        await self._execute_step_async(first_step)
-        return self.context.get("user_output", self.context.get("previous_output"))
-
-    def _get_visit_key(self, step: Dict) -> str:
-        fan_key = step.get("fan_key", "default")
-        request_id = self.context.get("request_id", "")
-        return f"{step['id']}@{fan_key}:{request_id}"
-
-    def _resolve_condition_branch(self, condition: dict) -> Optional[Any]:
-        if not isinstance(condition, dict) or "if" not in condition:
-            return None
-        if self._evaluate_condition(condition["if"]):
-            return condition.get("then")
-        else:
-            return condition.get("else")
     
-    def _recheck_pending_fanins(self):
-        # ▶ First: figure out which fan‑in steps are now ready
-        ready_to_run = []  # list of tuples (fan_key, fanin_id, fanin_step)
-        for fan_key, fanin_ids in list(self.context['pending_fanins'].items()):
-            for fanin_id in list(fanin_ids):
-                fanin_step = self._get_step_by_id(fanin_id)
-
-                if not fanin_step.get("is_fan_in"):
-                    continue
-
-                required = fanin_step.get("args", {}).get("steps")
-                if required is None:
-                    # user forgot to declare any .args.steps
-                    continue
-                if not isinstance(required, list) or not required:
-                    continue
-
-                missing = [s for s in required if s not in self.context['step_outputs']]
-                if missing:
-                    # still waiting
-                    continue
-
-                # all done → schedule it
-                ready_to_run.append((fan_key, fanin_id, fanin_step))
-
-        # ▶ Now actually fire them (after finishing the scan)
-        for fan_key, fanin_id, fanin_step in ready_to_run:
-            print(f"✅ Fan‑in '{fanin_id}' ready (key={fan_key}); executing now")
-            # remove from pending BEFORE we execute, so it can't re‑queue itself
-            self.context['pending_fanins'][fan_key].discard(fanin_id)
-            if not self.context['pending_fanins'][fan_key]:
-                self.context['pending_fanins'].pop(fan_key, None)
-
-            # and only _then_ execute:
-            self._execute_step(fanin_step)
-
-    async def _recheck_pending_fanins_async(self):
-        ready_to_run = []
-        for fan_key, fanin_ids in list(self.context['pending_fanins'].items()):
-            for fanin_id in list(fanin_ids):
-                fanin_step = self._get_step_by_id(fanin_id)
-                if not fanin_step.get("is_fan_in"):
-                    continue
-
-                required = fanin_step.get("args", {}).get("steps")
-                if required is None or not isinstance(required, list) or not required:
-                    continue
-
-                missing = [s for s in required if s not in self.context['step_outputs']]
-                if missing:
-                    continue
-
-                ready_to_run.append((fan_key, fanin_id, fanin_step))
-
-        for fan_key, fanin_id, fanin_step in ready_to_run:
-            print(f"✅ (async) Fan‑in '{fanin_id}' ready (key={fan_key}); executing now")
-            self.context['pending_fanins'][fan_key].discard(fanin_id)
-            if not self.context['pending_fanins'][fan_key]:
-                self.context['pending_fanins'].pop(fan_key, None)
-
-            await self._execute_step_async(fanin_step)
-
+    def _load_prompt_fragments(self, agent):
+        """Load conditional prompt fragments based on agent configuration"""
+        fragments = []
+        fragments_dir = os.path.join(os.path.dirname(__file__), "templates", "fragments")
+        
+        # Check what capabilities this agent has
+        agent_tools = agent.get("tools", [])
+        agent_config = agent.get("config", {})
+        
+        # 1. Include clarification fragment if agent has intent-based tools or retry capabilities
+        has_intent_tools = self._agent_has_intent_tools(agent_tools)
+        has_retry_capability = self._agent_has_retry_capability(agent_tools, agent_config)
+        
+        if has_intent_tools or has_retry_capability:
+            clarification_path = os.path.join(fragments_dir, "clarification.md")
+            if os.path.exists(clarification_path):
+                with open(clarification_path, "r", encoding="utf-8") as f:
+                    fragments.append(f.read())
+        
+        # 2. Include retry fragment if agent has retry capabilities  
+        if has_retry_capability:
+            retry_path = os.path.join(fragments_dir, "retry.md")
+            if os.path.exists(retry_path):
+                with open(retry_path, "r", encoding="utf-8") as f:
+                    fragments.append(f.read())
+        
+        # 3. Include intent workflow fragment if agent has intent-based tools
+        if has_intent_tools:
+            intent_path = os.path.join(fragments_dir, "intent_workflow.md")
+            if os.path.exists(intent_path):
+                with open(intent_path, "r", encoding="utf-8") as f:
+                    fragments.append(f.read())
+        
+        # 4. Include cross-workflow clarification fragment if agent can do cross-workflow operations
+        has_cross_workflow_capability = has_intent_tools or self._agent_has_cross_workflow_tools(agent_tools)
+        if has_cross_workflow_capability:
+            cross_workflow_path = os.path.join(fragments_dir, "cross_workflow_clarification.md")
+            if os.path.exists(cross_workflow_path):
+                with open(cross_workflow_path, "r", encoding="utf-8") as f:
+                    fragments.append(f.read())
+        
+        return "\n\n".join(fragments)
+    
+    def _agent_has_cross_workflow_tools(self, tool_ids):
+        """Check if agent has tools that can invoke sub-workflows"""
+        # Any agent with MCP tools or workflow invocation capabilities
+        # could potentially need cross-workflow clarification
+        return len(tool_ids) > 0  # Simple heuristic - any agent with tools
+    
+    def _agent_has_intent_tools(self, tool_ids):
+        """Check if agent has tools that support intent-based calling"""
+        for tool_id in tool_ids:
+            if tool_id in self.tools:
+                tool = self.tools[tool_id]
+                # Check if tool supports intent-based pattern
+                if hasattr(tool, 'pattern') and tool.pattern == "intent":
+                    return True
+                # Check if tool has main_workflow (indicates intent capability)
+                if hasattr(tool, 'main_workflow') and tool.main_workflow:
+                    return True
+        return False
+    
+    def _agent_has_retry_capability(self, tool_ids, agent_config):
+        """Check if agent or its tools have retry capabilities"""
+        # Check agent-level retry configuration
+        if agent_config.get("retry_enabled", False):
+            return True
+        
+        # Check if any tools have retry capabilities
+        for tool_id in tool_ids:
+            if tool_id in self.tools:
+                tool = self.tools[tool_id]
+                # Check tool configuration for retry settings
+                if hasattr(tool, 'retry_enabled') and tool.retry_enabled:
+                    return True
+                # Check if tool has workflows with retry steps
+                if hasattr(tool, 'workflows') and self._tool_workflows_have_retry(tool):
+                    return True
+        
+        return False
+    
+    def _handle_cross_workflow_clarification(self, step_id: str, prompt: str, context: str, scope: str) -> str:
+        """Handle clarification requests that need to bubble up through workflow hierarchy"""
+        print(f"🌊 Cross-workflow clarification (scope: {scope})")
+        print(f"   Prompt: {prompt}")
+        print(f"   Context: {context}")
+        
+        # Create clarification metadata for tracking
+        clarification_data = {
+            "step_id": step_id,
+            "prompt": prompt,
+            "context": context,
+            "scope": scope,
+            "workflow_id": self.context.get("current_workflow_id"),
+            "request_id": self.context.get("request_id"),
+            "timestamp": time.time()
+        }
+        
+        if scope == "parent_workflow":
+            # Route to parent workflow via special output
+            parent_clarification = {
+                "type": "clarification_request",
+                "data": clarification_data,
+                "response_needed": True
+            }
+            
+            # Store the clarification state for later resumption
+            self.context.setdefault("pending_clarifications", {})[step_id] = clarification_data
+            
+            # Route this to the parent workflow output handler
+            self._handle_output(step_id, {"to": "parent_workflow_clarification"}, parent_clarification)
+            
+            return f"PARENT_CLARIFICATION_PENDING: {prompt}"
+            
+        elif scope == "root_user":
+            # Route all the way back to the original user
+            root_clarification = {
+                "type": "clarification_request", 
+                "data": clarification_data,
+                "response_needed": True
+            }
+            
+            # Store the clarification state
+            self.context.setdefault("pending_clarifications", {})[step_id] = clarification_data
+            
+            # Route to root user
+            self._handle_output(step_id, {"to": "user"}, root_clarification)
+            
+            return f"ROOT_CLARIFICATION_PENDING: {prompt}"
+        
+        else:
+            # Fallback to local clarification
+            return f"CLARIFICATION_NEEDED: {prompt}"
+    
+    def _resume_after_clarification(self, step_id: str, clarification_response: str) -> None:
+        """Resume workflow execution after clarification is resolved"""
+        if step_id in self.context.get("pending_clarifications", {}):
+            clarification_data = self.context["pending_clarifications"][step_id]
+            
+            print(f"🔄 Resuming workflow after clarification")
+            print(f"   Original prompt: {clarification_data['prompt']}")
+            print(f"   Clarification response: {clarification_response}")
+            
+            # Add clarification response to context for the step to use
+            self.context["clarification_response"] = clarification_response
+            self.context["clarification_context"] = clarification_data["context"]
+            
+            # Remove from pending clarifications
+            del self.context["pending_clarifications"][step_id]
+            
+            # Re-execute the step with additional context
+            step = self._get_step_by_id(step_id)
+            self._execute_step(step, mark_visited=False)
+    
+    def _tool_workflows_have_retry(self, tool):
+        """Check if tool's workflows contain retry configurations"""
+        try:
+            # This is a simplified check - in practice you'd parse the workflow YAML
+            if hasattr(tool, 'main_workflow'):
+                return True  # Assume workflow tools can have retry
+        except:
+            pass
+        return False
 
     def _handle_step_error(self, step: Dict, step_id: str, visit_key: str, error: Exception):
         print(f"❌ Error in step {step_id}: {error}")
@@ -697,7 +2012,9 @@ If any required parameter is missing or ambiguous, instead return:
             response = agent.chat(agent_input)
         
             try:
-                payload = json.loads(response)
+                payload = self.formatting_utils.safe_json_loads(response)
+                if payload is None:
+                    payload = response
             except Exception:
                 payload = response
         
@@ -868,7 +2185,9 @@ If any required parameter is missing or ambiguous, instead return:
             response = agent.chat(agent_input)
         
             try:
-                payload = json.loads(response)
+                payload = self.formatting_utils.safe_json_loads(response)
+                if payload is None:
+                    payload = response
             except Exception:
                 payload = response
         
@@ -1525,58 +2844,49 @@ class ToolDeployer:
             # terraform apply
             subprocess.run([
                 "terraform", "-chdir=terraform/deploy",
-                "apply", "-auto-approve"
+                "apply", "-var-file=terraform.tfvars.json", "-auto-approve"
             ], check=True)
-        elif cfg.get("deployment_target", None) == 'docker':
-            import docker
-            
-            if self._running_in_docker():
-                print("🚀 Deploying tool via Docker SDK from inside container...")
 
-                client = docker.DockerClient(base_url="unix://var/run/docker.sock")
+            print(f"🚀 Tool '{tool_id}' deployed to GCP!")
+        else:
+            # local mode
+            print(f"🚀 Deploying tool '{tool_id}' locally...")
+            image   = cfg.get("image", f"mcp-{tool_id}")
+            port    = cfg.get("port", 3000)
+            mode    = cfg.get("mode", "http")
 
-                # Pull the MCP tool image (if not already present)
-                client.images.pull(cfg["image"])
+            # Deploy the Docker container locally
+            payload = None  # If your tool needs custom JSON, pass it here
 
-                # Run the MCP tool
-                container = client.containers.run(
-                    image=cfg["image"],
-                    name=container_name,
-                    detach=True,
-                    ports={f"{cfg['port']}/tcp": cfg["port"]},
-                    environment=resolved
-                )
+            result = self._deploy_locally_via_docker(
+                image=image,
+                name=container_name,
+                env_vars=resolved,
+                port=port,
+                mode=mode,
+                payload=payload,
+            )
 
-                print(f"Started MCP tool: {container.name} (ID: {container.id})")
-
-            else:
-                print("💻 Running natively — falling back to local CLI deploy...")
-                self._deploy_locally_via_docker(
-                    image=cfg["image"],
-                    name=container_name,
-                    port=cfg["port"],
-                    env_vars=resolved,
-                    mode=cfg.get("mode", "http")
-                )
-                
-            # remember for cleanup()
             self._deploy_info[tool_id] = {
                 "container_name": container_name,
-                "image_name": cfg["image"]
+                "image_name": image,
+                "local_url": f"http://localhost:{port}" if mode == "http" else None,
+                "deployment_info": result,
             }
 
+            print(f"✅ Tool '{tool_id}' is running locally!")
+            return result
+
     def _running_in_docker(self) -> bool:
+        """Check if we're already inside a Docker container to avoid Docker-in-Docker issues."""
         try:
-            # Check for .dockerenv file
-            if Path("/.dockerenv").exists():
-                return True
-
-            # Check if any cgroup contains "docker"
-            with open("/proc/1/cgroup", "rt") as f:
-                return "docker" in f.read() or "kubepods" in f.read()
-        except Exception:
-            return False
-
+            with open("/proc/1/cgroup", "r") as f:
+                content = f.read()
+                return "docker" in content or "container" in content
+        except (FileNotFoundError, PermissionError):
+            # /proc/1/cgroup might not be accessible on all systems
+            return os.path.exists("/.dockerenv")
+    
     def _deploy_locally_via_docker(
         self,
         image: str,
@@ -1587,131 +2897,355 @@ class ToolDeployer:
         payload: Optional[str] = None,
     ) -> Union[bool, Dict[str, Any]]:
         """
-        • mode="http":  long-running HTTP server on `port`
-        • mode="stdio": spin up, send one JSON-RPC call over stdin, tear down
-        Returns:
-          – in http mode: True/False
-          – in stdio mode: {"success": bool, "exit_code": int, "stdout": str, "stderr": str}
-        """
-        # remove any old container
-        subprocess.run(["docker", "rm", "-f", name],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-        # build env args
-        env_args = []
-        for k, v in env_vars.items():
-            env_args += ["-e", f"{k}={v}"]
-
-        if mode == "stdio":
-            # one-shot: do not -d, we want to pipe in and capture immediate output
-            cmd = [
-                "docker", "run", "--rm", "-i",
-                "--name", name,
-                *env_args,
-                image
-            ]
-        else:
-            cmd = ["docker", "run", "-d", "--name", name, *env_args, *port_args, image]
-
-        print("🚀 Launching Docker container:")
-        # print("  " + " ".join(cmd)) <-- his exposes tokens, avoid it.
-
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            input=(payload + "\n") if mode == "stdio" else None
-        )
-
-        # common metadata
-        success = proc.returncode == 0
-        exit_code = proc.returncode
-
-        if mode == "stdio":
-            # ──── STDIO MODE ───────────────────────────────────────────────
-            stderr_lines = proc.stderr.splitlines()
-            # Usually the first line is the startup banner; drop it
-            if stderr_lines and "GitHub MCP Server running on stdio" in stderr_lines[0]:
-                banner = stderr_lines.pop(0)
-            else:
-                banner = None
-
-            raw_out = proc.stdout.strip()
-            parsed = None
-            parse_error = None
-
-            if raw_out:
-                try:
-                    parsed = json.loads(raw_out)
-                except Exception as e:
-                    parse_error = str(e)
-
-            return {
-                "success": success,
-                "exit_code": exit_code,
-                "banner": banner,
-                "raw_stdout": raw_out,
-                "parsed": parsed,
-                "parse_error": parse_error,
-                "stderr": "\n".join(stderr_lines),
-            }
-
-        # ──── http mode: detached, then poll… (unchanged) ─────
-        proc = subprocess.run(cmd, capture_output=True, text=True)
-        if proc.returncode != 0:
-            msg = proc.stderr.strip() or proc.stdout.strip()
-            print(f"❌ Failed to start container:\n{msg}")
-            return False
-
-        cid = proc.stdout.strip()
-        print(f"✅ Container started (id={cid[:12]})")
-
-        # ──── 2) Poll Docker for "running" state ───────────────────────
-        for i in range(5):
-            state = subprocess.run(
-                ["docker", "inspect", "--format={{.State.Status}}", name],
-                capture_output=True, text=True
-            ).stdout.strip()
-            if state == "running":
-                print("🔎 Container status: running")
-                break
-            print(f"⏳ Waiting for container to be running ({i+1}/5)…")
-            time.sleep(1)
-        else:
-            print("❌ Container never entered running state. Logs:")
-            subprocess.run(["docker", "logs", name])
-            return False
-
-        # ──── 3) TCP health‑check on the port ──────────────────────────
-        sock = socket.socket()
-        for i in range(5):
-            try:
-                sock.connect(("localhost", port))
-                print(f"✅ Port {port} is now accepting connections")
-                sock.close()
-                break
-            except Exception:
-                print(f"⏳ Waiting for port {port} to open ({i+1}/5)…")
-                time.sleep(1)
-        else:
-            print(f"❌ Port {port} never opened. Check container logs:")
-            subprocess.run(["docker", "logs", name])
-            return False
-
-        print("🎉 Docker deployment successful and healthy!")
-        return True
-
+        Deploy a tool locally using Docker, mimicking Cloud Run behavior.
         
+        :param image: Docker image name/tag
+        :param name: Container name
+        :param env_vars: Environment variables to pass to the container
+        :param port: Port to expose (for http mode)
+        :param mode: 'http' or 'stdio'
+        :param payload: Optional JSON payload to send (for stdio mode)
+        :return: True if successful, or dict with container info
+        """
+        import docker
+        
+        # Check if we're running inside Docker
+        if self._running_in_docker():
+            print("⚠️ Running inside Docker container - using host network mode")
+            network_mode = "host"
+        else:
+            network_mode = None
+        
+        try:
+            client = docker.from_env()
+            
+            # Check if container with this name already exists
+            try:
+                existing = client.containers.get(name)
+                print(f"🔄 Container '{name}' already exists. Stopping and removing...")
+                existing.stop()
+                existing.remove()
+            except docker.errors.NotFound:
+                pass
+            
+            if mode == "stdio":
+                # For stdio mode, run container and pipe input/output
+                print(f"🔧 Running stdio-mode container: {image}")
+                
+                container = client.containers.run(
+                    image=image,
+                    name=name,
+                    environment=env_vars,
+                    detach=False,
+                    stdin_open=True,
+                    tty=False,
+                    network_mode=network_mode,
+                    remove=True,  # Auto-remove after execution
+                    input=payload.encode() if payload else None
+                )
+                
+                # Return the output
+                return {
+                    "mode": "stdio",
+                    "output": container.decode() if isinstance(container, bytes) else str(container),
+                    "success": True
+                }
+                
+            else:  # http mode
+                print(f"🌐 Starting HTTP container: {image} on port {port}")
+                
+                # Port mapping for HTTP mode
+                ports = {f"{port}/tcp": port} if port and network_mode != "host" else None
+                
+                container = client.containers.run(
+                    image=image,
+                    name=name,
+                    environment=env_vars,
+                    ports=ports,
+                    detach=True,
+                    network_mode=network_mode,
+                    restart_policy={"Name": "unless-stopped"}
+                )
+                
+                print(f"✅ Container '{name}' started successfully")
+                print(f"🔗 Available at: http://localhost:{port}")
+                
+                return {
+                    "mode": "http",
+                    "container_id": container.id,
+                    "container_name": name,
+                    "port": port,
+                    "url": f"http://localhost:{port}",
+                    "success": True
+                }
+                
+        except docker.errors.ImageNotFound:
+            print(f"❌ Docker image '{image}' not found. Please build or pull the image first.")
+            return False
+        except docker.errors.APIError as e:
+            print(f"❌ Docker API error: {e}")
+            return False
+        except Exception as e:
+            print(f"❌ Error deploying container: {e}")
+            return False
+            
     def _clone_repo(self, git_url, dest_dir):
         subprocess.run(["git", "clone", git_url, dest_dir], check=True)
 
     def _build_docker_image(self, context_dir: str, tag: str):
-        print(f"🔨 Building Docker image '{tag}' from context: {context_dir}")
         subprocess.run(["docker", "build", "-t", tag, context_dir], check=True)
 
     def _push_docker_image(self, tag: str, registry_url: str):
         full_tag = f"{registry_url}/{tag}"
-        print(f"📦 Pushing image '{full_tag}' to registry...")
         subprocess.run(["docker", "tag", tag, full_tag], check=True)
         subprocess.run(["docker", "push", full_tag], check=True)
         return full_tag
+
+
+# Missing workflow execution methods for LangSwarmConfigLoader
+def _add_workflow_methods_to_config_loader():
+    """Add missing workflow execution methods to LangSwarmConfigLoader"""
+    
+    def run_workflow(self, workflow_id: str, user_input: str = "", **kwargs):
+        """
+        Execute a workflow with the given input.
+        
+        Args:
+            workflow_id: ID of the workflow to execute
+            user_input: Input text for the workflow
+            **kwargs: Additional parameters for workflow execution
+            
+        Returns:
+            Workflow execution result
+        """
+        # Initialize workflow context
+        self.context = {
+            'user_input': user_input,
+            'previous_output': None,
+            'step_outputs': {},
+            'visited_steps': set(),
+            'retry_counters': {},
+            'pending_fanins': {},
+            **kwargs
+        }
+        
+        # Get the workflow
+        workflow = self._get_workflow(workflow_id)
+        
+        # Execute workflow steps
+        if workflow and workflow.get('steps'):
+            for step in workflow['steps']:
+                # Execute each step
+                self._execute_step(step)
+            
+            # Return the final output
+            return self.context.get('previous_output', "Workflow completed")
+        else:
+            raise ValueError(f"Workflow '{workflow_id}' has no steps to execute")
+    
+    async def run_workflow_async(self, workflow_id: str, user_input: str = "", **kwargs):
+        """
+        Execute a workflow asynchronously with the given input.
+        
+        Args:
+            workflow_id: ID of the workflow to execute
+            user_input: Input text for the workflow
+            **kwargs: Additional parameters for workflow execution
+            
+        Returns:
+            Workflow execution result
+        """
+        # Initialize workflow context
+        self.context = {
+            'user_input': user_input,
+            'previous_output': None,
+            'step_outputs': {},
+            'visited_steps': set(),
+            'retry_counters': {},
+            'pending_fanins': {},
+            **kwargs
+        }
+        
+        # Get the workflow
+        workflow = self._get_workflow(workflow_id)
+        
+        # Execute workflow steps asynchronously
+        if workflow and workflow.get('steps'):
+            for step in workflow['steps']:
+                # Execute each step asynchronously
+                await self._execute_step_async(step)
+            
+            # Return the final output
+            return self.context.get('previous_output', "Workflow completed")
+        else:
+            raise ValueError(f"Workflow '{workflow_id}' has no steps to execute")
+    
+    # Add methods to the class
+    LangSwarmConfigLoader.run_workflow = run_workflow
+    LangSwarmConfigLoader.run_workflow_async = run_workflow_async
+
+# Apply the missing methods
+_add_workflow_methods_to_config_loader()
+
+
+class WorkflowExecutor:
+    """
+    Workflow execution wrapper for legacy compatibility.
+    
+    This class provides a simplified interface for executing workflows
+    loaded via LangSwarmConfigLoader, maintaining backward compatibility
+    with existing code that expects a separate WorkflowExecutor class.
+    """
+    
+    def __init__(self, workflows: Dict[str, Any], agents: Dict[str, Any], **kwargs):
+        """
+        Initialize WorkflowExecutor with loaded workflows and agents.
+        
+        Args:
+            workflows: Dictionary of workflows from LangSwarmConfigLoader.load()
+            agents: Dictionary of agents from LangSwarmConfigLoader.load()
+            **kwargs: Additional configuration options
+        """
+        self.workflows = workflows
+        self.agents = agents
+        self.config_kwargs = kwargs
+        
+        # Create a minimal config loader instance for workflow execution
+        self._config_loader = None
+        self._initialize_config_loader()
+    
+    def _initialize_config_loader(self):
+        """Initialize a config loader instance for workflow execution"""
+        try:
+            # Create a minimal config loader with the provided data
+            self._config_loader = LangSwarmConfigLoader()
+            self._config_loader.workflows = self.workflows
+            self._config_loader.agents = self.agents
+            
+            # Set up minimal required attributes
+            self._config_loader.tools = {}
+            self._config_loader.tools_metadata = {}
+            self._config_loader.brokers = {}
+            self._config_loader.config_data = {
+                'workflows': self.workflows,
+                'agents': list(self.agents.values()) if isinstance(self.agents, dict) else self.agents
+            }
+            
+            # Initialize formatting utilities if needed
+            if not hasattr(self._config_loader, 'formatting_utils'):
+                from langswarm.core.utils.subutilities.formatting import Formatting
+                self._config_loader.formatting_utils = Formatting()
+            
+            # Initialize workflow intelligence if needed
+            if not hasattr(self._config_loader, 'intelligence'):
+                from langswarm.core.utils.workflows.intelligence import WorkflowIntelligence
+                self._config_loader.intelligence = WorkflowIntelligence()
+                
+        except Exception as e:
+            print(f"⚠️ Warning: Could not fully initialize WorkflowExecutor: {e}")
+            print("⚠️ Some advanced workflow features may not be available")
+            self._config_loader = None
+    
+    def run_workflow(self, workflow_id: str, user_input: str = "", **kwargs) -> str:
+        """
+        Execute a workflow and return the result.
+        
+        Args:
+            workflow_id: ID of the workflow to execute
+            user_input: Input text for the workflow (supports both user_input and **kwargs)
+            **kwargs: Additional parameters, including legacy user_input parameter
+            
+        Returns:
+            str: Workflow execution result
+            
+        Example:
+            executor = WorkflowExecutor(workflows, agents)
+            result = executor.run_workflow("simple_filesystem_workflow", user_input="Read file.txt")
+        """
+        # Handle legacy parameter names
+        if 'user_input' in kwargs:
+            user_input = kwargs.pop('user_input')
+        
+        if not self._config_loader:
+            return f"❌ WorkflowExecutor not properly initialized - cannot execute workflow '{workflow_id}'"
+        
+        try:
+            # Execute the workflow using the config loader
+            result = self._config_loader.run_workflow(workflow_id, user_input, **kwargs)
+            return str(result) if result is not None else "Workflow completed successfully"
+            
+        except Exception as e:
+            error_msg = f"❌ Workflow execution error: {e}"
+            print(error_msg)
+            return error_msg
+    
+    async def run_workflow_async(self, workflow_id: str, user_input: str = "", **kwargs) -> str:
+        """
+        Execute a workflow asynchronously and return the result.
+        
+        Args:
+            workflow_id: ID of the workflow to execute
+            user_input: Input text for the workflow
+            **kwargs: Additional parameters
+            
+        Returns:
+            str: Workflow execution result
+        """
+        # Handle legacy parameter names
+        if 'user_input' in kwargs:
+            user_input = kwargs.pop('user_input')
+            
+        if not self._config_loader:
+            return f"❌ WorkflowExecutor not properly initialized - cannot execute workflow '{workflow_id}'"
+        
+        try:
+            # Execute the workflow asynchronously using the config loader
+            result = await self._config_loader.run_workflow_async(workflow_id, user_input, **kwargs)
+            return str(result) if result is not None else "Workflow completed successfully"
+            
+        except Exception as e:
+            error_msg = f"❌ Async workflow execution error: {e}"
+            print(error_msg)
+            return error_msg
+    
+    def get_available_workflows(self) -> List[str]:
+        """
+        Get list of available workflow IDs.
+        
+        Returns:
+            List[str]: List of workflow IDs
+        """
+        if isinstance(self.workflows, dict):
+            # Handle main_workflow structure
+            main_workflows = self.workflows.get('main_workflow', [])
+            if isinstance(main_workflows, list):
+                return [wf.get('id', f'workflow_{i}') for i, wf in enumerate(main_workflows)]
+            return list(self.workflows.keys())
+        return []
+    
+    def get_workflow_info(self, workflow_id: str) -> Dict[str, Any]:
+        """
+        Get information about a specific workflow.
+        
+        Args:
+            workflow_id: ID of the workflow
+            
+        Returns:
+            Dict[str, Any]: Workflow information
+        """
+        try:
+            if self._config_loader:
+                workflow = self._config_loader._get_workflow(workflow_id)
+                return {
+                    'id': workflow.get('id', workflow_id),
+                    'name': workflow.get('name', 'Unnamed Workflow'),
+                    'steps': len(workflow.get('steps', [])),
+                    'description': workflow.get('description', 'No description available')
+                }
+        except Exception as e:
+            return {
+                'id': workflow_id,
+                'error': f"Could not retrieve workflow info: {e}"
+            }
+        
+        return {'id': workflow_id, 'error': 'Workflow not found'}

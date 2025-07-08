@@ -23,6 +23,10 @@
 - **Never** mix plain text with JSON - always use structured format
 - **Multiple tool calls**: Include them in a future response after seeing results
 
+**Tool Call Patterns:**
+- **Direct**: Use `tool`, `method`, `params` when you know the exact method and parameters
+- **Intent-Based**: Use `tool`, `intent`, `context` when you want to express what you need to accomplish
+
 **Examples:**
 
 Pure response (no tools needed):
@@ -32,7 +36,7 @@ Pure response (no tools needed):
 }
 ```
 
-Response with tool call:
+**Direct Tool Call** (when you know exactly which tool/method to use):
 ```json
 {
   "response": "I'll check that file for you and analyze its contents.",
@@ -40,6 +44,30 @@ Response with tool call:
     "tool": "filesystem",
     "method": "read_file",
     "params": {"path": "/tmp/config.json"}
+  }
+}
+```
+
+**Intent-Based Tool Call** (when you want to express what you need to do):
+```json
+{
+  "response": "I need to read the configuration file to understand the current settings. Let me access that file now.",
+  "mcp": {
+    "tool": "filesystem",
+    "intent": "read configuration file",
+    "context": "analyze configuration settings in the root directory for troubleshooting"
+  }
+}
+```
+
+**Complex Intent-Based Example**:
+```json
+{
+  "response": "To solve this issue, I need to search through the codebase for similar error patterns and then analyze the log files to understand the root cause.",
+  "mcp": {
+    "tool": "github_mcp",
+    "intent": "find similar error patterns in codebase",
+    "context": "connection timeout error - need debugging analysis for root cause identification"
   }
 }
 ```

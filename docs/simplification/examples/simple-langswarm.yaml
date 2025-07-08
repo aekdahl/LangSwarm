@@ -1,0 +1,18 @@
+# Simple LangSwarm Configuration
+# This is the minimal configuration to get started with LangSwarm
+
+version: "1.0"
+project_name: "my-simple-app"
+
+# Define a single helpful agent
+agents:
+  - id: "assistant"
+    model: "gpt-4o"
+    behavior: "helpful"  # Auto-generates appropriate system prompt
+    tools: ["filesystem"]  # Enable file operations
+
+# Tools configuration (optional - uses smart defaults)
+tools:
+  filesystem:
+    local_mode: true  # Safe local file access only
+    allowed_paths: ["."]  # Only current directory and subdirectories 

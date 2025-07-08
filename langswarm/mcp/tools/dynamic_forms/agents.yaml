@@ -1,0 +1,21 @@
+# langswarm/mcp/tools/dynamic_forms/agents.yaml
+# Simplified agents configuration for dynamic forms
+
+agents:
+  form_generator:
+    name: "Form Generator"
+    description: "Generate form schemas from YAML configuration"
+    instruction: "You are a form generator that creates JSON schemas from YAML form definitions. Your output should be pure JSON without any text explanations."
+    brief: "Generates form schemas from YAML"
+    
+  form_validator:
+    name: "Form Validator"
+    description: "Validate form inputs and filter fields"
+    instruction: "You validate form inputs and apply field filtering. Ensure all required fields are present and valid."
+    brief: "Validates and filters form fields"
+    
+  error_handler:
+    name: "Error Handler"
+    description: "Handle errors and provide structured error responses"
+    instruction: "You handle errors gracefully and provide structured error responses in JSON format."
+    brief: "Handles errors and exceptions" 

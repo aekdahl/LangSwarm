@@ -238,6 +238,14 @@ Ensure your call follows the correct format.
         except json.JSONDecodeError as e:
             print(f"Initial JSON parsing failed: {e}. Attempting to sanitize...")
 
+            # First, try to extract JSON from code blocks
+            extracted_json = self.clear_markdown(json_string)
+            if extracted_json != json_string:
+                try:
+                    return json.loads(extracted_json)
+                except json.JSONDecodeError:
+                    pass  # Continue with sanitization
+
             # Sanitize JSON
             json_string = self._sanitize_json_string(json_string)
 
@@ -249,6 +257,11 @@ Ensure your call follows the correct format.
                 # Fix unescaped quotes and trailing commas
                 json_string = self.escape_unescaped_quotes_in_json_values(json_string)
                 json_string = self._fix_trailing_commas(json_string)
+                
+                # Try a simple regex-based quote fix for common patterns
+                if '"' in json_string and not json_string.startswith('"'):
+                    # Fix unescaped quotes in string values more aggressively
+                    json_string = re.sub(r'(:\s*")([^"]*)"([^"]*)"([^"]*")(\s*[,}])', r'\1\2\"\3\"\4\5', json_string)
 
                 try:
                     return json.loads(json_string)
@@ -420,7 +433,13 @@ Ensure your call follows the correct format.
     
     def clear_markdown(self, text):
         
-        # Remove starting code markup
+        # First, try to extract JSON from code blocks anywhere in the text
+        code_block_pattern = re.compile(r'```(?:json|python|javascript)?\s*\n?({.*?}|\[.*?\])\s*\n?```', re.DOTALL)
+        code_block_match = code_block_pattern.search(text)
+        if code_block_match:
+            return code_block_match.group(1)
+        
+        # Fallback: Remove starting code markup
         if text.startswith('```python'):
             text = text.split('```python',1)[-1]
         elif text.startswith('```json'):

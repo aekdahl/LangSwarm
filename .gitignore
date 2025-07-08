@@ -30,6 +30,12 @@ checkpoints/
 .vscode/
 .idea/
 
+# Runtime data files
+data/
+*.db
+*.sqlite
+*.sqlite3
+
 # Mac / OS X
 .DS_Store
 

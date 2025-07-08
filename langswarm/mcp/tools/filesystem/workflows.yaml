@@ -4,16 +4,24 @@ workflows:
   main_workflow:
     - id: use_filesystem_tool
       inputs:
+        - user_input
         - user_query
       steps:
+        - id: normalize_input
+          agent: input_normalizer
+          input: 
+            user_input: ${user_input}
+            user_query: ${user_query}
+          output_key: normalized_input
+
         - id: choose_function
           agent: tool_decider
-          input: ${user_query}
+          input: ${normalized_input}
           output_key: selected_function
 
         - id: extract_path
           agent: path_extractor
-          input: ${user_query}
+          input: ${normalized_input}
           output_key: extracted_path
 
         - id: fetch_schema

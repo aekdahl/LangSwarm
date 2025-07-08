@@ -4,13 +4,22 @@ workflows:
         description: Fully‑featured workflow for interacting with the GitHub MCP tool
         inputs:
           - user_input
+          - user_query
 
         steps:
+          # 0) Normalize input to handle both user_input and user_query
+          - id: normalize_input
+            agent: input_normalizer
+            input: 
+              user_input: ${context.user_input}
+              user_query: ${context.user_query}
+            output: 
+                to: choose_tool
           # 1) Decide which tool to call
           - id: choose_tool
             agent: github_action_decider
             input:
-                user_query: ${context.user_input}
+                user_query: ${context.step_outputs.normalize_input}
                 available_tools:
                   - name: list_repositories
                     description: List repositories for a user or organization
@@ -80,7 +89,7 @@ workflows:
           - id: build_input
             agent: github_input_builder
             input:
-                user_query: ${context.user_input}
+                user_query: ${context.step_outputs.normalize_input}
                 schema:     ${context.step_outputs.fetch_schema}
             output: 
                 to: call_tool

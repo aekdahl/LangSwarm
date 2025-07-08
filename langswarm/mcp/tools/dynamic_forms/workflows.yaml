@@ -1,0 +1,71 @@
+# langswarm/mcp/tools/dynamic_forms/workflows.yaml
+# Workflows for dynamic forms MCP tool
+
+workflows:
+  main_workflow:
+    - id: generate_form_schema
+      inputs:
+        - form_type
+        - user_context
+        - included_fields
+        - excluded_fields
+        - current_settings
+      steps:
+        - id: validate_form_type
+          agent: form_validator
+          input: ${form_type}
+          output_key: validation_result
+
+        - id: load_form_config
+          agent: config_loader
+          input:
+            form_type: ${form_type}
+            user_context: ${user_context}
+          output_key: form_definition
+
+        - id: apply_filters
+          agent: field_filter
+          input:
+            form_definition: ${form_definition}
+            included_fields: ${included_fields}
+            excluded_fields: ${excluded_fields}
+          output_key: filtered_form
+
+        - id: pre_populate_fields
+          agent: field_populator
+          input:
+            form_definition: ${filtered_form}
+            current_settings: ${current_settings}
+          output_key: populated_form
+
+        - id: generate_schema
+          agent: schema_generator
+          input: ${populated_form}
+          output:
+            to: user
+
+    - id: get_available_forms
+      steps:
+        - id: load_user_config
+          agent: config_loader
+          input: ${user_context}
+          output_key: user_config
+
+        - id: extract_form_list
+          agent: form_extractor
+          input: ${user_config}
+          output:
+            to: user
+
+    - id: get_form_definition
+      inputs:
+        - form_type
+        - user_context
+      steps:
+        - id: load_form_definition
+          agent: config_loader
+          input:
+            form_type: ${form_type}
+            user_context: ${user_context}
+          output:
+            to: user 
