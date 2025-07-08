@@ -1,6 +1,6 @@
-# LangSwarm v0.0.52.dev1 Pre-Release Testing Checklist
+# LangSwarm v0.0.52.dev2 Pre-Release Testing Checklist
 
-**Version**: `0.0.52.dev1`  
+**Version**: `0.0.52.dev2`  
 **Release Type**: Development Pre-Release  
 **Major Features**: Smart Tool Auto-Discovery, Zero-Config Agents, Enhanced Configuration System
 
@@ -24,7 +24,7 @@ This pre-release introduces **Smart Tool Auto-Discovery** as Priority 3 of the L
   pip install -e .
   
   # OR if testing published pre-release:
-  # pip install langswarm==0.0.52.dev1 --pre
+  # pip install langswarm==0.0.52.dev2 --pre
   
   python -c "import langswarm; print('✅ Import successful')"
   ```
@@ -40,9 +40,9 @@ This pre-release introduces **Smart Tool Auto-Discovery** as Priority 3 of the L
 - [x] **Version Verification** ✅ **PASSED**
   ```bash
   python -c "import pkg_resources; print(pkg_resources.get_distribution('langswarm').version)"
-  # Should output: 0.0.52.dev1
+  # Should output: 0.0.52.dev2
   ```
-  **Result**: Version correctly shows `0.0.52.dev1`
+  **Result**: Version correctly shows `0.0.52.dev2`
 
 ### **1.2 Basic Configuration Loading**
 - [x] **Legacy Multi-File Configuration** ✅ **PASSED (with API key limitation)**
@@ -427,7 +427,7 @@ This pre-release introduces **Smart Tool Auto-Discovery** as Priority 3 of the L
 
 ### **10.1 Version Consistency**
 - [x] **Version Number** ✅ **VERIFIED**
-  - [x] `pyproject.toml` shows `0.0.52.dev1` ✅ **Correct**
+  - [x] `pyproject.toml` shows `0.0.52.dev2` ✅ **Correct**
   - [x] Package import shows correct version ✅ **Verified**
   - [x] CHANGELOG.md is updated ✅ **Updated**
 

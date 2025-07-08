@@ -1597,20 +1597,41 @@ Adapt your approach based on the user's needs, drawing from your combined expert
 
     def _initialize_agents(self):
         for agent in self.config_data.get("agents", []):
-            agent_type = agent.get("register_as", "agent")
-            
-            # **SMART TOOL AUTO-DISCOVERY FOR AGENTS**
-            # Process simplified tool syntax before registry assignment
-            agent = self._process_simplified_agent_tools(agent)
-            
-            agent = self._assign_registries(agent)
-            agent = self._setup_memory(agent)
-            agent["system_prompt"] = self._render_system_prompt(agent)
+            try:
+                agent_type = agent.get("register_as", "agent")
+                
+                # **SMART TOOL AUTO-DISCOVERY FOR AGENTS**
+                # Process simplified tool syntax before registry assignment
+                agent = self._process_simplified_agent_tools(agent)
+                
+                agent = self._assign_registries(agent)
+                agent = self._setup_memory(agent)
+                agent["system_prompt"] = self._render_system_prompt(agent)
 
-            # Lazy import to prevent circular imports
-            from langswarm.core.factory.agents import AgentFactory
-            creator = getattr(AgentFactory, f"create_{agent_type}", AgentFactory.create)
-            self.agents[agent["id"]] = self._call_with_valid_args(creator, {"name": agent["id"], **agent})
+                # Lazy import to prevent circular imports
+                from langswarm.core.factory.agents import AgentFactory
+                creator = getattr(AgentFactory, f"create_{agent_type}", AgentFactory.create)
+                self.agents[agent["id"]] = self._call_with_valid_args(creator, {"name": agent["id"], **agent})
+                
+            except ValueError as e:
+                if "API key" in str(e):
+                    print(f"⚠️  Agent '{agent['id']}' requires API key: {e}")
+                    print(f"   Skipping initialization. Agent will be available but non-functional until API key is provided.")
+                    # Store agent config for later initialization when API key becomes available
+                    self.agents[agent["id"]] = {
+                        "id": agent["id"],
+                        "status": "pending_api_key",
+                        "config": agent,
+                        "error": str(e)
+                    }
+                else:
+                    print(f"❌ Failed to initialize agent '{agent['id']}': {e}")
+                    raise
+            except Exception as e:
+                print(f"❌ Unexpected error initializing agent '{agent['id']}': {e}")
+                print(f"   Skipping this agent. Check agent configuration.")
+                # Continue with other agents instead of failing entirely
+                continue
 
     def _assign_registries(self, agent):
         if "retrievers" in agent:
