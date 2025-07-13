@@ -1,0 +1,32 @@
+# Basic Navigation Configuration Template
+# This template demonstrates the simplest navigation setup with manual agent choice
+
+mode: manual
+
+available_steps:
+  - id: process_request
+    name: Process Request
+    description: Handle the user request normally
+    
+  - id: escalate_to_human
+    name: Escalate to Human
+    description: Route complex issues to human support
+    weight: 0.5  # Lower weight makes this less likely to be chosen
+    
+  - id: gather_more_info
+    name: Gather More Information
+    description: Ask user for additional details before proceeding
+
+# Safety fallback when no steps are available
+fallback_step: process_request
+
+# Basic configuration
+timeout_seconds: 30
+max_attempts: 3
+tracking_enabled: true
+analytics_enabled: true
+
+metadata:
+  description: "Basic navigation template for simple routing decisions"
+  use_case: "general_purpose"
+  complexity: "beginner" 

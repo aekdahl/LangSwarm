@@ -1,0 +1,291 @@
+id: "option1_navigation_demo"
+name: "Option 1 Navigation Integration Demo"
+description: "Demonstrates true Option 1 navigation where agents get navigation tools automatically"
+version: "1.0.0"
+
+# Regular workflow steps with navigation capability
+steps:
+  - id: "analyze_input"
+    type: "agent"
+    agent: "analyzer_agent"
+    description: "Analyze user input to understand intent and context"
+    input: "{{user_input}}"
+    output:
+      to: "routing_decision"
+  
+  # This is the key step - regular agent step with navigation config
+  - id: "routing_decision"
+    type: "agent"  # NOT "navigation" - this is a regular agent step!
+    agent: "router_agent" 
+    description: "Agent intelligently chooses the next step using navigation tool"
+    input: "Based on this analysis: {{previous_output}}, route the user appropriately"
+    
+    # Navigation configuration enables the navigate_workflow tool
+    navigation:
+      available_steps:
+        - id: "technical_support"
+          name: "Technical Support"
+          description: "Route to technical support team for bugs, API issues, and technical problems"
+          conditions:
+            - field: "output.category"
+              operator: "eq"
+              value: "technical"
+        
+        - id: "billing_support"
+          name: "Billing Support"
+          description: "Route to billing team for payment issues, subscription problems, and account billing"
+          conditions:
+            - field: "output.category"
+              operator: "eq"
+              value: "billing"
+        
+        - id: "feature_request"
+          name: "Feature Request"
+          description: "Route to product team for feature requests and product feedback"
+          conditions:
+            - field: "output.category"
+              operator: "eq"
+              value: "feature"
+        
+        - id: "general_inquiry"
+          name: "General Inquiry"
+          description: "Handle general questions and information requests"
+          weight: 0.5  # Lower weight as fallback option
+        
+        - id: "escalate_to_human"
+          name: "Escalate to Human"
+          description: "Escalate complex or sensitive issues to human support agent"
+          conditions:
+            - field: "output.complexity"
+              operator: "gt"
+              value: 0.8
+          weight: 1.5
+      
+      # Optional: Conditional routing rules (automatic routing)
+      rules:
+        - conditions:
+            - field: "output.priority"
+              operator: "eq"
+              value: "critical"
+          target_step: "escalate_to_human"
+          priority: 10
+          description: "Auto-escalate all critical priority issues"
+      
+      # Fallback if no valid steps are available
+      fallback_step: "general_inquiry"
+      
+      # Timeout for navigation decision
+      timeout_seconds: 30
+    
+    # The agent will use navigate_workflow tool to choose step
+    # Output routing is handled by the navigation system
+    output:
+      routing: "dynamic"  # Indicates dynamic routing based on navigation
+  
+  # Target steps for navigation
+  - id: "technical_support"
+    type: "agent"
+    agent: "technical_support_agent"
+    description: "Handle technical support issues"
+    input: "Technical issue to resolve: {{step_outputs.analyze_input}}"
+    output:
+      to: "provide_solution"
+  
+  - id: "billing_support"
+    type: "agent"
+    agent: "billing_support_agent"
+    description: "Handle billing and payment issues"
+    input: "Billing issue to resolve: {{step_outputs.analyze_input}}"
+    output:
+      to: "provide_solution"
+  
+  - id: "feature_request"
+    type: "agent"
+    agent: "product_agent"
+    description: "Handle feature requests and product feedback"
+    input: "Feature request to process: {{step_outputs.analyze_input}}"
+    output:
+      to: "log_feedback"
+  
+  - id: "general_inquiry"
+    type: "agent"
+    agent: "general_support_agent"
+    description: "Handle general inquiries and questions"
+    input: "General inquiry: {{step_outputs.analyze_input}}"
+    output:
+      to: "provide_solution"
+  
+  - id: "escalate_to_human"
+    type: "agent"
+    agent: "human_escalation_agent"
+    description: "Escalate to human support"
+    input: "Issue requiring human attention: {{step_outputs.analyze_input}}"
+    output:
+      to: "escalation_complete"
+  
+  # Follow-up steps
+  - id: "provide_solution"
+    type: "agent"
+    agent: "solution_provider"
+    description: "Provide final solution to user"
+    input: "Resolution: {{previous_output}}"
+    output:
+      format: "final_response"
+  
+  - id: "log_feedback"
+    type: "function"
+    function: "log_product_feedback"
+    args:
+      feedback: "{{previous_output}}"
+      category: "feature_request"
+    output:
+      to: "acknowledge_feedback"
+  
+  - id: "acknowledge_feedback"
+    type: "agent"
+    agent: "feedback_acknowledger"
+    description: "Acknowledge feature request submission"
+    input: "Thank user for feedback: {{step_outputs.feature_request}}"
+    output:
+      format: "final_response"
+  
+  - id: "escalation_complete"
+    type: "agent"
+    agent: "escalation_confirmer"
+    description: "Confirm escalation to human agent"
+    input: "Confirm escalation: {{previous_output}}"
+    output:
+      format: "final_response"
+
+# Agent definitions that will automatically get navigation tools
+agents:
+  - id: "analyzer_agent"
+    model: "gpt-4o"
+    behavior: "analytical"
+    description: "Analyzes user input to categorize and assess complexity"
+  
+  - id: "router_agent"
+    model: "gpt-4o"
+    behavior: "support"
+    description: "Intelligently routes users to appropriate support channels"
+    # This agent will automatically get the navigate_workflow tool
+    # because it's used in a step with navigation configuration
+  
+  - id: "technical_support_agent"
+    model: "gpt-4o"
+    behavior: "technical"
+    description: "Provides technical support and troubleshooting"
+  
+  - id: "billing_support_agent"
+    model: "gpt-4o-mini"
+    behavior: "support"
+    description: "Handles billing and payment related issues"
+  
+  - id: "product_agent"
+    model: "gpt-4o"
+    behavior: "product"
+    description: "Manages feature requests and product feedback"
+  
+  - id: "general_support_agent"
+    model: "gpt-4o-mini"
+    behavior: "helpful"
+    description: "Provides general support and information"
+  
+  - id: "human_escalation_agent"
+    model: "gpt-4o"
+    behavior: "support"
+    description: "Manages escalation to human support agents"
+  
+  - id: "solution_provider"
+    model: "gpt-4o-mini"
+    behavior: "helpful"
+    description: "Formats and provides final solutions to users"
+  
+  - id: "feedback_acknowledger"
+    model: "gpt-4o-mini"
+    behavior: "conversational"
+    description: "Acknowledges and thanks users for feedback"
+  
+  - id: "escalation_confirmer"
+    model: "gpt-4o-mini"
+    behavior: "support"
+    description: "Confirms escalation details to users"
+
+# Tools available to agents
+tools:
+  - id: "log_product_feedback"
+    type: "function"
+    function: "log_feedback_to_database"
+    description: "Logs product feedback to the feedback database"
+
+# Global navigation configuration
+global_config:
+  navigation:
+    tracking_enabled: true
+    analytics_enabled: true
+    decision_timeout: 30
+    max_retries: 3
+    
+metadata:
+  use_case: "customer_support_routing"
+  navigation_type: "option1_tool_based"
+  complexity: "intermediate"
+  estimated_tokens_per_decision: 200
+  
+  # Agent Output Format for Navigation
+  agent_output_format:
+    description: "Agents must use the standard LangSwarm tool format to navigate"
+    format: |
+      {
+        "response": "I'll route this to technical support since this is an API authentication issue that requires specialized expertise",
+        "tool": "navigate_workflow",
+        "args": {
+          "step_id": "technical_support",
+          "reasoning": "API authentication issue requires technical expertise",
+          "confidence": 0.9
+        }
+      }
+    
+    fallback_behavior: |
+      If the agent doesn't select a valid step:
+      1. System validates the step_id against available steps
+      2. If invalid, returns error with available options
+      3. If timeout occurs, uses fallback_step from configuration
+      4. If no fallback_step, raises NoAvailableStepsError
+  
+  # Tool Response Format 
+  tool_response_format:
+    description: "Navigation tool returns standard LangSwarm response format"
+    success_format: |
+      {
+        "response": "Successfully navigating to step 'technical_support'. API authentication issue requires technical expertise",
+        "mcp": null,
+        "no_mcp": null,
+        "tool": {
+          "status": "success",
+          "chosen_step": "technical_support",
+          "reasoning": "API authentication issue requires technical expertise",
+          "confidence": 0.9
+        }
+      }
+    
+    error_format: |
+      {
+        "response": "Navigation failed - 'invalid_step' is not available. Available steps: technical_support, billing_support, general_inquiry",
+        "mcp": null,
+        "no_mcp": null,
+        "tool": {
+          "status": "error",
+          "error": "Invalid step 'invalid_step'. Available steps: technical_support, billing_support, general_inquiry"
+        }
+      }
+  
+  # This workflow demonstrates:
+  example_flow:
+    - "User submits: 'I can't access the API, getting 401 errors'"
+    - "analyzer_agent categorizes as 'technical' with high complexity"
+    - "router_agent gets navigate_workflow tool automatically"
+    - "router_agent outputs standard format with tool navigation call"
+    - "Workflow routes to technical_support step automatically"
+    - "technical_support_agent resolves the API issue"
+    - "solution_provider formats final response" 

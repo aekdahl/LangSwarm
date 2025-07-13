@@ -1649,7 +1649,44 @@ Adapt your approach based on the user's needs, drawing from your combined expert
             for _id in agent["plugins"]:
                 reg.register_plugin(self.plugins[_id.lower()])
             agent["plugin_registry"] = reg
+        
+        # NAVIGATION TOOL AUTO-REGISTRATION
+        # Check if this agent will be used in navigation-enabled steps
+        if self._agent_needs_navigation_tool(agent["id"]):
+            # Create or get existing tool registry
+            if "tool_registry" not in agent:
+                agent["tool_registry"] = ToolRegistry()
+            
+            # Add navigation tool to registry
+            from langswarm.features.intelligent_navigation.navigator import NavigationTool
+            nav_tool = NavigationTool()
+            agent["tool_registry"].register_tool(nav_tool)
+            
+            # Store navigation context for the agent
+            agent["navigation_context"] = self._get_navigation_context(agent["id"])
+        
         return agent
+        
+    def _agent_needs_navigation_tool(self, agent_id: str) -> bool:
+        """Check if agent will be used in navigation-enabled steps"""
+        workflows = self.config_data.get('workflows', {})
+        for workflow_id, workflow_data in workflows.items():
+            for step in workflow_data.get('steps', []):
+                if step.get('agent') == agent_id and 'navigation' in step:
+                    return True
+        return False
+    
+    def _get_navigation_context(self, agent_id: str) -> Dict[str, Any]:
+        """Get navigation context for agent"""
+        navigation_contexts = {}
+        workflows = self.config_data.get('workflows', {})
+        
+        for workflow_id, workflow_data in workflows.items():
+            for step in workflow_data.get('steps', []):
+                if step.get('agent') == agent_id and 'navigation' in step:
+                    navigation_contexts[step['id']] = step['navigation']
+        
+        return navigation_contexts
 
     def _setup_memory(self, agent):
         if "memory_adapter" in agent:
@@ -1966,6 +2003,179 @@ If any required parameter is missing or ambiguous, instead return:
     
         return prompt
 
+    def _get_visit_key(self, step: Dict) -> str:
+        """
+        Generate a unique visit key for a workflow step.
+        
+        This key is used to track whether a step has been visited before,
+        enabling proper handling of retry logic and preventing infinite loops.
+        
+        Args:
+            step: The workflow step dictionary
+            
+        Returns:
+            A unique string identifier for the step
+        """
+        step_id = step.get('id', 'unknown')
+        
+        # Include retry context in the visit key if the step has retry capability
+        if step.get('retry'):
+            retry_count = self.context.get("retry_counters", {}).get(step_id, 0)
+            return f"{step_id}:retry:{retry_count}"
+        
+        # For loop steps, include loop iteration context
+        if 'loop' in step:
+            loop_id = step['loop'].get('id', step_id)
+            iteration = self.context.get("loop_counters", {}).get(loop_id, 0)
+            return f"{step_id}:loop:{loop_id}:iteration:{iteration}"
+        
+        # For fan-in steps, include fan key context
+        if step.get('fan_key'):
+            fan_key = step['fan_key']
+            return f"{step_id}:fan:{fan_key}"
+        
+        # Default visit key is just the step ID
+        return step_id
+
+    def _recheck_pending_fanins(self):
+        """
+        Check if any pending fan-in steps are ready to execute.
+        
+        Fan-in steps are only executed when all their required fan-out steps have completed.
+        This method is called after any step completes to check if any pending fan-ins
+        should now be executed.
+        """
+        if not hasattr(self, 'context') or not self.context:
+            return
+            
+        pending_fanins = self.context.get("pending_fanins", {})
+        
+        # Check each fan-in group
+        for fan_key, step_ids in list(pending_fanins.items()):
+            if not step_ids:
+                continue
+                
+            # Execute all pending fan-in steps for this fan key
+            for step_id in list(step_ids):
+                try:
+                    target_step = self._get_step_by_id(step_id)
+                    if target_step:
+                        print(f"🔄 Executing pending fan-in step: {step_id}")
+                        self._execute_step(target_step)
+                        # Remove from pending after successful execution
+                        step_ids.discard(step_id)
+                except Exception as e:
+                    print(f"⚠️ Error executing pending fan-in step {step_id}: {e}")
+                    # Remove failed step from pending to avoid infinite retries
+                    step_ids.discard(step_id)
+            
+            # Clean up empty fan-in groups
+            if not step_ids:
+                del pending_fanins[fan_key]
+
+    async def _recheck_pending_fanins_async(self):
+        """
+        Async version of _recheck_pending_fanins.
+        
+        Check if any pending fan-in steps are ready to execute asynchronously.
+        """
+        if not hasattr(self, 'context') or not self.context:
+            return
+            
+        pending_fanins = self.context.get("pending_fanins", {})
+        
+        # Check each fan-in group
+        for fan_key, step_ids in list(pending_fanins.items()):
+            if not step_ids:
+                continue
+                
+            # Execute all pending fan-in steps for this fan key
+            tasks = []
+            for step_id in list(step_ids):
+                try:
+                    target_step = self._get_step_by_id(step_id)
+                    if target_step:
+                        print(f"🔄 Executing pending fan-in step: {step_id} (async)")
+                        tasks.append(self._execute_step_async(target_step))
+                        # Remove from pending after queuing for execution
+                        step_ids.discard(step_id)
+                except Exception as e:
+                    print(f"⚠️ Error queuing pending fan-in step {step_id}: {e}")
+                    # Remove failed step from pending to avoid infinite retries
+                    step_ids.discard(step_id)
+            
+            # Execute all tasks concurrently
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Clean up empty fan-in groups
+            if not step_ids:
+                del pending_fanins[fan_key]
+
+    def _resolve_condition_branch(self, condition):
+        """
+        Resolve a condition and return the appropriate branch.
+        
+        Args:
+            condition: The condition configuration dict
+            
+        Returns:
+            The branch to execute (step_id, dict, or None)
+        """
+        if not condition:
+            return None
+            
+        # Handle different condition types
+        if isinstance(condition, dict):
+            # Check for if/then/else structure
+            if "if" in condition:
+                condition_expr = condition["if"]
+                then_branch = condition.get("then")
+                else_branch = condition.get("else")
+                
+                # Evaluate the condition
+                try:
+                    result = self._evaluate_condition(condition_expr)
+                    if result:
+                        return then_branch
+                    else:
+                        return else_branch
+                except Exception as e:
+                    print(f"⚠️ Error evaluating condition '{condition_expr}': {e}")
+                    return else_branch
+            
+            # Check for switch/case structure
+            elif "switch" in condition:
+                switch_value = self._resolve_input(condition["switch"])
+                cases = condition.get("cases", {})
+                default_case = condition.get("default")
+                
+                # Find matching case
+                for case_value, case_branch in cases.items():
+                    if str(switch_value) == str(case_value):
+                        return case_branch
+                
+                # Return default case if no match
+                return default_case
+            
+            # Check for exists condition
+            elif "exists" in condition:
+                path = condition["exists"]
+                try:
+                    value = self._resolve_input(f"${{{path}}}")
+                    exists = value is not None and value != ""
+                    then_branch = condition.get("then")
+                    else_branch = condition.get("else")
+                    return then_branch if exists else else_branch
+                except Exception:
+                    return condition.get("else")
+        
+        # If condition is a simple string, treat it as a direct step reference
+        elif isinstance(condition, str):
+            return condition
+        
+        return None
+
     def _make_output_serializable(self, output):
         if isinstance(output, pd.DataFrame):
             return {
@@ -2006,14 +2216,15 @@ If any required parameter is missing or ambiguous, instead return:
             else:
                 print(f"🔁 Step {step_id} already done, skipping.")
                 return
-    
+                
         if "loop" in step:
             return self._start_loop(step)
-    
+                
         if 'invoke_workflow' in step:
             wf_id = step['invoke_workflow']
             inp = self._resolve_input(step.get("input"))
             output = self.run_workflow(wf_id, inp)
+            
         elif 'no_mcp' in step:
             tools_raw = step['no_mcp']['tools']
             tool_ids = [t if isinstance(t, str) else t["name"] for t in tools_raw]
@@ -2087,85 +2298,86 @@ If any required parameter is missing or ambiguous, instead return:
             else:
                 # No tool call, just return the response text
                 result = user_response or str(payload)
-        
-            self.context['previous_output'] = result
-            self.context['step_outputs'][step['id']] = result
-        
-            # 🧠 Determine dynamic output override
-            opts = tool_options.get(tool_name, {})
-            if opts.get("return_to_agent"):
-                to_target = opts.get("return_to", agent_id)
-                self._handle_output(step['id'], {"to": to_target}, result, step)
-            else:
-                if "output" in step:
-                    self.intelligence.end_step(step_id, status="success", output=result)
-                    self._handle_output(step['id'], step["output"], result, step)
-        
-            if mark_visited:
-                visit_key = self._get_visit_key(step)
-                self.context["visited_steps"].add(visit_key)
-        
-            return
+                
         else:
-            try:
-                if 'agent' in step:
-                    agent = self.agents[step['agent']]
-                    raw_input = step.get("input")
-                    if isinstance(raw_input, dict):
-                        resolved = {k: self._resolve_input(v) for k, v in raw_input.items()}
-                        output = agent.chat(f"{resolved}")
-                    else:
-                        output = agent.chat(self._resolve_input(raw_input))
+            # Handle other step types
+            result = "Step executed"
+            
+        # Store result
+        self.context['previous_output'] = result
+        self.context['step_outputs'][step['id']] = result
+        
+        # Handle regular output routing (if no navigation was used)
+        if 'output' in step and not navigation_choice:
+            self._handle_step_output(step, result)
     
-                elif 'function' in step:
-                    func = self._resolve_function(step['function'], script=step.get('script'))
-                    args = {k: self._resolve_input(v) for k, v in step.get("args", {}).items()}
-                    args.setdefault("context", self.context)
-                    try:
-                        output = func(**args)
-                    except Exception as e:
-                        import traceback
-                        tb = traceback.format_exc()
-                        print(f"\n🚨 Exception in function `{step['function']}`:\n{tb}")
-                        raise  # Re-raise to keep workflow intelligence working
+    def _extract_navigation_choice(self, response: str, step: Dict) -> Optional[Dict]:
+        """Extract navigation choice from agent response"""
+        if 'navigation' not in step:
+            return None
+            
+        # Try to parse as JSON first
+        try:
+            parsed = self.formatting_utils.safe_json_loads(response)
+            if parsed and isinstance(parsed, dict):
+                # Check for navigation tool call
+                if parsed.get('tool') == 'navigate_workflow' or parsed.get('name') == 'navigate_workflow':
+                    args = parsed.get('args', parsed.get('arguments', {}))
+                    return {
+                        'step_id': args.get('step_id'),
+                        'reasoning': args.get('reasoning', ''),
+                        'confidence': args.get('confidence', 1.0)
+                    }
+        except:
+            pass
+            
+        return None
     
-                    if output == "__NOT_READY__":
-                        fan_key = step.get("fan_key", "default")
-                        self.context["pending_fanins"][f"{step_id}@{fan_key}"] = step
-                        return
-                else:
-                    raise ValueError(f"⚠️ Step {step_id} missing 'agent' or 'function'")
+    def _track_navigation_decision(self, current_step: str, chosen_step: str, reasoning: str, confidence: float):
+        """Track navigation decision for analytics"""
+        try:
+            from langswarm.features.intelligent_navigation.tracker import NavigationTracker, NavigationDecision
+            from datetime import datetime
+            import uuid
+            
+            # Create navigation decision record
+            decision = NavigationDecision(
+                decision_id=str(uuid.uuid4()),
+                workflow_id=self.workflow_id,
+                step_id=current_step,
+                agent_id=self.context.get('current_agent', 'unknown'),
+                chosen_step=chosen_step,
+                available_steps=[step['id'] for step in self.context.get('available_navigation_steps', [])],
+                reasoning=reasoning,
+                confidence=confidence,
+                context_hash=str(hash(str(self.context))),
+                timestamp=datetime.now(),
+                execution_time_ms=0.0  # Could be measured
+            )
+            
+            # Track the decision
+            tracker = NavigationTracker()
+            tracker.track_decision(decision)
+            
+        except Exception as e:
+            print(f"⚠️  Failed to track navigation decision: {e}")
     
-            except Exception as e:
-                self._handle_step_error(step, step_id, visit_key, e)
-
-        output = self._make_output_serializable(output)
-        if isinstance(output, (pd.DataFrame, pd.Series, np.ndarray)):
-            print(f"⚠️ Auto-converted non-serializable output ({type(output).__name__}) to JSON-safe format.")
-
-        # Explicitly store outputs regardless of conditional steps:
-        self.context['previous_output'] = output
-        self.context['step_outputs'][step_id] = output
-    
-        if "output" in step:
-            self.intelligence.end_step(step_id, status="success", output=output)
-            to_targets = step["output"].get("to", [])
-            if not isinstance(to_targets, list):
-                to_targets = [to_targets]
-    
-            if any(isinstance(t, dict) and "condition" in t for t in to_targets):
-                self._handle_output(step_id, step["output"], output, step)
-                if mark_visited:
-                    self.context["visited_steps"].add(visit_key)
-                return  # Important: return here explicitly after handling condition
-            else:
-                self._handle_output(step_id, step["output"], output, step)
-    
-        if mark_visited:
-            self.context["visited_steps"].add(visit_key)
-    
-        if step.get("fan_key"):
-            self._recheck_pending_fanins()
+    def _route_to_step(self, step_id: str, result: Dict):
+        """Route to chosen step"""
+        # Find the target step
+        workflow_data = self.config_data.get('workflows', {}).get(self.workflow_id, {})
+        target_step = None
+        
+        for step in workflow_data.get('steps', []):
+            if step['id'] == step_id:
+                target_step = step
+                break
+        
+        if not target_step:
+            raise ValueError(f"Navigation target step '{step_id}' not found in workflow")
+        
+        # Execute the target step
+        self._execute_step(target_step)
 
     @WorkflowIntelligence.track_step
     async def _execute_step_inner_async(self, step: Dict, mark_visited: bool = True):
@@ -2283,28 +2495,77 @@ If any required parameter is missing or ambiguous, instead return:
             try:
                 if 'agent' in step:
                     agent = self.agents[step['agent']]
+                    
+                    # NAVIGATION SUPPORT: Check if this step has navigation config
+                    navigation_choice = None
+                    if 'navigation' in step:
+                        # Set up navigation context for the agent
+                        from langswarm.features.intelligent_navigation.navigator import NavigationContext
+                        nav_context = NavigationContext(
+                            workflow_id=self.workflow_id,
+                            current_step=step['id'],
+                            context_data=self.context,
+                            step_history=self.context.get('step_history', []),
+                            available_steps=step['navigation'].get('available_steps', [])
+                        )
+                        
+                        # Store navigation context in agent if it has the capability
+                        if hasattr(agent, 'navigation_context'):
+                            agent.navigation_context = nav_context
+                    
+                    # Execute agent
                     raw_input = step.get("input")
                     if isinstance(raw_input, dict):
                         resolved = {k: self._resolve_input(v) for k, v in raw_input.items()}
                         output = agent.chat(f"{resolved}")
                     else:
                         output = agent.chat(self._resolve_input(raw_input))
-    
+                    
+                    # NAVIGATION SUPPORT: Check if agent made a navigation choice
+                    if 'navigation' in step:
+                        navigation_choice = self._extract_navigation_choice(output, step)
+                        
+                        if navigation_choice:
+                            # Agent chose a navigation step
+                            chosen_step = navigation_choice['step_id']
+                            reasoning = navigation_choice.get('reasoning', '')
+                            confidence = navigation_choice.get('confidence', 1.0)
+                            
+                            # Track navigation decision
+                            self._track_navigation_decision(step['id'], chosen_step, reasoning, confidence)
+                            
+                            # Create navigation result
+                            output = {
+                                'navigation_choice': chosen_step,
+                                'reasoning': reasoning,
+                                'confidence': confidence,
+                                'response': output
+                            }
+                            
+                            # Store result and route to chosen step
+                            self.context['previous_output'] = output
+                            self.context['step_outputs'][step['id']] = output
+                            
+                            # Mark this step as visited
+                            if mark_visited:
+                                self.context["visited_steps"].add(visit_key)
+                            
+                            # Route to chosen step
+                            self._route_to_step(chosen_step, output)
+                            return
+        
                 elif 'function' in step:
                     func = self._resolve_function(step['function'], script=step.get('script'))
                     args = {k: self._resolve_input(v) for k, v in step.get("args", {}).items()}
                     args.setdefault("context", self.context)
-                    if asyncio.iscoroutinefunction(func):
-                        output = await func(**args)
-                    else:
-                        try:
-                            output = func(**args)
-                        except Exception as e:
-                            import traceback
-                            tb = traceback.format_exc()
-                            print(f"\n🚨 Exception in function `{step['function']}`:\n{tb}")
-                            raise  # Re-raise to keep workflow intelligence working
-    
+                    try:
+                        output = func(**args)
+                    except Exception as e:
+                        import traceback
+                        tb = traceback.format_exc()
+                        print(f"\n🚨 Exception in function `{step['function']}`:\n{tb}")
+                        raise  # Re-raise to keep workflow intelligence working
+        
                     if output == "__NOT_READY__":
                         fan_key = step.get("fan_key", "default")
                         self.context["pending_fanins"][f"{step_id}@{fan_key}"] = step
@@ -2314,34 +2575,34 @@ If any required parameter is missing or ambiguous, instead return:
     
             except Exception as e:
                 self._handle_step_error(step, step_id, visit_key, e)
-
+        
         output = self._make_output_serializable(output)
         if isinstance(output, (pd.DataFrame, pd.Series, np.ndarray)):
             print(f"⚠️ Auto-converted non-serializable output ({type(output).__name__}) to JSON-safe format.")
-            
+        
         # Explicitly store outputs regardless of conditional steps:
         self.context['previous_output'] = output
         self.context['step_outputs'][step_id] = output
-    
+        
         if "output" in step:
             self.intelligence.end_step(step_id, status="success", output=output)
             to_targets = step["output"].get("to", [])
             if not isinstance(to_targets, list):
                 to_targets = [to_targets]
-    
+        
             if any(isinstance(t, dict) and "condition" in t for t in to_targets):
-                await self._handle_output_async(step_id, step["output"], output, step)
+                self._handle_output(step_id, step["output"], output, step)
                 if mark_visited:
                     self.context["visited_steps"].add(visit_key)
                 return  # Important: return here explicitly after handling condition
             else:
-                await self._handle_output_async(step_id, step["output"], output, step)
-    
+                self._handle_output(step_id, step["output"], output, step)
+        
         if mark_visited:
             self.context["visited_steps"].add(visit_key)
-    
+        
         if step.get("fan_key"):
-            await self._recheck_pending_fanins_async()
+            self._recheck_pending_fanins()
 
     def _handle_output(
         self,
