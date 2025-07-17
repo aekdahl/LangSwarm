@@ -389,15 +389,71 @@ class CohereSessionAdapter(BaseSessionAdapter):
         return message
 
 
+class TestSessionAdapter(BaseSessionAdapter):
+    """Test session adapter for unit testing"""
+    
+    def __init__(self, model: str):
+        super().__init__("test", model)
+    
+    def supports_native_sessions(self) -> bool:
+        """Test adapter supports native sessions for testing"""
+        return True
+    
+    def create_session(self, session: LangSwarmSession) -> Dict[str, Any]:
+        """Create test session"""
+        return {
+            "model": self.model,
+            "messages": session.get_messages_for_api(),
+            "test_session": True
+        }
+    
+    def prepare_request(self, session: LangSwarmSession, message: str) -> Dict[str, Any]:
+        """Prepare test request"""
+        params = {
+            "model": self.model,
+            "messages": session.get_messages_for_api()
+        }
+        
+        params["messages"].append({
+            "role": "user",
+            "content": message
+        })
+        
+        return params
+    
+    def process_response(self, session: LangSwarmSession, response: Any) -> ConversationMessage:
+        """Process test response"""
+        from datetime import datetime
+        
+        # Mock response for testing
+        if hasattr(response, 'content'):
+            content = response.content
+        elif hasattr(response, 'text'):
+            content = response.text
+        else:
+            content = "Test response"
+        
+        return ConversationMessage(
+            role=MessageRole.ASSISTANT,
+            content=content,
+            timestamp=datetime.now(),
+            message_id=f"test_msg_{session.history.message_count + 1}",
+            session_id=session.session_id
+        )
+
+
 class SessionAdapterFactory:
     """Factory for creating provider-specific session adapters"""
     
     _adapters = {
         "openai": OpenAISessionAdapter,
+        "gpt": OpenAISessionAdapter,  # Alias for OpenAI
         "claude": ClaudeSessionAdapter,
         "gemini": GeminiSessionAdapter,
         "mistral": MistralSessionAdapter,
-        "cohere": CohereSessionAdapter
+        "cohere": CohereSessionAdapter,
+        "test": TestSessionAdapter,   # For testing
+        "none": TestSessionAdapter,   # Another alias for testing
     }
     
     @classmethod

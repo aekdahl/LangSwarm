@@ -41,3 +41,26 @@ data/
 
 # Windows
 Thumbs.db
+
+# Development tools and user-specific directories
+.ipython/              # IPython configuration and history
+.jupyter/              # Jupyter configuration and runtime files
+.local/                # Local user data and configurations
+.npm/                  # npm cache and configuration
+.pytest_cache/         # pytest cache files
+.pytest_*/            # Other pytest temporary files
+.coverage              # Coverage.py reports
+.tox/                  # tox testing environments
+.mypy_cache/           # mypy type checker cache
+.ruff_cache/           # ruff linter cache
+
+# Package manager files
+node_modules/          # npm dependencies
+package-lock.json      # npm lock file (if not needed)
+yarn.lock              # yarn lock file (if not needed)
+
+# Temporary files
+*.tmp
+*.temp
+.temp/
+tmp/

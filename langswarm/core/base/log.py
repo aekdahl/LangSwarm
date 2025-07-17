@@ -43,7 +43,7 @@ class GlobalLogger:
             cls._logger.addHandler(extra_handler)
             print("Extra handler added to GlobalLogger.")
 
-        if langsmith_api_key and cls._langsmith_tracer is None:
+        if langsmith_api_key and cls._langsmith_tracer is None and LangSmithTracer is not None:
             cls._langsmith_tracer = LangSmithTracer(api_key=langsmith_api_key)
             print("LangSmith tracer added to global logger.")
 

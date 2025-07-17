@@ -155,7 +155,7 @@ class BaseTool(BaseClass):  # Conditional Inheritance
                     raise
             else:
                 available_methods = list(method_handlers.keys())
-                return f"Unknown method '{method}'. Available methods: {available_methods}"
+                return f"Error: Unknown method '{method}'. Available methods: {available_methods}"
         
         # Handle non-dict input (legacy or workflow-based calls)
         return f"{getattr(self, 'name', 'MCP tool')} called with input: {input_data}"        

@@ -26,14 +26,16 @@ class ReadFileOutput(BaseModel):
 # === Handlers ===
 def list_directory(path: str):
     if not os.path.isdir(path):
-        raise ValueError(f"Not a directory: {path}")
-    return {"path": path, "contents": sorted(os.listdir(path))}
+        raise FileNotFoundError(f"Directory not found: {path}")
+    contents = os.listdir(path)
+    return {"contents": contents, "path": path}
 
 def read_file(path: str):
     if not os.path.isfile(path):
-        raise ValueError(f"Not a file: {path}")
-    with open(path, "r", encoding="utf-8") as f:
-        return {"path": path, "content": f.read()}
+        raise FileNotFoundError(f"File not found: {path}")
+    with open(path, 'r') as file:
+        content = file.read()
+    return {"content": content, "path": path}
 
 # === Build MCP Server ===
 server = BaseMCPToolServer(
@@ -64,34 +66,24 @@ app = server.build_app()
 # === LangChain-Compatible Tool Class ===
 class FilesystemMCPTool(BaseTool):
     """
-    Filesystem MCP tool that properly inherits from BaseTool.
+    Filesystem MCP tool for local and remote operations.
     
-    This is a template for creating MCP tools with minimal boilerplate:
-    
-    1. Set _is_mcp_tool = True to enable MCP functionality
-    2. Define tool-specific defaults in __init__
-    3. Add mcp_server reference to kwargs
-    4. Create method_handlers dict in run() method
-    5. Use self._handle_mcp_structured_input() for standardized handling
-    
-    The BaseTool automatically handles:
-    - Pydantic validation bypass for MCP tools
-    - MCP attribute setup (id, type, workflows)
-    - LangChain compatibility (invoke, _run, func)
-    - Structured input parsing and error handling
+    Supports both local mode (direct filesystem operations) and remote mode (via MCP).
     """
+    _bypass_pydantic = True  # Bypass Pydantic validation
     
-    # Flag to enable Pydantic bypass and MCP functionality
-    _is_mcp_tool = True
-    
-    def __init__(self, identifier: str, name: str, description: str = "", instruction: str = "", brief: str = "", **kwargs):
+    def __init__(self, identifier: str, name: str = None, local_mode: bool = True, mcp_url: str = None, **kwargs):
         # Set defaults for filesystem MCP tool
-        description = description or "Read-only access to the local filesystem via MCP"
-        instruction = instruction or "Use this tool to list directories and read files from the local filesystem"
-        brief = brief or "Filesystem MCP tool"
+        description = kwargs.pop('description', "Read-only access to the local filesystem via MCP")
+        instruction = kwargs.pop('instruction', "Use this tool to list directories and read files from the local filesystem")
+        brief = kwargs.pop('brief', "Filesystem MCP tool")
         
         # Add MCP server reference
         kwargs['mcp_server'] = server
+        
+        # Set MCP tool attributes to bypass Pydantic validation issues
+        object.__setattr__(self, '_is_mcp_tool', True)
+        object.__setattr__(self, 'local_mode', local_mode)
         
         # Initialize with BaseTool (handles all MCP setup automatically)
         super().__init__(
@@ -112,7 +104,10 @@ class FilesystemMCPTool(BaseTool):
         }
         
         # Use BaseTool's common MCP input handler
-        return self._handle_mcp_structured_input(input_data, method_handlers)
+        try:
+            return self._handle_mcp_structured_input(input_data, method_handlers)
+        except Exception as e:
+            return f"Error: Unknown method '{method}'. Available methods: {list(method_handlers.keys())}"
 
 if __name__ == "__main__":
     if server.local_mode:

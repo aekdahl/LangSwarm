@@ -464,12 +464,21 @@ class UtilMixin:
             "fallback_mode": "immediate"  # when streaming fails
         }
         
+        # Handle case where config is None
+        if not config:
+            return default_config
+        
+        # Handle case where config is directly a streaming configuration
+        if isinstance(config, dict) and "streaming" not in config:
+            # This is likely a direct streaming config (e.g., from AgentWrapper parameter)
+            streaming_config = default_config.copy()
+            streaming_config.update(config)  # Override defaults with provided values
+            return streaming_config
+        
+        # Handle case where config contains a "streaming" key
         if config and "streaming" in config:
-            streaming_config = config["streaming"].copy()
-            # Merge with defaults
-            for key, default_value in default_config.items():
-                if key not in streaming_config:
-                    streaming_config[key] = default_value
+            streaming_config = default_config.copy()
+            streaming_config.update(config["streaming"])  # Override defaults with provided values
             return streaming_config
         
         return default_config

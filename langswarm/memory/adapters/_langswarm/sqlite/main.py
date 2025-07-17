@@ -113,7 +113,7 @@ START>>>
 Replace `rag_name`, `action_name`, and parameters as needed.
             """
         )
-        if any(var is None for var in (sqlite3)):
+        if sqlite3 is None:
             raise ValueError("Unsupported database. Make sure sqlite3 is installed.")
             
         self.db_path = db_path
@@ -168,31 +168,68 @@ Replace `rag_name`, `action_name`, and parameters as needed.
                 )
             conn.commit()
 
-    def query(self, query: str, filters: Dict = None, top_k: int = 5):
+    def query(self, query: str, filters: Dict = None, top_k: int = 5, n: int = None):
         """
         Perform a similarity-based search with optional metadata filtering.
-
+        
         Args:
-            query (str): The query string for retrieval.
-            filters (Dict, optional): Metadata filters for refining results.
+            query (str): The text query to search for.
+            filters (Dict): Metadata filters to apply.
             top_k (int): Number of results to return (default is 5).
-
+            n (int): Alternative parameter for number of results (for compatibility).
+        
         Returns:
-            List[Dict]: A list of standardized document results.
+            List[Dict]: Search results with content and metadata.
         """
-        translated_filters = self.translate_filters(filters) if filters else None
-        results = self.db.similarity_search(query, filter=translated_filters, k=top_k)
-
-        return [
-            self.standardize_output(
-                text=item["text"],
-                source="SQLite",
-                metadata=item["metadata"],
-                id=item["id"],
-                relevance_score=item.get("score")
-            )
-            for item in results
-        ]
+        # Use 'n' parameter if provided, otherwise use 'top_k'
+        if n is not None:
+            top_k = n
+            
+        # Build SQL query for text search
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Basic text search using LIKE
+            sql_query = "SELECT key, value, metadata FROM memory WHERE value LIKE ?"
+            params = [f"%{query}%"]
+            
+            # Add filter conditions if provided
+            if filters:
+                translated_filters = self._translate_filters(filters)
+                if translated_filters:
+                    sql_query += f" AND ({translated_filters})"
+            
+            # Add limit
+            sql_query += " LIMIT ?"
+            params.append(top_k)
+            
+            cursor.execute(sql_query, params)
+            rows = cursor.fetchall()
+            
+            results = []
+            for row in rows:
+                key, value, metadata_str = row
+                
+                # Parse metadata if it exists
+                metadata = {}
+                if metadata_str:
+                    try:
+                        import json
+                        metadata = json.loads(metadata_str)
+                    except:
+                        metadata = {}
+                
+                # Standardize output format
+                result = self.standardize_output(
+                    text=value,
+                    source="SQLite",
+                    metadata=metadata,
+                    id=key,
+                    relevance_score=1.0  # Simple text matching, no real scoring
+                )
+                results.append(result)
+            
+            return results
 
     def delete(self, document_ids):
         with self._get_connection() as conn:
@@ -225,3 +262,19 @@ Replace `rag_name`, `action_name`, and parameters as needed.
                 sqlite_filters.append(f"{field} <= {value}")
 
         return " AND ".join(sqlite_filters) if sqlite_filters else None
+    
+    def capabilities(self) -> Dict[str, bool]:
+        """
+        Return the capabilities of this SQLite adapter.
+        
+        Returns:
+            Dict[str, bool]: Dictionary indicating supported features
+        """
+        return {
+            "vector_search": False,  # SQLite does not support vector-based search.
+            "metadata_filtering": True,  # Supports metadata filtering through SQL queries.
+            "semantic_search": False,  # Requires external embeddings for semantic capabilities.
+            "full_text_search": True,  # Supports text-based searching with LIKE queries.
+            "persistent": True,  # Data persists to disk.
+            "scalable": False,  # Not designed for large-scale operations.
+        }

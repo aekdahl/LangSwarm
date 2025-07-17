@@ -111,7 +111,7 @@ class DatabaseAdapter(ABC):
     def standardize_output(self, text, source, metadata=None, id=None, relevance_score=None):
         return {
             "text": text,
-            "metadata": metadata or [],
+            "metadata": metadata or {},
             "source": source,
             "id": id
         }

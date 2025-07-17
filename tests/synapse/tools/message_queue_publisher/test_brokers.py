@@ -24,7 +24,7 @@ def test_internal_queue_broker_publish_and_subscribe():
     assert received == [{"hello": "world"}]
 
 
-@patch("redis.StrictRedis")
+@patch("langswarm.synapse.tools.message_queue_publisher.brokers.redis.StrictRedis")
 def test_redis_message_broker_publish(mock_redis):
     mock_client = MagicMock()
     mock_redis.return_value = mock_client
@@ -35,7 +35,7 @@ def test_redis_message_broker_publish(mock_redis):
     mock_client.publish.assert_called_once_with("test", json.dumps({"foo": "bar"}))
 
 
-@patch("redis.StrictRedis")
+@patch("langswarm.synapse.tools.message_queue_publisher.brokers.redis.StrictRedis")
 def test_redis_message_broker_subscribe_starts_thread(mock_redis):
     mock_pubsub = MagicMock()
     mock_pubsub.listen.return_value = iter([

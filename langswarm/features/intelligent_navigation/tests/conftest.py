@@ -13,7 +13,8 @@ from unittest.mock import Mock
 
 from ..tracker import NavigationTracker, NavigationDecision
 from ..navigator import NavigationTool, WorkflowNavigator, NavigationContext
-from ..config import NavigationConfig, NavigationStep, NavigationMode, NavigationCondition, ConditionOperator
+from ..config import NavigationConfig, NavigationStep, NavigationMode, NavigationCondition
+from ..schema import ConditionOperator
 from ..schema import NavigationConfigBuilder
 
 

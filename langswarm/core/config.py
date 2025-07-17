@@ -94,6 +94,9 @@ class AgentConfig:
     streaming: bool = False
     max_tokens: Optional[int] = None
     temperature: Optional[float] = None
+    presence_penalty: Optional[float] = None
+    frequency_penalty: Optional[float] = None
+    top_p: Optional[float] = None
     response_format: Optional[str] = None
     
 @dataclass
@@ -118,6 +121,40 @@ class MemoryConfig:
     enabled: bool = False
     backend: str = "auto"  # auto, sqlite, redis, chromadb, etc.
     settings: Dict[str, Any] = field(default_factory=dict)
+    
+    # MemoryPro configuration for Pro features
+    memorypro_enabled: bool = False
+    memorypro_mode: str = "internal"  # internal, external
+    memorypro_api_url: Optional[str] = None
+    memorypro_api_key: Optional[str] = None
+    memorypro_api_secret: Optional[str] = None
+    memorypro_webhook_url: Optional[str] = None
+    memorypro_webhook_secret: Optional[str] = None
+    
+    def get_memorypro_config(self) -> Dict[str, Any]:
+        """Get MemoryPro configuration with environment variable fallbacks"""
+        import os
+        
+        return {
+            "enabled": self.memorypro_enabled or os.getenv("MEMORYPRO_ENABLED", "false").lower() == "true",
+            "mode": self.memorypro_mode or os.getenv("MEMORYPRO_MODE", "internal"),
+            "api_url": self.memorypro_api_url or os.getenv("MEMORYPRO_API_URL"),
+            "api_key": self.memorypro_api_key or os.getenv("MEMORYPRO_API_KEY"),
+            "api_secret": self.memorypro_api_secret or os.getenv("MEMORYPRO_API_SECRET"),
+            "webhook_url": self.memorypro_webhook_url or os.getenv("MEMORYPRO_WEBHOOK_URL"),
+            "webhook_secret": self.memorypro_webhook_secret or os.getenv("MEMORYPRO_WEBHOOK_SECRET")
+        }
+    
+    def is_external_memorypro(self) -> bool:
+        """Check if external MemoryPro mode is enabled and configured"""
+        config = self.get_memorypro_config()
+        return (
+            config["enabled"] and 
+            config["mode"] == "external" and 
+            config["api_url"] and 
+            config["api_key"] and 
+            config["api_secret"]
+        )
     
 @dataclass
 class BrokerConfig:
@@ -447,7 +484,14 @@ class LangSwarmConfigLoader:
             memory_config = MemoryConfig(
                 enabled=memory_data.get("enabled", False),
                 backend=memory_data.get("backend", "auto"),
-                settings=memory_data.get("settings", {})
+                settings=memory_data.get("settings", {}),
+                memorypro_enabled=memory_data.get("memorypro_enabled", False),
+                memorypro_mode=memory_data.get("memorypro_mode", "internal"),
+                memorypro_api_url=memory_data.get("memorypro_api_url"),
+                memorypro_api_key=memory_data.get("memorypro_api_key"),
+                memorypro_api_secret=memory_data.get("memorypro_api_secret"),
+                memorypro_webhook_url=memory_data.get("memorypro_webhook_url"),
+                memorypro_webhook_secret=memory_data.get("memorypro_webhook_secret")
             )
         
         # Handle advanced configuration
@@ -602,6 +646,9 @@ class LangSwarmConfigLoader:
                     streaming=agent_data.get("streaming", False),
                     max_tokens=agent_data.get("max_tokens"),
                     temperature=agent_data.get("temperature"),
+                    presence_penalty=agent_data.get("presence_penalty"),
+                    frequency_penalty=agent_data.get("frequency_penalty"),
+                    top_p=agent_data.get("top_p"),
                     response_format=agent_data.get("response_format")
                 )
                 agents.append(agent_config)
@@ -686,6 +733,9 @@ class LangSwarmConfigLoader:
             streaming=kwargs.get("streaming", False),
             max_tokens=kwargs.get("max_tokens"),
             temperature=kwargs.get("temperature"),
+            presence_penalty=kwargs.get("presence_penalty"),
+            frequency_penalty=kwargs.get("frequency_penalty"),
+            top_p=kwargs.get("top_p"),
             response_format=kwargs.get("response_format")
         )
         
@@ -886,6 +936,9 @@ Adapt your approach based on the user's needs, drawing from your combined expert
             streaming=kwargs.get("streaming", False),
             max_tokens=kwargs.get("max_tokens"),
             temperature=kwargs.get("temperature"),
+            presence_penalty=kwargs.get("presence_penalty"),
+            frequency_penalty=kwargs.get("frequency_penalty"),
+            top_p=kwargs.get("top_p"),
             response_format=kwargs.get("response_format")
         )
     
@@ -2209,6 +2262,9 @@ If any required parameter is missing or ambiguous, instead return:
         step_id   = step['id']
         visit_key = self._get_visit_key(step)
         print(f"\n▶ Executing step: {step_id} (visit_key={visit_key}) (async=False)")
+        
+        # Initialize navigation_choice to prevent NameError
+        navigation_choice = None
     
         if visit_key in self.context["visited_steps"]:
             if step.get("retry") and self.context["retry_counters"].get(visit_key, 0) < step["retry"]:
@@ -2225,6 +2281,60 @@ If any required parameter is missing or ambiguous, instead return:
             inp = self._resolve_input(step.get("input"))
             output = self.run_workflow(wf_id, inp)
             
+        elif 'agent' in step:
+            agent = self.agents[step['agent']]
+            
+            # Initialize navigation_choice for this agent step
+            navigation_choice = None
+            
+            # NAVIGATION SUPPORT: Check if this step has navigation config
+            if 'navigation' in step:
+                # Set up navigation context for the agent
+                from langswarm.features.intelligent_navigation.navigator import NavigationContext
+                nav_context = NavigationContext(
+                    workflow_id=getattr(self, 'workflow_id', 'unknown'),
+                    current_step=step['id'],
+                    context_data=self.context,
+                    step_history=self.context.get('step_history', []),
+                    available_steps=step['navigation'].get('available_steps', [])
+                )
+                
+                # Store navigation context in agent if it has the capability
+                if hasattr(agent, 'navigation_context'):
+                    agent.navigation_context = nav_context
+            
+            # Execute agent
+            raw_input = step.get("input")
+            if isinstance(raw_input, dict):
+                resolved = {k: self._resolve_input(v) for k, v in raw_input.items()}
+                output = agent.chat(f"{resolved}")
+            else:
+                output = agent.chat(self._resolve_input(raw_input))
+            
+            # NAVIGATION SUPPORT: Check if agent made a navigation choice
+            if 'navigation' in step:
+                navigation_choice = self._extract_navigation_choice(output, step)
+                
+                if navigation_choice:
+                    # Agent chose a navigation step
+                    chosen_step = navigation_choice['step_id']
+                    reasoning = navigation_choice.get('reasoning', '')
+                    confidence = navigation_choice.get('confidence', 1.0)
+                    
+                    # Track navigation decision
+                    self._track_navigation_decision(step['id'], chosen_step, reasoning, confidence)
+                    
+                    # Create navigation result
+                    result = {
+                        'navigation_choice': chosen_step,
+                        'reasoning': reasoning,
+                        'confidence': confidence
+                    }
+                else:
+                    result = output
+            else:
+                result = output
+                
         elif 'no_mcp' in step:
             tools_raw = step['no_mcp']['tools']
             tool_ids = [t if isinstance(t, str) else t["name"] for t in tools_raw]
@@ -2496,8 +2606,10 @@ If any required parameter is missing or ambiguous, instead return:
                 if 'agent' in step:
                     agent = self.agents[step['agent']]
                     
-                    # NAVIGATION SUPPORT: Check if this step has navigation config
+                    # Initialize navigation_choice for this agent step
                     navigation_choice = None
+                    
+                    # NAVIGATION SUPPORT: Check if this step has navigation config
                     if 'navigation' in step:
                         # Set up navigation context for the agent
                         from langswarm.features.intelligent_navigation.navigator import NavigationContext

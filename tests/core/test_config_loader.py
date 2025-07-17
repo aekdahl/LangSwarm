@@ -10,17 +10,16 @@ agents:
     model: gpt-3.5-turbo
 """)
     @patch("os.path.exists", return_value=True)
-    @patch("langswarm.core.config.AgentFactory.create")
-    def test_load_agents_only(self, mock_create, mock_exists, mock_file):
+    @patch("langswarm.core.factory.agents.AgentFactory.create")
+    @patch("langswarm.core.config.LangSwarmConfigLoader._load_builtin_tool_classes")
+    def test_load_agents_only(self, mock_load_tools, mock_create, mock_exists, mock_file):
         mock_agent_instance = MagicMock()
         mock_create.return_value = mock_agent_instance
 
         loader = LangSwarmConfigLoader(config_path=".")
-        config_data, agents = loader.load()
+        workflows, agents, brokers, tools, tools_metadata = loader.load()
 
-        self.assertIn("agents", config_data)
-        self.assertEqual(len(config_data["agents"]), 1)
-
+        # Check that we have agents data
         self.assertIn("test_agent", agents)
         self.assertEqual(agents["test_agent"], mock_agent_instance)
 

@@ -385,6 +385,34 @@ class EnvironmentCapabilities:
         
         return suggestions
 
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert capabilities to dictionary format.
+        
+        Returns:
+            Dict[str, Any]: Dictionary representation of capabilities
+        """
+        return {
+            "available_models": self.available_models,
+            "preferred_model": self.preferred_model,
+            "available_memory_mb": self.available_memory_mb,
+            "cpu_cores": self.cpu_cores,
+            "storage_available_gb": self.storage_available_gb,
+            "internet_access": self.internet_access,
+            "max_concurrent_requests": self.max_concurrent_requests,
+            "environment_type": self.environment_type,
+            "container_runtime": self.container_runtime,
+            "platform": self.platform,
+            "has_docker": self.has_docker,
+            "has_git": self.has_git,
+            "has_python": self.has_python,
+            "python_version": self.python_version,
+            "available_apis": self.available_apis,
+            "is_low_resource": self.is_low_resource,
+            "is_cloud_environment": self.is_cloud_environment,
+            "supports_gpu": self.supports_gpu
+        }
+
 
 @dataclass
 class ToolPreset:
@@ -408,6 +436,18 @@ class EnvironmentDetector:
         self.available_tools = {}
         self.detected_environments = {}
         self._load_tool_presets()
+    
+    def detect_capabilities(self) -> EnvironmentCapabilities:
+        """
+        Detect system capabilities using EnvironmentCapabilities.
+        
+        This method provides the interface expected by the config loader
+        and delegates to the comprehensive capabilities detection.
+        
+        Returns:
+            EnvironmentCapabilities: Detected system capabilities
+        """
+        return EnvironmentCapabilities.detect_system_capabilities()
     
     def _load_tool_presets(self):
         """Load built-in tool presets with smart defaults"""

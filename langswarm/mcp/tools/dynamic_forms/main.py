@@ -78,6 +78,174 @@ def load_form_definitions(user_config_path: Optional[str] = None):
                         "help_text": "Enable this feature"
                     }
                 ]
+            },
+            "general": {
+                "title": "General Settings Configuration", 
+                "description": "Configure general application settings",
+                "fields": [
+                    {
+                        "id": "app_name",
+                        "label": "Application Name",
+                        "type": "text",
+                        "required": True,
+                        "placeholder": "Enter application name"
+                    },
+                    {
+                        "id": "display_name",
+                        "label": "Display Name", 
+                        "type": "text",
+                        "required": False,
+                        "placeholder": "Enter display name"
+                    },
+                    {
+                        "id": "language",
+                        "label": "Language",
+                        "type": "select",
+                        "required": False,
+                        "options": [
+                            {"value": "en", "label": "English"},
+                            {"value": "es", "label": "Spanish"},
+                            {"value": "fr", "label": "French"}
+                        ],
+                        "default": "en"
+                    },
+                    {
+                        "id": "timezone",
+                        "label": "Timezone",
+                        "type": "select",
+                        "required": False,
+                        "options": [
+                            {"value": "UTC", "label": "UTC"},
+                            {"value": "EST", "label": "Eastern"},
+                            {"value": "PST", "label": "Pacific"}
+                        ],
+                        "default": "UTC"
+                    },
+                    {
+                        "id": "debug_mode",
+                        "label": "Debug Mode",
+                        "type": "toggle",
+                        "required": False,
+                        "default": False
+                    },
+                    {
+                        "id": "max_users",
+                        "label": "Maximum Users",
+                        "type": "number",
+                        "required": False,
+                        "default": 100,
+                        "min": 1,
+                        "max": 10000
+                    }
+                ]
+            },
+            "ui": {
+                "title": "User Interface Settings",
+                "description": "Configuration for user interface preferences",
+                "fields": [
+                    {
+                        "id": "theme",
+                        "label": "Theme",
+                        "type": "select",
+                        "options": [
+                            {"value": "light", "label": "Light"},
+                            {"value": "dark", "label": "Dark"},
+                            {"value": "auto", "label": "Auto"}
+                        ],
+                        "default_value": "auto"
+                    },
+                    {
+                        "id": "language",
+                        "label": "Language",
+                        "type": "select",
+                        "options": [
+                            {"value": "en", "label": "English"},
+                            {"value": "es", "label": "Spanish"},
+                            {"value": "fr", "label": "French"}
+                        ],
+                        "default_value": "en"
+                    },
+                    {
+                        "id": "notifications",
+                        "label": "Enable Notifications",
+                        "type": "toggle",
+                        "default_value": True
+                    }
+                ]
+            },
+            "ai": {
+                "title": "AI Configuration",
+                "description": "Settings for AI model and behavior",
+                "fields": [
+                    {
+                        "id": "model",
+                        "label": "AI Model",
+                        "type": "select",
+                        "options": [
+                            {"value": "gpt-4o", "label": "GPT-4o"},
+                            {"value": "gpt-4", "label": "GPT-4"},
+                            {"value": "claude-3", "label": "Claude 3"}
+                        ],
+                        "default_value": "gpt-4o"
+                    },
+                    {
+                        "id": "temperature",
+                        "label": "Temperature",
+                        "type": "slider",
+                        "min_value": 0,
+                        "max_value": 2,
+                        "step": 0.1,
+                        "default_value": 0.7,
+                        "help_text": "Controls randomness of AI responses"
+                    },
+                    {
+                        "id": "max_tokens",
+                        "label": "Max Tokens",
+                        "type": "number",
+                        "min_value": 100,
+                        "max_value": 4000,
+                        "default_value": 1000
+                    }
+                ]
+            },
+            "system": {
+                "title": "System Configuration",
+                "description": "Advanced system and infrastructure settings",
+                "fields": [
+                    {
+                        "id": "log_level",
+                        "label": "Log Level",
+                        "type": "select",
+                        "options": [
+                            {"value": "debug", "label": "Debug"},
+                            {"value": "info", "label": "Info"},
+                            {"value": "warning", "label": "Warning"},
+                            {"value": "error", "label": "Error"}
+                        ],
+                        "default_value": "info"
+                    },
+                    {
+                        "id": "cache_enabled",
+                        "label": "Enable Caching",
+                        "type": "toggle",
+                        "default_value": True
+                    },
+                    {
+                        "id": "backup_frequency",
+                        "label": "Backup Frequency (hours)",
+                        "type": "number",
+                        "min_value": 1,
+                        "max_value": 168,
+                        "default_value": 24
+                    },
+                    {
+                        "id": "admin_email",
+                        "label": "Administrator Email",
+                        "type": "email",
+                        "required": True,
+                        "placeholder": "admin@example.com"
+                    }
+                ]
             }
         }
     
@@ -129,13 +297,13 @@ def generate_form_schema(
     # Build form schema
     form_schema = {
         "form_id": f"{form_type}_form_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-        "title": f"{form_def['title']} Configuration",
+        "title": form_def['title'],
         "description": f"Configure your {form_def['description'].lower()}",
         "form_type": form_type,
         "sections": [
             {
                 "id": f"{form_type}_section",
-                "title": form_def['title'],
+                "title": form_def['title'].replace(' Configuration', ''),
                 "description": form_def['description'],
                 "fields": fields
             }
@@ -178,30 +346,26 @@ app = server.build_app()
 # === Simplified Tool Class ===
 class DynamicFormsMCPTool(BaseTool):
     """
-    Simplified Dynamic Forms MCP tool
+    Dynamic Forms MCP tool for generating configuration forms.
     
-    Loads form definitions from user's main configuration and generates pure JSON schemas.
-    No text responses - frontend handles all rendering.
+    This tool loads form definitions from the user's main tools.yaml configuration file
+    and creates JSON schemas for frontend rendering. Supports multiple field types,
+    filtering, and pre-population of values.
     """
+    _bypass_pydantic = True  # Bypass Pydantic validation
     
-    _is_mcp_tool = True
-    _bypass_pydantic = True
-    
-    def __init__(self, identifier: str, name: str, description: str = "", instruction: str = "", brief: str = "", user_config_path: str = None, **kwargs):
+    def __init__(self, identifier: str, name: str = None, user_config_path: str = None, **kwargs):
         # Load template values for defaults
         current_dir = os.path.dirname(__file__)
         template_values = get_cached_tool_template(current_dir)
         
         # Set defaults from template if not provided
-        description = description or template_values.get('description', 'Generate dynamic configuration forms from user-defined YAML schemas')
-        instruction = instruction or template_values.get('instruction', 'Use this tool to create form schemas for frontend rendering from user configuration')
-        brief = brief or template_values.get('brief', 'Dynamic forms from user config')
+        description = kwargs.pop('description', template_values.get('description', 'Generate dynamic configuration forms from user-defined YAML schemas'))
+        instruction = kwargs.pop('instruction', template_values.get('instruction', 'Use this tool to generate dynamic forms from configuration files'))
+        brief = kwargs.pop('brief', template_values.get('brief', 'Dynamic forms tool'))
         
         # Add MCP server reference
         kwargs['mcp_server'] = server
-        
-        # Store user config path for dynamic loading
-        self.user_config_path = user_config_path
         
         super().__init__(
             name=name,
@@ -211,6 +375,14 @@ class DynamicFormsMCPTool(BaseTool):
             brief=brief,
             **kwargs
         )
+        
+        # Set configuration file path
+        object.__setattr__(self, 'user_config_path', user_config_path or os.path.join(os.getcwd(), "tools.yaml"))
+        
+        # Set MCP tool attributes to bypass Pydantic validation issues
+        object.__setattr__(self, '_is_mcp_tool', True)
+        
+        # Load form definitions from config
     
     def run(self, input_data=None):
         """Execute form generation method"""

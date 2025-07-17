@@ -5,43 +5,28 @@ from langswarm.mcp.tools.template_loader import get_cached_tool_template
 
 class MCPGitHubTool(BaseTool):
     """
-    GitHub MCP tool that properly inherits from BaseTool.
+    GitHub MCP tool for repository and issue management.
     
-    This tool is designed for intent-based calls with complex GitHub operations
-    like creating issues, managing pull requests, and repository management.
-    It leverages workflows for orchestration and MCP servers for GitHub API access.
+    This tool provides GitHub API integration through MCP protocol,
+    supporting repository operations, issue management, and code analysis.
     """
-
-    # Flag to enable Pydantic bypass and MCP functionality
-    _is_mcp_tool = True
-
-    def __init__(
-        self,
-        identifier: str,
-        name: str,
-        description: str = "",
-        instruction: str = "",
-        brief: str = "",
-        **kwargs
-    ):
+    _bypass_pydantic = True  # Bypass Pydantic validation
+    
+    def __init__(self, identifier: str, name: str = None, **kwargs):
         """Initialize GitHub MCP tool with simplified architecture"""
         # Load template values for defaults
         current_dir = os.path.dirname(__file__)
         template_values = get_cached_tool_template(current_dir)
         
-        # Set defaults from template if not provided
-        description = description or template_values.get('description', 'GitHub repository management via MCP with full API access')
-        instruction = instruction or template_values.get('instruction', 'Use this tool for GitHub operations like creating issues, managing PRs, and repository management')
-        brief = brief or template_values.get('brief', 'GitHub MCP tool')
+        # Set defaults for GitHub MCP tool
+        description = kwargs.pop('description', "GitHub repository and issue management via MCP")
+        instruction = kwargs.pop('instruction', "Use this tool to interact with GitHub repositories, issues, and pull requests")
+        brief = kwargs.pop('brief', "GitHub MCP tool")
         
-        # GitHub MCP tools are typically intent-based with workflows
-        # Set default pattern and workflow if not specified
-        if "pattern" not in kwargs:
-            kwargs["pattern"] = "intent"
-        if "main_workflow" not in kwargs and kwargs.get("pattern") == "intent":
-            kwargs["main_workflow"] = "main_workflow"  # From workflows.yaml
+        # Set MCP tool attributes to bypass Pydantic validation issues
+        object.__setattr__(self, '_is_mcp_tool', True)
         
-        # Initialize with BaseTool (handles all MCP setup automatically)
+        # Initialize with BaseTool
         super().__init__(
             name=name,
             description=description,

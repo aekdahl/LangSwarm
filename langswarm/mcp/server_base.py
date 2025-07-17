@@ -28,6 +28,11 @@ class BaseMCPToolServer:
         """Get a locally registered server by name."""
         registry = getattr(cls, '_global_registry', {})
         return registry.get(name)
+    
+    @property
+    def tasks(self) -> Dict[str, Dict[str, Any]]:
+        """Public access to registered tasks"""
+        return self._tasks
 
     def add_task(self, name: str, description: str, input_model: Type[BaseModel],
                  output_model: Type[BaseModel], handler: Callable):
