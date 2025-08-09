@@ -24,6 +24,33 @@ from inspect import signature, Parameter
 from typing import Dict, List, Optional, Union, Any
 from dataclasses import dataclass, field
 
+# Enhanced error handling imports
+try:
+    from langswarm.core.errors import (
+        ConfigurationNotFoundError, 
+        InvalidAgentBehaviorError,
+        UnknownToolError,
+        WorkflowNotFoundError,
+        InvalidWorkflowSyntaxError,
+        InvalidMemoryTierError,
+        ZeroConfigDependencyError,
+        AgentToolError,
+        create_helpful_error,
+        format_validation_errors
+    )
+except ImportError:
+    # Fallback to standard errors if enhanced errors module not available
+    ConfigurationNotFoundError = FileNotFoundError
+    InvalidAgentBehaviorError = ValueError
+    UnknownToolError = ValueError
+    WorkflowNotFoundError = ValueError
+    InvalidWorkflowSyntaxError = ValueError
+    InvalidMemoryTierError = ValueError
+    ZeroConfigDependencyError = RuntimeError
+    AgentToolError = RuntimeError
+    create_helpful_error = lambda error_type, **kwargs: Exception(f"{error_type}: {kwargs}")
+    format_validation_errors = lambda errors: f"Validation errors: {errors}"
+
 # @v0.0.1
 # AgentFactory import moved to lazy loading to prevent circular imports
 from langswarm.core.utils.workflows.intelligence import WorkflowIntelligence
@@ -110,14 +137,271 @@ class ToolConfig:
     
 @dataclass
 class WorkflowConfig:
-    """Unified workflow configuration"""
+    """Unified workflow configuration with Workflow Simplification support"""
     id: str
     name: Optional[str] = None
     steps: List[Dict[str, Any]] = field(default_factory=list)
     
+    @staticmethod
+    def from_simple_syntax(workflow_id: str, simple_syntax: str, available_agents: List[str] = None) -> 'WorkflowConfig':
+        """
+        Workflow Simplification: Create complex workflow from simple syntax
+        
+        Supported patterns:
+        - "assistant -> user" (simple agent to user)
+        - "extractor -> summarizer -> user" (chained agents)
+        - "analyzer -> reviewer -> formatter -> user" (multi-step chain)
+        - "agent1, agent2 -> consensus -> user" (parallel then merge)
+        - "router -> (specialist1 | specialist2) -> user" (conditional routing)
+        
+        Args:
+            workflow_id: Unique workflow identifier
+            simple_syntax: Simple workflow syntax string
+            available_agents: List of available agent IDs for validation
+            
+        Returns:
+            Full WorkflowConfig with generated steps
+        """
+        available_agents = available_agents or []
+        
+        # Parse the simple syntax
+        steps = WorkflowConfig._parse_simple_syntax(simple_syntax, available_agents)
+        
+        return WorkflowConfig(
+            id=workflow_id,
+            name=f"Generated from: {simple_syntax}",
+            steps=steps
+        )
+    
+    @staticmethod
+    def _parse_simple_syntax(syntax: str, available_agents: List[str]) -> List[Dict[str, Any]]:
+        """Parse simple workflow syntax into complex step definitions"""
+        syntax = syntax.strip()
+        
+        # Handle different workflow patterns
+        if " -> " in syntax:
+            return WorkflowConfig._parse_linear_workflow(syntax, available_agents)
+        elif " | " in syntax:
+            return WorkflowConfig._parse_conditional_workflow(syntax, available_agents)
+        elif ", " in syntax:
+            return WorkflowConfig._parse_parallel_workflow(syntax, available_agents)
+        else:
+            # Single agent workflow
+            return WorkflowConfig._parse_single_agent_workflow(syntax, available_agents)
+    
+    @staticmethod
+    def _parse_linear_workflow(syntax: str, available_agents: List[str]) -> List[Dict[str, Any]]:
+        """Parse linear workflow: agent1 -> agent2 -> user"""
+        parts = [part.strip() for part in syntax.split(" -> ")]
+        steps = []
+        
+        for i, part in enumerate(parts):
+            step_id = f"step_{i+1}_{part.replace(' ', '_')}"
+            
+            if part == "user":
+                # Final step - output to user
+                if i > 0:
+                    # Previous step should output to user
+                    steps[-1]["output"] = {"to": "user"}
+                break
+            
+            # Check if this is a known agent
+            if part in available_agents:
+                # Agent step
+                step = {
+                    "id": step_id,
+                    "agent": part,
+                    "input": "${context.user_input}" if i == 0 else f"${{context.step_outputs.{steps[i-1]['id']}}}",
+                }
+                
+                # Add output routing (except for last step before user)
+                if i < len(parts) - 2:  # Not the last agent step
+                    next_step_id = f"step_{i+2}_{parts[i+1].replace(' ', '_')}"
+                    step["output"] = {"to": next_step_id}
+                
+                steps.append(step)
+            else:
+                # Unknown agent - create a placeholder or tool call
+                step = {
+                    "id": step_id,
+                    "function": "langswarm.core.utils.workflows.functions.custom_function",
+                    "args": {
+                        "operation": part,
+                        "input": "${context.user_input}" if i == 0 else f"${{context.step_outputs.{steps[i-1]['id']}}}"
+                    }
+                }
+                
+                if i < len(parts) - 2:
+                    next_step_id = f"step_{i+2}_{parts[i+1].replace(' ', '_')}"
+                    step["output"] = {"to": next_step_id}
+                
+                steps.append(step)
+        
+        return steps
+    
+    @staticmethod
+    def _parse_conditional_workflow(syntax: str, available_agents: List[str]) -> List[Dict[str, Any]]:
+        """Parse conditional workflow: router -> (agent1 | agent2) -> user"""
+        # For now, implement as a simple router step
+        # TODO: Implement full conditional logic
+        
+        parts = syntax.split(" -> ")
+        router_part = parts[0].strip()
+        
+        if "(" in syntax and "|" in syntax:
+            # Extract conditional agents
+            condition_part = syntax[syntax.find("(")+1:syntax.find(")")]
+            agents = [agent.strip() for agent in condition_part.split(" | ")]
+            
+            steps = [
+                {
+                    "id": "routing_decision",
+                    "agent": router_part if router_part in available_agents else "routing_agent",
+                    "input": "${context.user_input}",
+                    "output": {"to": "conditional_execution"}
+                },
+                {
+                    "id": "conditional_execution", 
+                    "function": "langswarm.core.utils.workflows.functions.conditional_router",
+                    "args": {
+                        "available_agents": agents,
+                        "routing_input": "${context.step_outputs.routing_decision}"
+                    },
+                    "output": {"to": "user"}
+                }
+            ]
+            return steps
+        
+        # Fallback to linear parsing
+        return WorkflowConfig._parse_linear_workflow(syntax, available_agents)
+    
+    @staticmethod
+    def _parse_parallel_workflow(syntax: str, available_agents: List[str]) -> List[Dict[str, Any]]:
+        """Parse parallel workflow: agent1, agent2 -> consensus -> user"""
+        if " -> " in syntax:
+            parts = syntax.split(" -> ")
+            parallel_part = parts[0].strip()
+            rest = " -> ".join(parts[1:])
+            
+            if ", " in parallel_part:
+                parallel_agents = [agent.strip() for agent in parallel_part.split(", ")]
+                
+                # Create fan-out steps
+                fan_out_steps = []
+                for i, agent in enumerate(parallel_agents):
+                    step = {
+                        "id": f"parallel_{i+1}_{agent.replace(' ', '_')}",
+                        "agent": agent if agent in available_agents else "parallel_agent",
+                        "input": "${context.user_input}",
+                        "async": True,
+                        "fan_key": "parallel_execution"
+                    }
+                    fan_out_steps.append(step)
+                
+                # Create consensus/merger step
+                consensus_steps = WorkflowConfig._parse_linear_workflow(rest, available_agents)
+                if consensus_steps:
+                    consensus_steps[0]["input"] = "${context.parallel_outputs}"
+                    consensus_steps[0]["is_fan_in"] = True
+                    consensus_steps[0]["fan_key"] = "parallel_execution"
+                
+                return fan_out_steps + consensus_steps
+        
+        # Fallback to linear parsing
+        return WorkflowConfig._parse_linear_workflow(syntax, available_agents)
+    
+    @staticmethod
+    def _parse_single_agent_workflow(syntax: str, available_agents: List[str]) -> List[Dict[str, Any]]:
+        """Parse single agent workflow: just agent name"""
+        agent_name = syntax.strip()
+        
+        return [{
+            "id": f"single_step_{agent_name.replace(' ', '_')}",
+            "agent": agent_name if agent_name in available_agents else "default_agent",
+            "input": "${context.user_input}",
+            "output": {"to": "user"}
+        }]
+    
+    @staticmethod
+    def get_workflow_templates() -> Dict[str, str]:
+        """Get common workflow templates for easy copy-paste"""
+        return {
+            "simple_chat": "assistant -> user",
+            "analyze_and_respond": "analyzer -> responder -> user", 
+            "extract_and_summarize": "extractor -> summarizer -> user",
+            "review_process": "drafter -> reviewer -> editor -> user",
+            "research_workflow": "researcher -> analyzer -> summarizer -> user",
+            "consensus_building": "expert1, expert2, expert3 -> consensus -> user",
+            "routing_workflow": "router -> (specialist1 | specialist2) -> user",
+            "quality_assurance": "processor -> validator -> formatter -> user",
+            "multi_step_analysis": "collector -> processor -> analyzer -> reporter -> user",
+            "collaborative_writing": "writer -> editor -> proofreader -> user"
+        }
+    
+    def to_simple_syntax(self) -> Optional[str]:
+        """Convert complex workflow back to simple syntax (if possible)"""
+        if not self.steps:
+            return None
+        
+        # Try to detect linear workflow pattern
+        if len(self.steps) >= 2:
+            agents = []
+            
+            for step in self.steps:
+                if "agent" in step:
+                    agents.append(step["agent"])
+                elif "function" in step:
+                    # Extract operation name from function step
+                    if "args" in step and "operation" in step["args"]:
+                        agents.append(step["args"]["operation"])
+                    else:
+                        agents.append("custom_function")
+            
+            # Check if it ends with user output
+            if self.steps[-1].get("output", {}).get("to") == "user":
+                agents.append("user")
+            
+            return " -> ".join(agents)
+        
+        return None
+    
+    def get_complexity_metrics(self) -> Dict[str, Any]:
+        """Get workflow complexity metrics for optimization suggestions"""
+        if not self.steps:
+            return {"complexity": "empty", "steps": 0, "suggestions": ["Add workflow steps"]}
+        
+        step_count = len(self.steps)
+        has_parallel = any(step.get("async") or step.get("fan_key") for step in self.steps)
+        has_conditions = any("condition" in str(step) for step in self.steps)
+        agent_count = len(set(step.get("agent") for step in self.steps if step.get("agent")))
+        
+        # Determine complexity level
+        if step_count <= 2 and not has_parallel and not has_conditions:
+            complexity = "simple"
+            suggestions = ["Consider using simple syntax: 'agent -> user'"]
+        elif step_count <= 5 and not has_parallel:
+            complexity = "moderate"
+            suggestions = ["Consider using simple syntax: 'agent1 -> agent2 -> user'"]
+        elif has_parallel and not has_conditions:
+            complexity = "parallel"
+            suggestions = ["Consider using parallel syntax: 'agent1, agent2 -> consensus -> user'"]
+        else:
+            complexity = "complex"
+            suggestions = ["Complex workflow - manual YAML configuration recommended"]
+        
+        return {
+            "complexity": complexity,
+            "steps": step_count,
+            "agents": agent_count,
+            "has_parallel": has_parallel,
+            "has_conditions": has_conditions,
+            "suggestions": suggestions,
+            "simple_syntax": self.to_simple_syntax()
+        }
+    
 @dataclass
 class MemoryConfig:
-    """Unified memory configuration"""
+    """Unified memory configuration with Memory Made Simple support"""
     enabled: bool = False
     backend: str = "auto"  # auto, sqlite, redis, chromadb, etc.
     settings: Dict[str, Any] = field(default_factory=dict)
@@ -155,6 +439,222 @@ class MemoryConfig:
             config["api_key"] and 
             config["api_secret"]
         )
+    
+    @staticmethod
+    def setup_memory(config_input: Union[bool, str, Dict[str, Any]]) -> 'MemoryConfig':
+        """
+        Memory Made Simple: Create memory configuration from simplified inputs
+        
+        Three tiers of complexity:
+        1. memory: true → auto-select SQLite for development
+        2. memory: "production" → auto-select appropriate production backend
+        3. memory: {backend: custom, config: {...}} → full control
+        
+        Args:
+            config_input: Simple memory configuration input
+            
+        Returns:
+            Fully configured MemoryConfig object
+        """
+        import os
+        
+        # Tier 1: memory: true (or false)
+        if isinstance(config_input, bool):
+            if not config_input:
+                return MemoryConfig(enabled=False)
+            
+            return MemoryConfig(
+                enabled=True,
+                backend="sqlite",
+                settings={
+                    "db_path": os.path.join(os.getcwd(), "langswarm_memory.db"),
+                    "max_memory_size": "100MB",
+                    "persistence": True,
+                    "description": "Development SQLite database"
+                }
+            )
+        
+        # Tier 2: memory: "production" (or other environment strings)
+        if isinstance(config_input, str):
+            env_type = config_input.lower()
+            
+            if env_type == "production":
+                # Smart production backend selection
+                backend, settings = MemoryConfig._select_production_backend()
+                return MemoryConfig(
+                    enabled=True,
+                    backend=backend,
+                    settings=settings
+                )
+            
+            elif env_type in ["development", "dev", "local"]:
+                # Enhanced development setup
+                return MemoryConfig(
+                    enabled=True,
+                    backend="sqlite",
+                    settings={
+                        "db_path": os.path.join(os.getcwd(), "langswarm_dev_memory.db"),
+                        "max_memory_size": "200MB",
+                        "persistence": True,
+                        "vacuum_interval": "1h",
+                        "description": "Enhanced development SQLite database"
+                    }
+                )
+            
+            elif env_type in ["testing", "test"]:
+                # Testing environment with in-memory database
+                return MemoryConfig(
+                    enabled=True,
+                    backend="sqlite",
+                    settings={
+                        "db_path": ":memory:",
+                        "max_memory_size": "50MB",
+                        "persistence": False,
+                        "description": "Testing in-memory database"
+                    }
+                )
+            
+            elif env_type == "cloud":
+                # Cloud-optimized configuration
+                backend, settings = MemoryConfig._select_cloud_backend()
+                return MemoryConfig(
+                    enabled=True,
+                    backend=backend,
+                    settings=settings
+                )
+            
+            else:
+                # Unknown string, fall back to auto with the string as backend hint
+                return MemoryConfig(
+                    enabled=True,
+                    backend=env_type,
+                    settings={"description": f"Custom {env_type} backend"}
+                )
+        
+        # Tier 3: memory: {backend: custom, config: {...}} (full control)
+        if isinstance(config_input, dict):
+            return MemoryConfig(
+                enabled=config_input.get("enabled", True),
+                backend=config_input.get("backend", "auto"),
+                settings=config_input.get("settings", {}),
+                memorypro_enabled=config_input.get("memorypro_enabled", False),
+                memorypro_mode=config_input.get("memorypro_mode", "internal"),
+                memorypro_api_url=config_input.get("memorypro_api_url"),
+                memorypro_api_key=config_input.get("memorypro_api_key"),
+                memorypro_api_secret=config_input.get("memorypro_api_secret"),
+                memorypro_webhook_url=config_input.get("memorypro_webhook_url"),
+                memorypro_webhook_secret=config_input.get("memorypro_webhook_secret")
+            )
+        
+        # Fallback: disable memory for unknown types
+        return MemoryConfig(enabled=False)
+    
+    @staticmethod
+    def _select_production_backend() -> tuple[str, Dict[str, Any]]:
+        """Select optimal production memory backend based on available services"""
+        import os
+        
+        # Check for cloud provider environment variables
+        if os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or os.getenv("GOOGLE_CLOUD_PROJECT"):
+            # Google Cloud environment - use BigQuery for analytics
+            return "bigquery", {
+                "project_id": os.getenv("GOOGLE_CLOUD_PROJECT", "langswarm-prod"),
+                "dataset_id": "langswarm_memory",
+                "table_id": "agent_conversations",
+                "location": "US",
+                "max_memory_size": "10GB",
+                "retention_days": 365,
+                "description": "Production BigQuery analytics backend"
+            }
+        
+        elif os.getenv("AWS_ACCESS_KEY_ID") or os.getenv("AWS_DEFAULT_REGION"):
+            # AWS environment - use Elasticsearch for search and analytics
+            return "elasticsearch", {
+                "index_name": "langswarm_memory",
+                "max_memory_size": "5GB",
+                "retention_days": 90,
+                "replicas": 1,
+                "shards": 2,
+                "description": "Production Elasticsearch backend"
+            }
+        
+        elif os.getenv("REDIS_URL") or os.getenv("REDIS_HOST"):
+            # Redis available - use for fast access
+            redis_url = os.getenv("REDIS_URL") or f"redis://{os.getenv('REDIS_HOST', 'localhost')}:6379"
+            return "redis", {
+                "redis_url": redis_url,
+                "max_memory_size": "1GB",
+                "persistence": True,
+                "ttl": 2592000,  # 30 days
+                "description": "Production Redis backend"
+            }
+        
+        else:
+            # Fallback to ChromaDB for vector search in production
+            return "chromadb", {
+                "persist_directory": "/var/lib/langswarm/memory",
+                "collection_name": "langswarm_production",
+                "max_memory_size": "2GB",
+                "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+                "description": "Production ChromaDB vector backend"
+            }
+    
+    @staticmethod
+    def _select_cloud_backend() -> tuple[str, Dict[str, Any]]:
+        """Select optimal cloud memory backend for distributed deployments"""
+        import os
+        
+        # Prioritize cloud-native solutions
+        if os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
+            return "bigquery", {
+                "project_id": os.getenv("GOOGLE_CLOUD_PROJECT", "langswarm-cloud"),
+                "dataset_id": "langswarm_memory",
+                "table_id": "distributed_conversations",
+                "location": "US",
+                "max_memory_size": "100GB",
+                "partitioning": "timestamp",
+                "description": "Cloud BigQuery distributed backend"
+            }
+        
+        elif os.getenv("AWS_ACCESS_KEY_ID"):
+            return "elasticsearch", {
+                "cloud_id": os.getenv("ELASTICSEARCH_CLOUD_ID"),
+                "api_key": os.getenv("ELASTICSEARCH_API_KEY"),
+                "index_name": "langswarm_cloud",
+                "max_memory_size": "50GB",
+                "description": "Cloud Elasticsearch distributed backend"
+            }
+        
+        else:
+            # Fallback to Qdrant for cloud vector search
+            return "qdrant", {
+                "url": os.getenv("QDRANT_URL", "http://localhost:6333"),
+                "collection_name": "langswarm_cloud",
+                "vector_size": 384,
+                "max_memory_size": "10GB",
+                "description": "Cloud Qdrant vector backend"
+            }
+    
+    def get_tier_description(self) -> str:
+        """Get a human-readable description of the memory configuration tier"""
+        if not self.enabled:
+            return "Tier 0: Memory disabled"
+        
+        backend_descriptions = {
+            "sqlite": "Tier 1: Simple SQLite (Development)",
+            "chromadb": "Tier 2: ChromaDB Vector Search (Production)",
+            "redis": "Tier 2: Redis Fast Access (Production)",
+            "bigquery": "Tier 3: BigQuery Analytics (Cloud)",
+            "elasticsearch": "Tier 3: Elasticsearch Search (Cloud)",
+            "qdrant": "Tier 3: Qdrant Vector (Cloud)"
+        }
+        
+        description = backend_descriptions.get(self.backend, f"Custom: {self.backend}")
+        settings_desc = self.settings.get("description", "")
+        
+        if settings_desc:
+            return f"{description} - {settings_desc}"
+        return description
     
 @dataclass
 class BrokerConfig:
@@ -326,10 +826,12 @@ class LangSwarmConfigLoader:
         # Import MCP tool wrapper classes
         from langswarm.mcp.tools.filesystem.main import FilesystemMCPTool
         from langswarm.mcp.tools.mcpgithubtool.main import MCPGitHubTool
+        from langswarm.mcp.tools.dynamic_forms.main import DynamicFormsMCPTool
         
         self.tool_classes = {
             "mcpfilesystem": FilesystemMCPTool,
             "mcpgithubtool": MCPGitHubTool,
+            "mcpforms": DynamicFormsMCPTool,
             # add more here (or via register_tool_class below)
         }
 
@@ -355,7 +857,7 @@ class LangSwarmConfigLoader:
         if os.path.exists(os.path.join(self.config_path, "agents.yaml")):
             return "multi-file"
         
-        raise FileNotFoundError("No configuration found. Expected 'langswarm.yaml' or 'agents.yaml'")
+        raise ConfigurationNotFoundError(self.config_path)
     
     def _is_file_unified_config(self, file_path: str) -> bool:
         """Check if a specific file is a unified configuration"""
@@ -453,46 +955,88 @@ class LangSwarmConfigLoader:
         else:
             agents = self._process_standard_agents(agents_data)
         
-        # Handle tools
+        # Handle tools - support both old dict format and new list format
         tools = {}
-        for tool_id, tool_data in data.get("tools", {}).items():
-            if isinstance(tool_data, dict):
-                tool_config = ToolConfig(
-                    id=tool_id,
-                    type=tool_data.get("type"),
-                    settings=tool_data.get("settings", {}),
-                    auto_configure=tool_data.get("auto_configure", False),
-                    local_mode=tool_data.get("local_mode", True)
-                )
-                tools[tool_id] = tool_config
+        tools_data = data.get("tools", {})
         
-        # Handle workflows
+        if isinstance(tools_data, list):
+            # New list format: [{"id": "tool1", "type": "mcpfilesystem", ...}, ...]
+            for tool_item in tools_data:
+                if isinstance(tool_item, dict) and "id" in tool_item:
+                    tool_id = tool_item["id"]
+                    tool_config = ToolConfig(
+                        id=tool_id,
+                        type=tool_item.get("type"),
+                        settings=tool_item.get("settings", {}),
+                        auto_configure=tool_item.get("auto_configure", False),
+                        local_mode=tool_item.get("local_mode", True)
+                    )
+                    tools[tool_id] = tool_config
+        elif isinstance(tools_data, dict):
+            # Old dict format: {"tool1": {"type": "mcpfilesystem", ...}, ...}
+            for tool_id, tool_data in tools_data.items():
+                if isinstance(tool_data, dict):
+                    tool_config = ToolConfig(
+                        id=tool_id,
+                        type=tool_data.get("type"),
+                        settings=tool_data.get("settings", {}),
+                        auto_configure=tool_data.get("auto_configure", False),
+                        local_mode=tool_data.get("local_mode", True)
+                    )
+                    tools[tool_id] = tool_config
+        
+        # Handle workflows with Workflow Simplification support
         workflows = []
-        for workflow_data in data.get("workflows", []):
-            workflow_config = WorkflowConfig(
-                id=workflow_data["id"],
-                name=workflow_data.get("name"),
-                steps=workflow_data.get("steps", [])
-            )
-            workflows.append(workflow_config)
+        agent_ids = [agent.id for agent in agents]  # Get available agent IDs for validation
         
-        # Handle memory
-        memory_data = data.get("memory", {})
-        if isinstance(memory_data, bool):
-            memory_config = MemoryConfig(enabled=memory_data)
-        else:
-            memory_config = MemoryConfig(
-                enabled=memory_data.get("enabled", False),
-                backend=memory_data.get("backend", "auto"),
-                settings=memory_data.get("settings", {}),
-                memorypro_enabled=memory_data.get("memorypro_enabled", False),
-                memorypro_mode=memory_data.get("memorypro_mode", "internal"),
-                memorypro_api_url=memory_data.get("memorypro_api_url"),
-                memorypro_api_key=memory_data.get("memorypro_api_key"),
-                memorypro_api_secret=memory_data.get("memorypro_api_secret"),
-                memorypro_webhook_url=memory_data.get("memorypro_webhook_url"),
-                memorypro_webhook_secret=memory_data.get("memorypro_webhook_secret")
-            )
+        for workflow_data in data.get("workflows", []):
+            if isinstance(workflow_data, str):
+                # Simple syntax: "assistant -> user"
+                workflow_id = f"simple_workflow_{len(workflows) + 1}"
+                workflow_config = WorkflowConfig.from_simple_syntax(
+                    workflow_id=workflow_id,
+                    simple_syntax=workflow_data,
+                    available_agents=agent_ids
+                )
+                workflows.append(workflow_config)
+                
+            elif isinstance(workflow_data, dict):
+                # Check if it's a simple workflow definition
+                if "simple" in workflow_data:
+                    # Simple syntax in dict format: {"id": "my_workflow", "simple": "assistant -> user"}
+                    workflow_config = WorkflowConfig.from_simple_syntax(
+                        workflow_id=workflow_data["id"],
+                        simple_syntax=workflow_data["simple"],
+                        available_agents=agent_ids
+                    )
+                    # Override name if provided
+                    if "name" in workflow_data:
+                        workflow_config.name = workflow_data["name"]
+                    workflows.append(workflow_config)
+                    
+                elif "workflow" in workflow_data:
+                    # Simple syntax in workflow field: {"id": "my_workflow", "workflow": "assistant -> user"}
+                    workflow_config = WorkflowConfig.from_simple_syntax(
+                        workflow_id=workflow_data["id"],
+                        simple_syntax=workflow_data["workflow"],
+                        available_agents=agent_ids
+                    )
+                    if "name" in workflow_data:
+                        workflow_config.name = workflow_data["name"]
+                    workflows.append(workflow_config)
+                    
+                else:
+                    # Complex workflow definition (existing format)
+                    workflow_config = WorkflowConfig(
+                        id=workflow_data["id"],
+                        name=workflow_data.get("name"),
+                        steps=workflow_data.get("steps", [])
+                    )
+                    workflows.append(workflow_config)
+        
+        # Handle memory with Memory Made Simple
+        memory_data = data.get("memory", False)
+        memory_config = MemoryConfig.setup_memory(memory_data)
         
         # Handle advanced configuration
         advanced_data = data.get("advanced", {})
@@ -2372,6 +2916,7 @@ If any required parameter is missing or ambiguous, instead return:
                     print(f"Agent response: {user_response}")
             else:
                 # Fallback for plain text responses
+                user_response = str(payload)  # Initialize user_response for non-dict responses
                 tool_name = None
                 args = {}
                 print(f"Agent response (non-JSON): {payload}")
@@ -2409,6 +2954,22 @@ If any required parameter is missing or ambiguous, instead return:
                 # No tool call, just return the response text
                 result = user_response or str(payload)
                 
+        elif 'function' in step:
+            func = self._resolve_function(step['function'], script=step.get('script'))
+            args = {k: self._resolve_input(v) for k, v in step.get("args", {}).items()}
+            args.setdefault("context", self.context)
+            try:
+                result = func(**args)
+            except Exception as e:
+                import traceback
+                tb = traceback.format_exc()
+                print(f"\n🚨 Exception in function `{step['function']}`:\n{tb}")
+                raise  # Re-raise to keep workflow intelligence working
+
+            if result == "__NOT_READY__":
+                fan_key = step.get("fan_key", "default")
+                self.context["pending_fanins"][f"{step_id}@{fan_key}"] = step
+                return
         else:
             # Handle other step types
             result = "Step executed"
@@ -2419,7 +2980,7 @@ If any required parameter is missing or ambiguous, instead return:
         
         # Handle regular output routing (if no navigation was used)
         if 'output' in step and not navigation_choice:
-            self._handle_step_output(step, result)
+            self._handle_output(step['id'], step['output'], result, step)
     
     def _extract_navigation_choice(self, response: str, step: Dict) -> Optional[Dict]:
         """Extract navigation choice from agent response"""
@@ -2546,6 +3107,7 @@ If any required parameter is missing or ambiguous, instead return:
                     print(f"Agent response: {user_response}")
             else:
                 # Fallback for plain text responses
+                user_response = str(payload)  # Initialize user_response for non-dict responses
                 tool_name = None
                 args = {}
                 print(f"Agent response (non-JSON): {payload}")
