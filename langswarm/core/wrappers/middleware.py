@@ -160,12 +160,21 @@ class MiddlewareMixin:
             raise ValueError(f"Tool '{tool_id}' not found in registry")
         
         # Build MCP URL based on tool configuration
-        if getattr(handler, 'local_mode', False):
+        # First check if it's a local mode MCP tool
+        local_mode = getattr(handler, 'local_mode', False)
+        if local_mode:
             mcp_url = f"local://{tool_id}"
-        elif hasattr(handler, 'mcp_url'):
+        elif hasattr(handler, 'mcp_url') and handler.mcp_url:
             mcp_url = handler.mcp_url
         else:
-            raise ValueError(f"Tool '{tool_id}' has no MCP URL configuration")
+            # For MCP tools without explicit URL, default to local mode
+            # This handles cases where tools are configured for local operation
+            tool_type = getattr(handler, 'identifier', tool_id)
+            if any(mcp_type in str(type(handler)).lower() for mcp_type in ['mcp', 'filesystem', 'forms', 'github']):
+                print(f"🔧 Defaulting to local mode for MCP tool '{tool_id}'")
+                mcp_url = f"local://{tool_id}"
+            else:
+                raise ValueError(f"Tool '{tool_id}' has no MCP URL configuration")
         
         # Make direct MCP call
         payload = {
