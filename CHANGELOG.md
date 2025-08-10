@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.54.dev1] - 2025-01-17
+
+### 🐛 Critical Bug Fixes
+- **Agent + Workflow Initialization Bug**: Fixed `'list' object has no attribute 'get'` error when agents and workflows are used together
+  - **Root Cause 1**: System prompt template `_lookup_many` function expected tool configurations but received tool instances
+  - **Root Cause 2**: Navigation tool auto-registration incorrectly assumed workflow data structure
+  - **Impact**: Agents failed to initialize when workflows were present in configuration
+  - **Fix**: Enhanced `_render_system_prompt` to handle both dict configs and object instances
+  - **Fix**: Updated `_agent_needs_navigation_tool` and `_get_navigation_context` to properly parse workflow list structure
+- **Workflow Execution**: Fixed `'LangSwarmConfigLoader' object has no attribute '_get_visit_key'` in certain configurations
+
+### 🔧 Stability Improvements  
+- **Error Handling**: Improved error messages and debugging output for agent initialization failures
+- **Backward Compatibility**: Existing configurations continue to work without changes
+- **Navigation System**: Enhanced navigation tool auto-registration for workflow-enabled agents
+
+### 🚀 Deployment Ready
+- **Cloud Run**: Agent + workflow combinations now deploy successfully to cloud environments
+- **Production Stability**: Eliminates initialization errors that prevented production deployments
+- **API Integration**: Proper error handling for missing API keys vs. configuration errors
+
 ## [0.0.54.dev0] - 2025-01-17
 
 ### 🧪 Test Suite Excellence & Stability  

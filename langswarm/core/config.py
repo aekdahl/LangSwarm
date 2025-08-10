@@ -2267,10 +2267,12 @@ Adapt your approach based on the user's needs, drawing from your combined expert
     def _agent_needs_navigation_tool(self, agent_id: str) -> bool:
         """Check if agent will be used in navigation-enabled steps"""
         workflows = self.config_data.get('workflows', {})
-        for workflow_id, workflow_data in workflows.items():
-            for step in workflow_data.get('steps', []):
-                if step.get('agent') == agent_id and 'navigation' in step:
-                    return True
+        for workflow_id, workflow_list in workflows.items():
+            # workflow_list is a list of workflow definitions
+            for workflow_data in (workflow_list if isinstance(workflow_list, list) else [workflow_list]):
+                for step in workflow_data.get('steps', []):
+                    if step.get('agent') == agent_id and 'navigation' in step:
+                        return True
         return False
     
     def _get_navigation_context(self, agent_id: str) -> Dict[str, Any]:
@@ -2278,10 +2280,12 @@ Adapt your approach based on the user's needs, drawing from your combined expert
         navigation_contexts = {}
         workflows = self.config_data.get('workflows', {})
         
-        for workflow_id, workflow_data in workflows.items():
-            for step in workflow_data.get('steps', []):
-                if step.get('agent') == agent_id and 'navigation' in step:
-                    navigation_contexts[step['id']] = step['navigation']
+        for workflow_id, workflow_list in workflows.items():
+            # workflow_list is a list of workflow definitions
+            for workflow_data in (workflow_list if isinstance(workflow_list, list) else [workflow_list]):
+                for step in workflow_data.get('steps', []):
+                    if step.get('agent') == agent_id and 'navigation' in step:
+                        navigation_contexts[step['id']] = step['navigation']
         
         return navigation_contexts
 
@@ -2309,10 +2313,23 @@ Adapt your approach based on the user's needs, drawing from your combined expert
 
         template = Template(template_str)
         def _lookup_many(ids, source):
-            return [
-                {"id": _id, "description": src.get("description", ""), "instruction": src.get("instruction", "")}
-                for _id in ids if (_id in source and (src := source[_id]))
-            ]
+            result = []
+            for _id in ids:
+                if _id in source:
+                    src = source[_id]
+                    if hasattr(src, 'get'):  # It's a dict (config)
+                        result.append({
+                            "id": _id, 
+                            "description": src.get("description", ""), 
+                            "instruction": src.get("instruction", "")
+                        })
+                    else:  # It's an instance (tool object)
+                        result.append({
+                            "id": _id,
+                            "description": getattr(src, 'description', f'{_id} tool'),
+                            "instruction": getattr(src, 'instruction', f'Use the {_id} tool')
+                        })
+            return result
 
         return template.render(
             system_prompt=agent.get("system_prompt"),
@@ -4084,7 +4101,7 @@ class WorkflowExecutor:
             self._config_loader.brokers = {}
             self._config_loader.config_data = {
                 'workflows': self.workflows,
-                'agents': list(self.agents.values()) if isinstance(self.agents, dict) else self.agents
+                'agents': []  # Leave empty - agents are already initialized instances
             }
             
             # Initialize formatting utilities if needed
