@@ -1,0 +1,238 @@
+version: "1.0"
+project_name: "workflow_executor_usage_examples"
+
+# Comprehensive examples showing all capabilities of the workflow_executor tool
+memory: "production"
+
+tools:
+  - id: workflow_orchestrator
+    type: mcpworkflow_executor
+    description: "Dynamic workflow execution and generation"
+
+agents:
+  - id: demo_agent
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You are a demonstration agent showcasing the workflow_executor tool capabilities.
+      
+      **Available Methods:**
+      1. execute_workflow - Run pre-written workflows
+      2. generate_workflow - Create workflow configurations  
+      3. execute_generated_workflow - Generate and run in one step
+      4. check_execution_status - Monitor running workflows
+      5. cancel_execution - Stop running workflows
+      6. list_workflows - Discover available workflows
+      
+      **Usage Examples:**
+      
+      For executing existing workflows:
+      ```json
+      {
+        "response": "I'll execute the document analysis workflow",
+        "mcp": {
+          "tool": "workflow_orchestrator",
+          "method": "execute_workflow",
+          "params": {
+            "workflow_name": "document_analysis",
+            "input_data": {"file_path": "/docs/report.pdf"},
+            "execution_mode": "sync"
+          }
+        }
+      }
+      ```
+      
+      For generating new workflows:
+      ```json
+      {
+        "response": "I'll create a custom workflow for your requirements",
+        "mcp": {
+          "tool": "workflow_orchestrator", 
+          "method": "generate_workflow",
+          "params": {
+            "workflow_description": "Analyze code repositories and generate quality reports",
+            "complexity": "medium"
+          }
+        }
+      }
+      ```
+      
+      For one-step generation and execution:
+      ```json
+      {
+        "response": "I'll create and run a research workflow",
+        "mcp": {
+          "tool": "workflow_orchestrator",
+          "method": "execute_generated_workflow",
+          "params": {
+            "workflow_description": "Research artificial intelligence trends and create summary report",
+            "input_data": {"topic": "AI trends 2024", "sources": ["academic", "industry"]},
+            "execution_mode": "async",
+            "complexity": "complex"
+          }
+        }
+      }
+      ```
+      
+      Always choose the right execution mode and complexity for the task.
+    
+    tools:
+      - workflow_orchestrator
+
+workflows:
+  # Example 1: Execute pre-written workflow
+  execute_existing_workflow_demo:
+    description: "Demo: Execute an existing workflow configuration"
+    steps:
+      - agent: demo_agent
+        input: |
+          Execute the 'data_processing' workflow with this input data:
+          - Dataset: /data/sales_2024.csv
+          - Output format: JSON
+          - Include visualizations: true
+        output:
+          to: user
+
+  # Example 2: Generate workflow from description
+  generate_workflow_demo:
+    description: "Demo: Generate a workflow from natural language"
+    steps:
+      - agent: demo_agent
+        input: |
+          Create a workflow that:
+          1. Reads CSV files from a directory
+          2. Analyzes the data for trends and patterns
+          3. Generates visualizations
+          4. Creates a comprehensive report
+          5. Validates the results
+          Make it a complex workflow with proper error handling.
+        output:
+          to: user
+
+  # Example 3: One-step generation and execution
+  generate_and_execute_demo:
+    description: "Demo: Generate and execute workflow in one step"
+    steps:
+      - agent: demo_agent
+        input: |
+          Build and run a content analysis workflow that:
+          - Processes documents in /documents/research/
+          - Extracts key themes and insights
+          - Identifies sentiment and topics
+          - Creates a structured summary report
+          
+          Input data: {"source_dir": "/documents/research/", "output_format": "markdown"}
+          Use async execution mode.
+        output:
+          to: user
+
+  # Example 4: Async workflow with monitoring
+  async_workflow_demo:
+    description: "Demo: Run async workflow with status monitoring"
+    steps:
+      - agent: demo_agent
+        input: |
+          Start a long-running data analysis workflow in async mode:
+          - Workflow: "comprehensive_analysis"
+          - Data: Large dataset (5GB CSV files)
+          - Processing: Statistical analysis, ML modeling, report generation
+          Then monitor its progress.
+        output:
+          to: user
+
+  # Example 5: Workflow discovery and management
+  workflow_management_demo:
+    description: "Demo: Discover and manage workflows"
+    steps:
+      - agent: demo_agent
+        input: |
+          Show me all available workflows in the current project, then help me choose 
+          the best one for processing customer feedback data and generating insights.
+        output:
+          to: user
+
+  # Example 6: Complex orchestration scenario
+  complex_orchestration_demo:
+    description: "Demo: Complex multi-step workflow orchestration"
+    steps:
+      - agent: demo_agent
+        input: |
+          I need to build a sophisticated workflow system for a research project:
+          
+          1. First, create a workflow that can process academic papers (PDF)
+          2. Extract citations, abstracts, and key findings
+          3. Cross-reference with existing database
+          4. Generate similarity analysis
+          5. Create network graphs of paper relationships
+          6. Produce final research synthesis report
+          
+          This should be a complex workflow with multiple specialized agents.
+          Start it in isolated mode for security and resource isolation.
+        output:
+          to: user
+
+  # Example 7: Batch processing workflow
+  batch_processing_demo:
+    description: "Demo: Batch processing multiple datasets"
+    steps:
+      - agent: demo_agent
+        input: |
+          Set up batch processing for multiple datasets:
+          - Process 20 different CSV files in parallel
+          - Each needs the same analysis workflow
+          - Combine results into master report
+          - Use isolated mode for each dataset to prevent interference
+          
+          Datasets: /data/batch/*.csv
+        output:
+          to: user
+
+  # Example 8: Error handling and troubleshooting
+  error_handling_demo:
+    description: "Demo: Handle workflow errors and troubleshooting"
+    steps:
+      - agent: demo_agent
+        input: |
+          I have a workflow that keeps failing with timeout errors. 
+          The workflow ID is: abc-123-def-456
+          
+          Please:
+          1. Check its current status
+          2. If it's still running, cancel it
+          3. Suggest optimizations to prevent timeouts
+          4. Create an improved version with better timeout handling
+        output:
+          to: user
+
+  # Example 9: Custom configuration and overrides
+  custom_configuration_demo:
+    description: "Demo: Use configuration overrides for customization"
+    steps:
+      - agent: demo_agent
+        input: |
+          Execute the 'standard_analysis' workflow but customize it:
+          - Use GPT-4 Turbo instead of default model
+          - Increase timeout to 10 minutes
+          - Use Redis for memory instead of default
+          - Add custom environment variables
+          
+          Input data: {"dataset": "financial_data.csv", "analysis_type": "risk_assessment"}
+        output:
+          to: user
+
+  # Example 10: Integration with external systems
+  integration_demo:
+    description: "Demo: Integrate workflows with external systems"
+    steps:
+      - agent: demo_agent
+        input: |
+          Create a workflow that integrates with external APIs:
+          1. Fetch data from REST API (https://api.example.com/data)
+          2. Process the data using our analysis tools
+          3. Send results to webhook endpoint
+          4. Update external database via API
+          5. Send notification email
+          
+          Make this robust with retry logic and error handling.
+        output:
+          to: user

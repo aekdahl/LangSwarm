@@ -1,0 +1,103 @@
+# Multiple Vector Search RAG Tools Configuration
+# This file demonstrates how to configure multiple vector RAG instances
+
+source:
+  source_id: "vector_rag_config"
+  description: "Multiple vector search RAG tools for different datasets and use cases"
+
+tools:
+  - tool_id: "customer_support_rag"
+    tool_type: "vector_search_rag"
+    name: "Customer Support Knowledge Base"
+    description: "Vector search for customer support documentation and FAQs"
+    enabled: false  # Disabled - demo tool, enable if needed
+    config:
+      project_id: "${GOOGLE_CLOUD_PROJECT}"
+      dataset_id: "customer_support_vectors"
+      embedding_model: "text-embedding-3-small"
+    tags: ["customer_support", "faq", "documentation"]
+    priority: 10
+
+  - tool_id: "product_documentation_rag"
+    tool_type: "vector_search_rag"
+    name: "Product Documentation RAG"
+    description: "Vector search for technical product documentation"
+    enabled: false  # Disabled - demo tool, enable if needed
+    config:
+      project_id: "${GOOGLE_CLOUD_PROJECT}"
+      dataset_id: "product_docs_vectors"
+      embedding_model: "text-embedding-3-large"  # Higher quality for technical docs
+    tags: ["product", "documentation", "technical"]
+    priority: 9
+
+  - tool_id: "company_policies_rag"
+    tool_type: "vector_search_rag"
+    name: "Company Policies and Procedures"
+    description: "Internal company policies and procedure documents"
+    enabled: false  # Disabled - demo tool, enable if needed
+    config:
+      project_id: "${GOOGLE_CLOUD_PROJECT}"
+      dataset_id: "company_policies_vectors"
+      embedding_model: "text-embedding-3-small"
+    tags: ["internal", "policies", "hr"]
+    priority: 8
+
+  - tool_id: "api_reference_rag"
+    tool_type: "vector_search_rag"
+    name: "API Reference Documentation"
+    description: "Developer API reference and code examples"
+    enabled: false  # Disabled - demo tool, enable if needed
+    config:
+      project_id: "${GOOGLE_CLOUD_PROJECT}"
+      dataset_id: "api_reference_vectors"
+      embedding_model: "text-embedding-3-large"  # Better for code
+    tags: ["api", "developer", "reference", "code"]
+    priority: 7
+
+  - tool_id: "marketing_content_rag"
+    tool_type: "vector_search_rag"
+    name: "Marketing Content Library"
+    description: "Marketing materials, case studies, and sales content"
+    enabled: false  # Disabled - demo tool, enable if needed
+    config:
+      project_id: "${GOOGLE_CLOUD_PROJECT}"
+      dataset_id: "marketing_vectors"
+      embedding_model: "text-embedding-3-small"
+    tags: ["marketing", "sales", "content"]
+    priority: 6
+
+  - tool_id: "legal_documents_rag"
+    tool_type: "vector_search_rag"
+    name: "Legal Documents Archive"
+    description: "Legal documents, contracts, and compliance materials"
+    enabled: false  # Disabled - not needed for most use cases
+    config:
+      project_id: "${LEGAL_DOCS_PROJECT_ID}"  # Separate project for security
+      dataset_id: "legal_documents_vectors"
+      embedding_model: "text-embedding-3-large"  # High accuracy for legal
+    tags: ["legal", "contracts", "compliance", "secure"]
+    priority: 5
+
+  - tool_id: "training_materials_rag"
+    tool_type: "vector_search_rag"
+    name: "Employee Training Materials"
+    description: "Training courses, onboarding materials, and learning resources"
+    enabled: false  # Disabled - demo tool, enable if needed
+    config:
+      project_id: "${GOOGLE_CLOUD_PROJECT}"
+      dataset_id: "training_vectors"
+      embedding_model: "text-embedding-3-small"
+    tags: ["training", "onboarding", "education", "hr"]
+    priority: 4
+
+  - tool_id: "development_rag"
+    tool_type: "vector_search_rag"
+    name: "Development Environment RAG"
+    description: "Development and testing vector search instance"
+    enabled: false  # Only enabled in development
+    config:
+      project_id: "${DEV_PROJECT_ID}"
+      dataset_id: "dev_test_vectors"
+      embedding_model: "text-embedding-3-small"
+    tags: ["development", "testing", "dev"]
+    priority: 1

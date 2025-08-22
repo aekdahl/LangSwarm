@@ -1,0 +1,163 @@
+# Remote MCP Tool Configuration Examples
+# ========================================
+
+# === Example 1: Basic Remote HTTP MCP Tool ===
+tools:
+  - id: remote_data_analyzer
+    type: mcpremote
+    description: "Remote data analysis service via MCP protocol"
+    mcp_url: "https://data-analytics.company.com:8080"
+    pattern: "direct"
+    
+    # Optional: HTTP configuration
+    timeout: 30
+    retry_count: 3
+    
+    # Available methods (for documentation/validation)
+    methods:
+      - analyze_dataset: "Analyze large datasets"
+      - generate_report: "Generate analysis reports"
+      - get_insights: "Extract key insights"
+
+  # === Example 2: Authenticated Remote MCP Tool ===
+  - id: secure_ml_processor
+    type: mcpremote
+    description: "Secure ML processing service with authentication"
+    mcp_url: "https://ml-api.company.com/mcp/v1"
+    pattern: "intent"
+    main_workflow: "ml_processing_workflow"
+    
+    # Authentication headers
+    headers:
+      Authorization: "Bearer ${ML_API_TOKEN}"
+      X-API-Key: "${ML_API_KEY}"
+      Content-Type: "application/json"
+    
+    # Optional: Environment-specific configuration
+    environment_overrides:
+      development:
+        mcp_url: "https://dev-ml-api.company.com/mcp/v1"
+      staging:
+        mcp_url: "https://staging-ml-api.company.com/mcp/v1"
+      production:
+        mcp_url: "https://ml-api.company.com/mcp/v1"
+
+  # === Example 3: Multi-Environment Remote Tool ===
+  - id: document_processor
+    type: mcpremote
+    description: "Document processing service"
+    mcp_url: "${DOCUMENT_PROCESSOR_URL}"  # Environment variable
+    pattern: "direct"
+    
+    # Dynamic configuration based on environment
+    headers:
+      Authorization: "Bearer ${DOCUMENT_API_TOKEN}"
+      X-Client-ID: "${CLIENT_ID}"
+    
+    # Connection settings
+    timeout: 60  # Longer timeout for document processing
+    retry_count: 2
+    
+    methods:
+      - extract_text: "Extract text from documents"
+      - analyze_sentiment: "Analyze document sentiment"
+      - translate_content: "Translate document content"
+
+# === Agent Configuration ===
+agents:
+  - id: remote_analysis_agent
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You are an AI assistant with access to remote data analysis tools.
+      
+      Available remote tools:
+      - remote_data_analyzer: Advanced data analysis via remote MCP service
+        Methods: analyze_dataset, generate_report, get_insights
+      
+      - secure_ml_processor: ML processing with enterprise security
+        Use intent-based calls: "Process this data with ML analysis"
+      
+      - document_processor: Document processing and analysis
+        Methods: extract_text, analyze_sentiment, translate_content
+      
+      Use MCP direct pattern for specific method calls:
+      {
+        "mcp": {
+          "tool": "remote_data_analyzer",
+          "method": "analyze_dataset",
+          "params": {"data": "...", "analysis_type": "statistical"}
+        }
+      }
+      
+      Use MCP intent pattern for complex operations:
+      {
+        "mcp": {
+          "tool": "secure_ml_processor", 
+          "intent": "analyze customer behavior patterns",
+          "context": "e-commerce transaction data"
+        }
+      }
+    
+    tools:
+      - remote_data_analyzer
+      - secure_ml_processor
+      - document_processor
+
+# === Workflow Examples ===
+workflows:
+  remote_data_analysis_workflow:
+    - steps:
+      - agent: remote_analysis_agent
+        input: "${user_input}"
+        output:
+          to: user
+
+# === Environment Configuration ===
+# Set these environment variables for remote MCP tools:
+
+# For ML processor
+# export ML_API_TOKEN="your-ml-api-token"
+# export ML_API_KEY="your-ml-api-key"
+
+# For document processor  
+# export DOCUMENT_PROCESSOR_URL="https://docs-api.company.com/mcp"
+# export DOCUMENT_API_TOKEN="your-docs-api-token"
+# export CLIENT_ID="your-client-id"
+
+# === Usage Examples ===
+
+# Direct method call to remote tool:
+# {
+#   "mcp": {
+#     "tool": "remote_data_analyzer",
+#     "method": "analyze_dataset", 
+#     "params": {
+#       "dataset_url": "https://data.company.com/sales_2024.csv",
+#       "analysis_type": "trend_analysis",
+#       "output_format": "json"
+#     }
+#   }
+# }
+
+# Intent-based call to remote tool:
+# {
+#   "mcp": {
+#     "tool": "secure_ml_processor",
+#     "intent": "predict customer churn from transaction patterns",
+#     "context": "last 6 months of transaction data, focus on frequency and amount trends"
+#   }
+# }
+
+# Document processing example:
+# {
+#   "mcp": {
+#     "tool": "document_processor",
+#     "method": "extract_text",
+#     "params": {
+#       "document_url": "https://storage.company.com/contract.pdf",
+#       "extract_tables": true,
+#       "output_format": "structured_json"
+#     }
+#   }
+# }

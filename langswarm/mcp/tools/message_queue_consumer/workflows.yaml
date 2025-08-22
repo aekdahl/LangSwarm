@@ -1,0 +1,182 @@
+version: "1.0"
+
+workflows:
+  # Basic consumer management
+  start_queue_consumer:
+    description: "Start a message queue consumer for task processing"
+    steps:
+      - agent: task_consumer_coordinator
+        input: "${user_input}"
+        output:
+          to: user
+
+  # Redis-specific consumer management
+  manage_redis_consumer:
+    description: "Manage Redis-based message queue consumers"
+    steps:
+      - agent: redis_queue_manager
+        input: "${user_input}"
+        output:
+          to: user
+
+  # GCP Pub/Sub consumer management
+  manage_pubsub_consumer:
+    description: "Manage GCP Pub/Sub message queue consumers"
+    steps:
+      - agent: gcp_pubsub_manager
+        input: "${user_input}"
+        output:
+          to: user
+
+  # Consumer monitoring and optimization
+  monitor_task_processing:
+    description: "Monitor and optimize task processing performance"
+    steps:
+      - agent: task_processing_monitor
+        input: "${user_input}"
+        output:
+          to: user
+
+  # Development testing workflow
+  test_queue_functionality:
+    description: "Test message queue consumer functionality in development"
+    steps:
+      - agent: development_queue_tester
+        input: "${user_input}"
+        output:
+          to: user
+
+  # Production operations workflow
+  production_queue_operations:
+    description: "Manage production message queue operations"
+    steps:
+      - agent: production_operations_manager
+        input: "${user_input}"
+        output:
+          to: user
+
+  # Comprehensive consumer setup
+  setup_distributed_consumers:
+    description: "Set up multiple consumers for distributed task processing"
+    steps:
+      - agent: production_operations_manager
+        input: "Plan distributed consumer setup: ${user_input}"
+        
+      - agent: task_consumer_coordinator
+        input: "Implement consumer plan: ${production_operations_manager.output}"
+        
+      - agent: task_processing_monitor
+        input: "Monitor initial performance: ${task_consumer_coordinator.output}"
+        output:
+          to: user
+
+  # Consumer health check and optimization
+  optimize_consumer_performance:
+    description: "Analyze and optimize consumer performance"
+    steps:
+      - agent: task_processing_monitor
+        input: "Analyze current performance: ${user_input}"
+        
+      - agent: production_operations_manager
+        input: "Recommend optimizations: ${task_processing_monitor.output}"
+        
+      - agent: task_consumer_coordinator
+        input: "Implement optimizations: ${production_operations_manager.output}"
+        output:
+          to: user
+
+  # Disaster recovery workflow
+  consumer_disaster_recovery:
+    description: "Handle consumer failures and implement recovery procedures"
+    steps:
+      - agent: task_processing_monitor
+        input: "Assess failure situation: ${user_input}"
+        
+      - agent: production_operations_manager
+        input: "Plan recovery strategy: ${task_processing_monitor.output}"
+        
+      - agent: task_consumer_coordinator
+        input: "Execute recovery plan: ${production_operations_manager.output}"
+        output:
+          to: user
+
+  # Multi-broker consumer management
+  manage_multi_broker_consumers:
+    description: "Manage consumers across different message brokers"
+    steps:
+      - agent: redis_queue_manager
+        input: "Handle Redis consumers: ${user_input}"
+        
+      - agent: gcp_pubsub_manager
+        input: "Handle GCP Pub/Sub consumers: ${user_input}"
+        
+      - agent: task_consumer_coordinator
+        input: "Coordinate across brokers: Redis: ${redis_queue_manager.output}, Pub/Sub: ${gcp_pubsub_manager.output}"
+        output:
+          to: user
+
+  # Load testing workflow
+  load_test_consumers:
+    description: "Perform load testing on message queue consumers"
+    steps:
+      - agent: development_queue_tester
+        input: "Setup load test environment: ${user_input}"
+        
+      - agent: task_processing_monitor
+        input: "Monitor load test performance: ${development_queue_tester.output}"
+        
+      - agent: production_operations_manager
+        input: "Analyze load test results: ${task_processing_monitor.output}"
+        output:
+          to: user
+
+  # Consumer scaling workflow
+  scale_consumer_capacity:
+    description: "Scale consumer capacity based on workload"
+    steps:
+      - agent: task_processing_monitor
+        input: "Assess current workload: ${user_input}"
+        
+      - agent: production_operations_manager
+        input: "Plan scaling strategy: ${task_processing_monitor.output}"
+        
+      - agent: task_consumer_coordinator
+        input: "Execute scaling plan: ${production_operations_manager.output}"
+        
+      - agent: task_processing_monitor
+        input: "Verify scaling results: ${task_consumer_coordinator.output}"
+        output:
+          to: user
+
+  # Queue maintenance workflow
+  perform_queue_maintenance:
+    description: "Perform routine maintenance on message queue consumers"
+    steps:
+      - agent: production_operations_manager
+        input: "Plan maintenance procedure: ${user_input}"
+        
+      - agent: task_consumer_coordinator
+        input: "Execute maintenance plan: ${production_operations_manager.output}"
+        
+      - agent: task_processing_monitor
+        input: "Verify maintenance completion: ${task_consumer_coordinator.output}"
+        output:
+          to: user
+
+  # Consumer migration workflow
+  migrate_consumers:
+    description: "Migrate consumers between different brokers or configurations"
+    steps:
+      - agent: production_operations_manager
+        input: "Plan migration strategy: ${user_input}"
+        
+      - agent: task_consumer_coordinator
+        input: "Stop old consumers gracefully: ${production_operations_manager.output}"
+        
+      - agent: task_consumer_coordinator
+        input: "Start new consumers: ${production_operations_manager.output}"
+        
+      - agent: task_processing_monitor
+        input: "Verify migration success: ${task_consumer_coordinator.output}"
+        output:
+          to: user

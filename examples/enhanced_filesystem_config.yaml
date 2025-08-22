@@ -1,0 +1,295 @@
+# Enhanced Filesystem MCP Tool Configuration Examples
+# ====================================================
+# Demonstrates permission-based CRUD filesystem operations
+
+version: "1.0"
+project_name: "enhanced-filesystem-demo"
+
+# === Basic Enhanced Filesystem Configuration ===
+tools:
+  - id: enhanced_filesystem
+    type: mcpfilesystem
+    description: "Enhanced filesystem with CRUD operations and permission control"
+    
+    # Optional: Custom permission zones (defaults provided if not specified)
+    permissions:
+      "/": "read_only"                    # Root filesystem read-only
+      "~/": "read_only"                   # Home directory read-only
+      "~/agent_workspace/": "read_write"  # Agent workspace full CRUD
+      "/tmp/": "read_write"               # Temp directory full CRUD
+      "/var/log/": "forbidden"            # Log directory forbidden
+      "~/Documents/projects/": "read_write" # Specific project folder CRUD
+
+# === Agent Configurations ===
+
+agents:
+  # General purpose file manager
+  - id: file_manager
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You are a file management assistant with enhanced filesystem capabilities.
+      
+      **PERMISSION ZONES:**
+      - read_only: Can list directories and read files
+      - read_write: Full CRUD operations (create, read, update, delete)
+      - forbidden: No access allowed
+      
+      **ALWAYS check permissions first using get_file_info before write operations!**
+      
+      **Available Methods:**
+      
+      **Read Operations (work in read_only and read_write zones):**
+      - list_directory: List directory contents with metadata
+      - read_file: Read file contents with encoding support  
+      - get_file_info: Get file info and permission level
+      
+      **Write Operations (require read_write permissions):**
+      - write_file: Create or overwrite files
+      - update_file: Append to or overwrite files
+      - delete_file: Delete files or directories
+      - create_directory: Create new directories
+      
+      **Safe Practices:**
+      1. Check permissions before write operations
+      2. Use create_dirs: true when creating files in new directories
+      3. Use force: false for delete operations (safer)
+      4. Handle permission errors gracefully
+      
+      **Example MCP Call:**
+      {
+        "mcp": {
+          "tool": "enhanced_filesystem",
+          "method": "write_file", 
+          "params": {
+            "path": "~/agent_workspace/output.txt",
+            "content": "Hello, World!",
+            "create_dirs": true
+          }
+        }
+      }
+      
+    tools:
+      - enhanced_filesystem
+  
+  # Document processor with safe CRUD
+  - id: document_processor
+    agent_type: openai
+    model: gpt-4o-mini
+    system_prompt: |
+      You process documents safely using the enhanced filesystem tool.
+      
+      **Your workflow:**
+      1. Check document permissions with get_file_info
+      2. Read source documents from read_only zones
+      3. Process and analyze content
+      4. Write results to ~/agent_workspace/ (read_write zone)
+      5. Provide detailed status reports
+      
+      **Always specify encoding and handle errors gracefully.**
+      
+    tools:
+      - enhanced_filesystem
+
+  # Log analyzer (read-only operations)
+  - id: log_analyzer
+    agent_type: openai
+    model: gpt-4o-mini
+    system_prompt: |
+      You analyze log files and system information using read-only access.
+      
+      Focus on:
+      - Reading log files and configuration files
+      - Analyzing directory structures  
+      - Generating reports about system state
+      - NO write operations (read-only access)
+      
+    tools:
+      - enhanced_filesystem
+
+# === Workflow Configurations ===
+
+workflows:
+  # Safe document processing workflow
+  document_processing_workflow:
+    steps:
+      - agent: document_processor
+        input: "${user_input}"
+        output:
+          to: user
+  
+  # File management workflow
+  file_management_workflow:
+    steps:
+      - agent: file_manager
+        input: "${user_input}"
+        output:
+          to: user
+  
+  # Multi-step secure file processing
+  secure_file_processing_workflow:
+    steps:
+      # Step 1: Check permissions and read source
+      - agent: document_processor
+        input: |
+          Check the permissions and read the source file: ${user_input}
+          
+          First use get_file_info to check permissions, then read if allowed.
+        output:
+          to: next_step
+      
+      # Step 2: Process and write results
+      - agent: file_manager
+        input: |
+          Process this content and write results to ~/agent_workspace/:
+          
+          ${previous_output}
+          
+          Create appropriate output files with processed results.
+        output:
+          to: user
+
+# === Usage Examples ===
+
+# Example 1: Safe document reading
+# Input: "Read the contents of ~/Documents/readme.txt"
+# 
+# The agent will:
+# 1. Check permissions with get_file_info
+# 2. Read file if in read_only or read_write zone
+# 3. Return content with metadata
+
+# Example 2: Secure file creation
+# Input: "Create a summary file in the agent workspace with today's results"
+#
+# The agent will:
+# 1. Check ~/agent_workspace/ permissions (read_write)
+# 2. Create file with appropriate content
+# 3. Confirm creation with status
+
+# Example 3: Directory management
+# Input: "Create a new project folder structure in ~/agent_workspace/project1"
+#
+# The agent will:
+# 1. Verify write permissions
+# 2. Create directory structure
+# 3. Provide confirmation
+
+# Example 4: Safe file updates
+# Input: "Append today's log entry to ~/agent_workspace/daily_log.txt"
+#
+# The agent will:
+# 1. Check file exists and permissions
+# 2. Append content using update_file method
+# 3. Report bytes written
+
+---
+
+# === Alternative Configuration: Restricted Mode ===
+# For high-security environments
+
+version: "1.0"
+project_name: "restricted-filesystem"
+
+tools:
+  - id: restricted_filesystem
+    type: mcpfilesystem
+    description: "Highly restricted filesystem access"
+    
+    # Very restrictive permissions
+    permissions:
+      "/": "forbidden"                     # Block root access
+      "~/": "forbidden"                    # Block home access
+      "~/agent_workspace/": "read_write"   # Only agent workspace allowed
+      "/tmp/agent_temp/": "read_write"     # Specific temp folder only
+      "~/safe_documents/": "read_only"     # Specific read-only folder
+
+agents:
+  - id: restricted_agent
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You operate in a highly restricted filesystem environment.
+      
+      **ALLOWED AREAS:**
+      - ~/agent_workspace/ (read_write) - Your main work area
+      - /tmp/agent_temp/ (read_write) - Temporary files
+      - ~/safe_documents/ (read_only) - Safe document reading
+      
+      **FORBIDDEN AREAS:**
+      - Everything else is blocked for security
+      
+      Always work within your allowed areas and handle permission errors gracefully.
+      
+    tools:
+      - restricted_filesystem
+
+---
+
+# === Advanced Configuration: Multi-Zone Setup ===
+# For complex multi-user or multi-project environments
+
+version: "1.0"
+project_name: "multi-zone-filesystem"
+
+tools:
+  - id: multi_zone_filesystem
+    type: mcpfilesystem
+    description: "Multi-zone filesystem with granular permissions"
+    
+    # Complex permission setup
+    permissions:
+      # System areas (read-only)
+      "/": "read_only"
+      "/etc/": "read_only"
+      "/var/log/": "read_only"
+      
+      # User areas (mixed)
+      "~/": "read_only"
+      "~/Documents/": "read_only"
+      "~/Downloads/": "read_only"
+      
+      # Work areas (read-write)
+      "~/agent_workspace/": "read_write"
+      "~/projects/agent_work/": "read_write"
+      "/tmp/": "read_write"
+      
+      # Specific project areas
+      "~/projects/project_a/": "read_write"
+      "~/projects/project_b/output/": "read_write"
+      
+      # Sensitive areas (forbidden)
+      "~/sensitive/": "forbidden"
+      "~/.ssh/": "forbidden"
+      "/root/": "forbidden"
+
+agents:
+  - id: multi_zone_agent
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You work across multiple filesystem zones with different permission levels.
+      
+      **Zone Strategy:**
+      1. Read system info and documents from read_only zones
+      2. Write outputs to designated read_write zones
+      3. Respect forbidden areas completely
+      4. Always check permissions before operations
+      
+      **Best Practices:**
+      - Use get_file_info to understand permission landscape
+      - Route outputs to appropriate zones based on content type
+      - Handle permission errors with helpful suggestions
+      
+    tools:
+      - multi_zone_filesystem
+
+# Environment Variables (if needed)
+# export AGENT_WORKSPACE_PATH="~/agent_workspace"
+# export TEMP_PATH="/tmp/agent_temp"
+
+# Security Notes:
+# - Test permission configurations before deployment
+# - Monitor filesystem access logs
+# - Regularly review and update permission zones
+# - Use least privilege principle for agent operations

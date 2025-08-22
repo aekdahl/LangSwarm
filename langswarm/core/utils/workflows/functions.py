@@ -275,9 +275,86 @@ def mcp_call(
         print("resp_text", resp_text)
         return resp_text['parsed']
     
-    response = requests.post(mcp_url, json=payload, headers=headers, **kwargs)
-    response.raise_for_status()
-    return response.json()
+    # Enhanced HTTP error handling for remote MCP tools
+    try:
+        response = requests.post(mcp_url, json=payload, headers=headers, **kwargs)
+        
+        # Handle specific HTTP status codes
+        if response.status_code == 401:
+            return {
+                "error": {
+                    "message": "Authentication failed - check API key or JWT token",
+                    "code": 401,
+                    "url": mcp_url
+                }
+            }
+        elif response.status_code == 400:
+            try:
+                error_data = response.json()
+                return {
+                    "error": {
+                        "message": f"Bad request: {error_data.get('error', {}).get('message', response.text)}",
+                        "code": 400,
+                        "url": mcp_url,
+                        "details": error_data
+                    }
+                }
+            except:
+                return {
+                    "error": {
+                        "message": f"Bad request: {response.text}",
+                        "code": 400,
+                        "url": mcp_url
+                    }
+                }
+        elif response.status_code >= 500:
+            return {
+                "error": {
+                    "message": f"Server error {response.status_code}: {response.text}",
+                    "code": response.status_code,
+                    "url": mcp_url,
+                    "retryable": True
+                }
+            }
+        
+        response.raise_for_status()
+        return response.json()
+        
+    except requests.exceptions.Timeout:
+        return {
+            "error": {
+                "message": f"Request timeout - server did not respond within timeout period",
+                "code": "TIMEOUT",
+                "url": mcp_url,
+                "retryable": True
+            }
+        }
+    except requests.exceptions.ConnectionError as e:
+        return {
+            "error": {
+                "message": f"Connection error: {str(e)}",
+                "code": "CONNECTION_ERROR", 
+                "url": mcp_url,
+                "retryable": True
+            }
+        }
+    except requests.exceptions.RequestException as e:
+        return {
+            "error": {
+                "message": f"Request failed: {str(e)}",
+                "code": "REQUEST_ERROR",
+                "url": mcp_url
+            }
+        }
+    except json.JSONDecodeError:
+        return {
+            "error": {
+                "message": f"Invalid JSON response from server",
+                "code": "INVALID_JSON",
+                "url": mcp_url,
+                "response_text": response.text[:500] if 'response' in locals() else None
+            }
+        }
 
 
 def find_tool_by_name(response: Dict[str, Any], tool_name: str) -> Optional[Dict[str, Any]]:

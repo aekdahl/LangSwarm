@@ -1,0 +1,86 @@
+# AAF Chatbot LangSwarm Configuration
+# Complete single-file configuration with workflows
+
+version: "1.0"
+project_name: "aaf-chatbot"
+
+# Core LangSwarm settings
+langswarm:
+  debug: false
+  log_level: "${LOG_LEVEL}"
+  config_validation: true
+
+# Default Agent Configuration
+agents:
+  - id: "aaf_chatbot"
+    name: "AAF Website Chatbot"
+    model: "${DEFAULT_AGENT_MODEL}"
+    behavior: "${DEFAULT_AGENT_BEHAVIOR}"
+    
+    system_prompt: |
+      ${DEFAULT_SYSTEM_PROMPT}
+      
+      Remember to:
+      - Be professional and helpful
+      - Provide accurate information about the company
+      - If you don't know something, say so honestly
+      - Keep responses concise but informative
+      - Always maintain a friendly tone
+    
+    # Tool configuration (simple tool references for config-editor compatibility)
+    tools: ["vector_search"]
+    
+    # Memory and conversation settings
+    memory: true
+    is_conversational: true
+    max_history_length: 20
+    streaming: true
+    max_tokens: 4000
+    temperature: 0.7
+
+# Tool definitions
+tools:
+  vector_search:
+    type: "local_mcp"
+    description: "Search through company knowledge base using vector similarity"
+    mcp_server: "bigquery_vector_search"
+    enabled: true
+
+# Workflow definitions - CRITICAL for making anything happen!
+workflows:
+  - id: "chat_workflow"
+    name: "Main Chat Workflow"
+    description: "Primary chat interaction workflow for AAF chatbot"
+    steps:
+      - id: "process_user_input"
+        agent: "aaf_chatbot"
+        input: "{{user_input}}"
+        tools: ["vector_search"]
+        output:
+          to: user
+
+# Memory configuration
+memory:
+  enabled: true
+  backend: "bigquery"
+  settings:
+    project_id: "${GOOGLE_CLOUD_PROJECT}"
+    dataset_id: "${BIGQUERY_DATASET_ID}"
+    table_id: "${BIGQUERY_TABLE_ID}"
+    location: "US"
+    description: "AAF Chatbot conversation storage"
+
+# Session management configuration
+session:
+  provider: "bigquery"
+  unified_memory: true
+  session_strategy: "persistent"
+  persist_session: true
+  session_timeout: 3600  # 1 hour session timeout
+  settings:
+    project_id: "${GOOGLE_CLOUD_PROJECT}"
+    dataset_id: "${BIGQUERY_DATASET_ID}"
+    table_id: "sessions"
+
+# Note: Logging is configured via langswarm.log_level above
+# Additional logging configuration can be added to langswarm section if needed

@@ -1,0 +1,411 @@
+# User MCP (Agent Server) Configuration
+# =====================================
+# Complete LangSwarm configuration for connecting to the User MCP server
+# Base URL: https://silzzbehvqzdtwupbmur.functions.supabase.co/mcp-agent-server
+
+version: "1.0"
+project_name: "user-mcp-integration"
+
+# === User MCP Tool Configuration ===
+tools:
+  - id: user_mcp
+    type: mcpremote
+    description: "User MCP (Agent Server) for project, task, and team operations"
+    mcp_url: "https://silzzbehvqzdtwupbmur.functions.supabase.co/mcp-agent-server"
+    pattern: "direct"
+    
+    # Authentication (choose one - exactly one required)
+    headers:
+      # Option 1: User JWT (preferred by User MCP)
+      Authorization: "Bearer ${USER_JWT}"
+      Content-Type: "application/json"
+      
+      # Option 2: Personal API Key (alternative)
+      # x-api-key: "${USER_API_KEY}"
+      # Content-Type: "application/json"
+    
+    # Connection settings (aligned with User MCP requirements)
+    timeout: 10  # Max 10s timeout as recommended
+    retry_count: 3  # Retry 429/5xx with backoff
+    auto_initialize: true
+    
+    # Available methods (auto-discovered, listed for reference)
+    # NOTE: These are discovered automatically - no need to manually specify
+    methods:
+      # Core Task operations
+      - create_task: "Create a new task"
+      - list_tasks: "List all tasks"
+      - update_task_status: "Update task status"
+      - delete_task: "Delete a task (requires confirmation)"
+      
+      # Subtask operations (NEW)
+      - create_subtask: "Create a subtask under a parent task"
+      - list_subtasks: "List subtasks for a task"
+      - update_subtask: "Update subtask details"
+      - delete_subtask: "Delete a subtask (requires confirmation)"
+      - promote_subtask: "Promote subtask to full task"
+      
+      # Project operations  
+      - create_project: "Create a new project"
+      - list_projects: "List all projects"
+      - get_project_stats: "Get project statistics"
+      
+      # Subproject operations (NEW)
+      - create_subproject: "Create a subproject under a parent project"
+      - list_subprojects: "List subprojects for a project"
+      
+      # Team operations
+      - create_team: "Create a new team"
+      - list_teams: "List all teams"
+      
+      # Task Messages/Logs (NEW)
+      - send_task_message: "Send a message/comment to a task"
+      - list_task_messages: "List messages/comments for a task"
+      - delete_task_message: "Delete a task message (requires confirmation)"
+      - add_task_log: "Add a log entry to a task"
+      
+      # Backlog operations (NEW)
+      - create_backlog_item: "Create a new backlog item"
+      - list_backlog: "List backlog items"
+      - update_backlog_item: "Update backlog item"
+      - delete_backlog_item: "Delete backlog item (requires confirmation)"
+      - reorder_backlog: "Reorder backlog items"
+      - convert_backlog_to_task: "Convert backlog item to task"
+      
+      # Document operations (NEW)
+      - create_document: "Create a new document"
+      - list_documents: "List documents"
+      - update_document: "Update document content"
+      - delete_document: "Delete document (requires confirmation)"
+      - create_document_group: "Create document group/folder"
+      - list_document_groups: "List document groups"
+      
+      # Milestone operations (NEW)
+      - create_milestone: "Create a new milestone"
+      - list_milestones: "List milestones"
+      - update_milestone: "Update milestone details"
+      - delete_milestone: "Delete milestone (requires confirmation)"
+      - create_milestone_item: "Create item under milestone"
+      - list_milestone_items: "List items for milestone"
+      
+      # File operations (NEW - limited)
+      - list_file_attachments: "List file attachments (read-only)"
+      - delete_file_attachment: "Delete file attachment (requires confirmation)"
+
+# === Agent Configuration ===
+agents:
+  - id: project_manager
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You are a comprehensive project management assistant with access to the User MCP server.
+      
+      **IMPORTANT USER MCP GUIDELINES:**
+      
+      **Authentication:** Always use exactly one auth header (Bearer JWT preferred, x-api-key alternative).
+      
+      **Data Scoping:** Always provide scope IDs (teamId/projectId/subprojectId/taskId) to keep results focused and fast.
+      
+      **Dates:** Use ISO 8601 format (YYYY-MM-DDTHH:mm:ssZ) for all dates (deadlineDate, targetDate, dueDate).
+      
+      **Safety First:** ALWAYS ask for explicit confirmation before any delete_* or destructive operations.
+      
+      **Response Handling:** Check for errors first, then read result.content[0].text for the actual data.
+      
+      **Rate Limits:** Respect ~3 requests/second limit. Use filtering to avoid large payloads.
+      
+      **Available Operations:**
+      
+      **Core Management:**
+      - Tasks: create, list, update, delete (with subtasks support)
+      - Projects: create, list, get stats (with subprojects support)  
+      - Teams: create, list
+      
+      **Enhanced Features:**
+      - Task Messages/Logs: send messages, add logs, list conversations
+      - Backlog: create items, reorder, convert to tasks
+      - Documents: create, organize in groups, manage content
+      - Milestones: create, track items, manage deadlines
+      - Files: list attachments, delete (upload not supported via MCP)
+      
+      **Example Call Structure:**
+      {
+        "mcp": {
+          "tool": "user_mcp",
+          "method": "create_task",
+          "params": {
+            "title": "Task title",
+            "description": "Task description", 
+            "projectId": "proj_123",
+            "deadlineDate": "2024-03-15T18:00:00Z",
+            "priority": "high"
+          }
+        }
+      }
+      
+      Always provide scope context and ask for confirmation on destructive actions.
+      
+    tools:
+      - user_mcp
+    
+    # Optional: Enable conversation memory
+    is_conversational: true
+
+  - id: task_specialist
+    agent_type: openai
+    model: gpt-4o-mini
+    system_prompt: |
+      You are a task management specialist focused on task operations.
+      
+      You help users with:
+      - Creating well-structured tasks
+      - Organizing task lists
+      - Updating task statuses
+      - Tracking task progress
+      
+      Use the User MCP server for all task operations.
+      
+    tools:
+      - user_mcp
+
+# === Workflow Configuration ===
+workflows:
+  # General project management workflow
+  project_management_workflow:
+    - steps:
+      - agent: project_manager
+        input: "${user_input}"
+        output:
+          to: user
+
+  # Task-focused workflow
+  task_management_workflow:
+    - steps:
+      - agent: task_specialist
+        input: "${user_input}"
+        output:
+          to: user
+
+  # Multi-step project setup workflow
+  project_setup_workflow:
+    - steps:
+      # Step 1: Create project
+      - agent: project_manager
+        input: |
+          Create a new project based on this request: ${user_input}
+          
+          Use the create_project method to set up the project structure.
+        output:
+          to: next_step
+      
+      # Step 2: Create initial tasks
+      - agent: task_specialist
+        input: |
+          Based on the project created in the previous step:
+          ${previous_output}
+          
+          Create initial tasks to get the project started.
+        output:
+          to: user
+
+# === Environment Variables Required ===
+# Set these environment variables before running:
+
+# For JWT authentication (preferred by User MCP):
+# export USER_JWT="your-user-jwt-token"
+
+# For Personal API Key authentication (alternative):
+# export USER_API_KEY="your-personal-api-key-from-settings"
+
+# === Usage Examples ===
+
+# Example 1: Create a new project
+# Input: "Create a new project called 'Website Redesign' for improving our company website"
+# 
+# The agent will call:
+# {
+#   "mcp": {
+#     "tool": "user_mcp",
+#     "method": "create_project",
+#     "params": {
+#       "name": "Website Redesign",
+#       "description": "Project for improving our company website",
+#       "status": "active"
+#     }
+#   }
+# }
+
+# Example 2: List all current tasks
+# Input: "Show me all current tasks"
+#
+# The agent will call:
+# {
+#   "mcp": {
+#     "tool": "user_mcp", 
+#     "method": "list_tasks",
+#     "params": {}
+#   }
+# }
+
+# Example 3: Create a high-priority task
+# Input: "Create a high-priority task to fix the login bug assigned to john@company.com"
+#
+# The agent will call:
+# {
+#   "mcp": {
+#     "tool": "user_mcp",
+#     "method": "create_task", 
+#     "params": {
+#       "title": "Fix login bug",
+#       "description": "Urgent fix needed for user login functionality",
+#       "priority": "high",
+#       "assignee": "john@company.com",
+#       "status": "open"
+#     }
+#   }
+# }
+
+# Example 4: Update task status
+# Input: "Mark task #123 as completed"
+#
+# The agent will call:
+# {
+#   "mcp": {
+#     "tool": "user_mcp",
+#     "method": "update_task_status",
+#     "params": {
+#       "task_id": "123",
+#       "status": "completed"
+#     }
+#   }
+# }
+
+# Example 5: Get project statistics
+# Input: "Show me statistics for the Website Redesign project"
+#
+# The agent will call:
+# {
+#   "mcp": {
+#     "tool": "user_mcp",
+#     "method": "get_project_stats",
+#     "params": {
+#       "project_name": "Website Redesign"
+#     }
+#   }
+# }
+
+---
+
+# === Alternative Configuration: Environment-Based ===
+# For different environments (dev, staging, prod)
+
+version: "1.0"
+project_name: "user-mcp-multi-env"
+
+tools:
+  - id: user_mcp
+    type: mcpremote
+    description: "User MCP with environment-based configuration"
+    mcp_url: "${USER_MCP_URL}"  # Environment-specific URL
+    headers:
+      x-api-key: "${USER_API_KEY}"
+      Content-Type: "application/json"
+    timeout: 30
+    retry_count: 3
+
+# Environment variables for different stages:
+# Development:
+# export USER_MCP_URL="https://dev-silzzbehvqzdtwupbmur.functions.supabase.co/mcp-agent-server"
+# export USER_API_KEY="dev-api-key"
+
+# Staging:  
+# export USER_MCP_URL="https://staging-silzzbehvqzdtwupbmur.functions.supabase.co/mcp-agent-server"
+# export USER_API_KEY="staging-api-key"
+
+# Production:
+# export USER_MCP_URL="https://silzzbehvqzdtwupbmur.functions.supabase.co/mcp-agent-server"
+# export USER_API_KEY="prod-api-key"
+
+---
+
+# === Advanced Configuration: Multiple User MCP Instances ===
+# For connecting to multiple User MCP servers or accounts
+
+version: "1.0"
+project_name: "multi-user-mcp"
+
+tools:
+  # Primary User MCP instance
+  - id: primary_user_mcp
+    type: mcpremote
+    description: "Primary User MCP for main operations"
+    mcp_url: "https://silzzbehvqzdtwupbmur.functions.supabase.co/mcp-agent-server"
+    headers:
+      x-api-key: "${PRIMARY_USER_API_KEY}"
+      Content-Type: "application/json"
+    
+  # Secondary User MCP instance (different account/project)
+  - id: secondary_user_mcp
+    type: mcpremote
+    description: "Secondary User MCP for client projects"
+    mcp_url: "https://silzzbehvqzdtwupbmur.functions.supabase.co/mcp-agent-server"
+    headers:
+      x-api-key: "${SECONDARY_USER_API_KEY}"
+      Content-Type: "application/json"
+
+agents:
+  - id: multi_mcp_manager
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You manage projects across multiple User MCP instances.
+      
+      Tools available:
+      - primary_user_mcp: Main company projects
+      - secondary_user_mcp: Client projects
+      
+      Choose the appropriate MCP instance based on the context.
+      
+    tools:
+      - primary_user_mcp
+      - secondary_user_mcp
+
+# Environment variables:
+# export PRIMARY_USER_API_KEY="main-account-api-key"
+# export SECONDARY_USER_API_KEY="client-account-api-key"
+
+---
+
+# === Testing Configuration ===
+# Minimal configuration for testing User MCP connection
+
+version: "1.0"
+project_name: "user-mcp-test"
+
+tools:
+  - id: test_user_mcp
+    type: mcpremote
+    mcp_url: "https://silzzbehvqzdtwupbmur.functions.supabase.co/mcp-agent-server"
+    headers:
+      x-api-key: "${USER_API_KEY}"
+    auto_initialize: true
+
+agents:
+  - id: test_agent
+    agent_type: openai
+    model: gpt-4o-mini
+    system_prompt: "You are testing the User MCP connection. Try listing projects."
+    tools:
+      - test_user_mcp
+
+workflows:
+  test_workflow:
+    - steps:
+      - agent: test_agent
+        input: "List all projects to test the connection"
+        output:
+          to: user
+
+# Test with:
+# export USER_API_KEY="your-api-key"
+# langswarm run test_workflow --input "test connection"

@@ -1,0 +1,147 @@
+workflows:
+  - id: use_tasklist_tool
+    description: "Complete workflow for processing natural language task management requests"
+    steps:
+      - id: normalize_input
+        agent: input_normalizer
+        input: |
+          user_input: ${user_input}
+          user_query: ${user_query}
+        output:
+          to: normalized_input
+
+      - id: classify_action
+        agent: action_classifier
+        input: |
+          User request: ${context.step_outputs.normalize_input}
+          
+          Determine what task operation the user wants to perform.
+        output:
+          to: action_type
+
+      - id: extract_details
+        agent: task_detail_extractor
+        input: |
+          User request: ${context.step_outputs.normalize_input}
+          Action type: ${context.step_outputs.classify_action}
+          
+          Extract the relevant task details for this ${context.step_outputs.classify_action} operation.
+        output:
+          to: task_details
+
+      - id: build_parameters
+        agent: parameter_builder
+        input: |
+          Action: ${context.step_outputs.classify_action}
+          Details: ${context.step_outputs.extract_details}
+          
+          Build the MCP tool call parameters.
+        output:
+          to: mcp_params
+
+      - id: execute_task_operation
+        tool: tasklist
+        input: "${context.step_outputs.build_parameters}"
+        output:
+          to: task_result
+
+      - id: format_response
+        agent: response_formatter
+        input: |
+          Operation: ${context.step_outputs.classify_action}
+          Raw result: ${context.step_outputs.execute_task_operation}
+          Original request: ${context.step_outputs.normalize_input}
+          
+          Format this into a user-friendly response.
+        output:
+          to: final_response
+
+    # Error handling workflow
+    error_handling:
+      - condition: "task_result contains 'Error:'"
+        steps:
+          - id: handle_error
+            agent: error_handler
+            input: |
+              Error details: ${context.step_outputs.execute_task_operation}
+              User request: ${context.step_outputs.normalize_input}
+              Attempted action: ${context.step_outputs.classify_action}
+              
+              Provide helpful error guidance to the user.
+            output:
+              to: final_response
+
+  - id: direct_task_workflow
+    description: "Simplified workflow for direct MCP tool calls"
+    steps:
+      - id: execute_direct_task
+        tool: tasklist
+        input: "${user_input}"
+        output:
+          to: direct_result
+
+      - id: format_direct_response
+        agent: response_formatter
+        input: |
+          Operation: direct_call
+          Raw result: ${context.step_outputs.execute_direct_task}
+          
+          Format this result for the user.
+        output:
+          to: final_response
+
+  - id: list_tasks_workflow
+    description: "Quick workflow specifically for listing tasks"
+    steps:
+      - id: list_all_tasks
+        tool: tasklist
+        input: |
+          {
+            "method": "list_tasks",
+            "params": {}
+          }
+        output:
+          to: task_list
+
+      - id: format_task_list
+        agent: response_formatter
+        input: |
+          Operation: list_tasks
+          Raw result: ${context.step_outputs.list_all_tasks}
+          
+          Format the task list in a clear, readable way.
+        output:
+          to: final_response
+
+  - id: create_task_workflow
+    description: "Dedicated workflow for creating new tasks"
+    steps:
+      - id: extract_task_info
+        agent: task_detail_extractor
+        input: |
+          User request: ${user_input}
+          Action type: create_task
+          
+          Extract the task description, priority, and notes.
+        output:
+          to: new_task_details
+
+      - id: create_new_task
+        tool: tasklist
+        input: |
+          {
+            "method": "create_task",
+            "params": ${context.step_outputs.extract_task_info}
+          }
+        output:
+          to: creation_result
+
+      - id: confirm_creation
+        agent: response_formatter
+        input: |
+          Operation: create_task
+          Raw result: ${context.step_outputs.creation_result}
+          
+          Confirm the task creation to the user.
+        output:
+          to: final_response

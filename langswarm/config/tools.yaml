@@ -1,0 +1,42 @@
+# LangSwarm Tools Configuration
+# This file defines the tools available to LangSwarm agents
+
+tools:
+  # BigQuery Vector Search MCP Tool
+  - name: "vector_search"
+    type: "local_mcp"
+    description: "Search through company knowledge base using vector similarity"
+    mcp_server: "bigquery_vector_search"
+    priority: 10
+    enabled: true
+    capabilities:
+      - "similarity_search"
+      - "list_datasets" 
+      - "dataset_info"
+      - "get_content"
+    usage_examples:
+      - "Search for information about our pricing policy"
+      - "Find documentation about API endpoints"
+      - "Look up company policies and procedures"
+      - "Search for technical information"
+
+# Global tool settings
+settings:
+  max_concurrent_tools: 5
+  tool_timeout_seconds: 30
+  enable_tool_caching: true
+  cache_ttl_seconds: 300
+
+# Tool categories for organization
+categories:
+  knowledge:
+    - "vector_search"
+  
+  # Future categories can be added here
+  # communication:
+  #   - "email_tool"
+  #   - "slack_tool"
+  # 
+  # data:
+  #   - "database_tool"
+  #   - "spreadsheet_tool"

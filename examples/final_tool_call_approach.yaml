@@ -1,0 +1,241 @@
+# Final Tool Call Approach - Clean & Efficient
+# ===============================================
+# Shows the preferred tool call approach with chaining capabilities
+
+version: "1.0"
+project_name: "tool-call-approach-final"
+
+# === Tools Configuration ===
+tools:
+  # Smart filesystem with get_allowed_paths capability
+  - id: smart_fs
+    type: mcpfilesystem
+    description: "Smart filesystem with permission discovery"
+    gcs_project_id: "my-project"
+    permissions:
+      "/": "read_only"
+      "~/workspace/": "read_write"
+      "~/projects/": "read_write" 
+      "~/sensitive/": "forbidden"
+      "gs://data/": "read_only"
+      "gs://outputs/": "read_write"
+      "gs://private/": "forbidden"
+
+  # Smart tasklist
+  - id: smart_tasks
+    type: mcptasklist
+    description: "Smart task management"
+
+# === Smart Agents Using Tool Call Discovery ===
+agents:
+  # Agent that discovers permissions via tool calls
+  - id: discovery_agent
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You are a smart filesystem agent that discovers capabilities via tool calls.
+      
+      **PREFERRED WORKFLOW:**
+      
+      1. **Discovery First**: When working with files, start by calling get_allowed_paths
+      2. **Informed Decisions**: Use permission info to choose optimal paths  
+      3. **Chain Efficiently**: Use information from one call to inform the next
+      4. **Explain Actions**: Tell users what you discovered and why you chose specific paths
+      
+      **TOOL CALL CHAINING EXAMPLE:**
+      
+      User: "Save my analysis results"
+      
+      Response 1 (Discovery):
+      ```json
+      {
+        "response": "I'll first discover my filesystem permissions to choose the best save location.",
+        "mcp": {
+          "tool": "smart_fs",
+          "method": "get_allowed_paths",
+          "params": {}
+        }
+      }
+      ```
+      
+      Response 2 (Action):
+      ```json
+      {
+        "response": "Perfect! I can write to ~/workspace/ and gs://outputs/. I'll save locally for quick access.",
+        "mcp": {
+          "tool": "smart_fs",
+          "method": "write_file", 
+          "params": {
+            "path": "~/workspace/analysis_results.json",
+            "content": "...",
+            "create_dirs": true
+          }
+        }
+      }
+      ```
+      
+      **Benefits of This Approach:**
+      - ✅ Clean tool-based architecture
+      - ✅ Agent discovers capabilities dynamically  
+      - ✅ Permissions always current with tool config
+      - ✅ Flexible and adaptable to changes
+      - ✅ Clear separation of concerns
+      
+    tools:
+      - smart_fs
+      - smart_tasks
+
+  # Agent optimized for complex workflows
+  - id: workflow_agent
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You excel at complex tool call workflows with intelligent chaining.
+      
+      **COMPLEX CHAINING PATTERNS:**
+      
+      **Pattern 1: Validate → Execute → Confirm**
+      ```
+      get_allowed_paths → check permissions
+      write_file → execute operation  
+      get_file_info → confirm success
+      ```
+      
+      **Pattern 2: Discovery → Analysis → Multi-Action**
+      ```
+      get_allowed_paths → discover capabilities
+      list_directory → analyze existing files
+      write_file → save new content
+      create_task → log the action
+      ```
+      
+      **Pattern 3: Read → Process → Write**
+      ```
+      get_allowed_paths → find read/write locations
+      read_file → get source data
+      write_file → save processed results
+      ```
+      
+      **Intelligent Decision Making:**
+      - Use permission info to choose optimal storage (local vs cloud)
+      - Check existing files before overwriting
+      - Create directory structure as needed
+      - Handle permission errors gracefully
+      - Provide clear explanations of choices
+      
+    tools:
+      - smart_fs
+      - smart_tasks
+
+# === Workflow Examples ===
+workflows:
+  # Discovery-driven workflow
+  smart_discovery_workflow:
+    steps:
+      - agent: discovery_agent
+        input: |
+          Handle this filesystem task: ${user_input}
+          
+          Use the discovery-first approach:
+          1. Call get_allowed_paths to understand your permissions
+          2. Use that information to make optimal decisions
+          3. Execute your plan with appropriate tool calls
+          4. Explain your choices to the user
+        output:
+          to: user
+
+  # Complex chaining workflow
+  advanced_workflow:
+    steps:
+      - agent: workflow_agent
+        input: |
+          Execute this complex request: ${user_input}
+          
+          Use intelligent tool call chaining:
+          - Discovery → Analysis → Action → Confirmation
+          - Chain multiple tools within this single step
+          - Adapt based on what you discover
+          - Handle errors gracefully
+        output:
+          to: user
+
+# =================================================================
+# REAL AGENT INTERACTION EXAMPLES:
+# =================================================================
+
+# Example 1: Smart File Creation
+# User: "Create a backup of my project data"
+#
+# Agent Response Chain:
+# 1. get_allowed_paths → "I can write to ~/workspace/ and gs://outputs/"
+# 2. list_directory → "Found project files in ~/projects/"  
+# 3. write_file → "Creating backup in ~/workspace/backup.zip"
+# 4. Final response: "✅ Backup created at ~/workspace/backup.zip (chose local for speed)"
+
+# Example 2: Intelligent Error Handling
+# User: "Save this to ~/private/secret.txt"
+#
+# Agent Response Chain:
+# 1. get_allowed_paths → "~/private/ is forbidden"
+# 2. Response: "I cannot save to ~/private/ due to permissions. I can save to ~/workspace/ instead."
+# 3. write_file → "Saving to ~/workspace/secret.txt"
+
+# Example 3: Multi-Tool Coordination
+# User: "Process my task list and generate a report"
+#
+# Agent Response Chain:
+# 1. get_allowed_paths → "Can write to ~/workspace/ and gs://outputs/"
+# 2. list_tasks → "Found 5 active tasks"
+# 3. write_file → "Creating report at ~/workspace/task_report.json"
+# 4. create_task → "Added 'report generated' task"
+
+# =================================================================
+# BENEFITS OF TOOL CALL APPROACH:
+# =================================================================
+
+# ✅ **Tool-Centric Design**: Aligns with MCP/tool architecture
+# ✅ **Dynamic Discovery**: Always gets current permissions  
+# ✅ **Flexible Adaptation**: Can adapt to permission changes
+# ✅ **Clear Separation**: Tool config vs agent behavior
+# ✅ **Intelligent Chaining**: Information flows between calls
+# ✅ **Error Recovery**: Can handle and adapt to failures
+# ✅ **User Transparency**: Clear explanation of decisions
+# ✅ **Maintainable**: Tool permissions independent of prompts
+
+# =================================================================
+# COMPARISON: TOOL CALL vs PROMPT INJECTION
+# =================================================================
+
+# **Tool Call Approach (CHOSEN):**
+# - Permissions discovered via get_allowed_paths()
+# - Agent makes informed decisions based on tool response
+# - Flexible and adapts to runtime conditions
+# - Clean separation between tool config and agent behavior
+# - Follows MCP/tool architecture principles
+
+# **Prompt Injection Approach (ALTERNATIVE):**
+# - Permissions injected into system prompt automatically
+# - Agent knows permissions without tool calls
+# - Slightly more efficient (no discovery call needed)
+# - Tighter coupling between tool config and prompts
+# - Less flexible for runtime adaptation
+
+# **Why Tool Call Approach is Preferred:**
+# 1. Better aligns with tool-based architecture
+# 2. More flexible and adaptable
+# 3. Cleaner separation of concerns
+# 4. Supports dynamic permission discovery
+# 5. Enables intelligent chaining workflows
+# 6. More maintainable long-term
+
+# =================================================================
+# IMPLEMENTATION SUMMARY:
+# =================================================================
+
+# ✅ **get_allowed_paths Method**: Available in FilesystemMCPTool
+# ✅ **Tool Call Chaining**: Supported within single workflow steps  
+# ✅ **Context Preservation**: Agent remembers all previous responses
+# ✅ **Error Handling**: Graceful fallbacks and alternatives
+# ✅ **User Experience**: Clear explanations and intelligent choices
+
+# **Ready to Use!** 🚀

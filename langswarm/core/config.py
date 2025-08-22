@@ -827,11 +827,25 @@ class LangSwarmConfigLoader:
         from langswarm.mcp.tools.filesystem.main import FilesystemMCPTool
         from langswarm.mcp.tools.mcpgithubtool.main import MCPGitHubTool
         from langswarm.mcp.tools.dynamic_forms.main import DynamicFormsMCPTool
+        from langswarm.mcp.tools.remote.main import RemoteMCPTool
+        from langswarm.mcp.tools.tasklist.main import TasklistMCPTool
+        from langswarm.mcp.tools.message_queue_publisher.main import MessageQueuePublisherMCPTool
+        from langswarm.mcp.tools.message_queue_consumer.main import MessageQueueConsumerMCPTool
+        from langswarm.mcp.tools.gcp_environment.main import GCPEnvironmentMCPTool
+        from langswarm.mcp.tools.codebase_indexer.main import CodebaseIndexerMCPTool
+        from langswarm.mcp.tools.workflow_executor.main import WorkflowExecutorMCPTool
         
         self.tool_classes = {
             "mcpfilesystem": FilesystemMCPTool,
             "mcpgithubtool": MCPGitHubTool,
             "mcpforms": DynamicFormsMCPTool,
+            "mcpremote": RemoteMCPTool,
+            "mcptasklist": TasklistMCPTool,
+            "mcpmessage_queue_publisher": MessageQueuePublisherMCPTool,
+            "mcpmessage_queue_consumer": MessageQueueConsumerMCPTool,
+            "mcpcodebase_indexer": CodebaseIndexerMCPTool,
+            "mcpworkflow_executor": WorkflowExecutorMCPTool,
+            "mcpgcp_environment": GCPEnvironmentMCPTool,
             # add more here (or via register_tool_class below)
         }
 
@@ -1800,13 +1814,26 @@ Adapt your approach based on the user's needs, drawing from your combined expert
         yaml.SafeLoader.add_constructor("!secret", self._make_secret_constructor(secrets_dict))
 
     def _initialize_brokers(self):
+        # Import message broker classes on demand
+        try:
+            from langswarm.mcp.tools.message_queue_publisher.main import InMemoryBroker, RedisBroker, GCPPubSubBroker
+        except ImportError:
+            # If MCP tools not available, skip broker initialization
+            return
+            
         for broker in self.config_data.get("brokers", []):
-            if broker["type"] in ["internal", "local"]:
-                self.brokers[broker["id"]] = InternalQueueBroker()
+            if broker["type"] in ["internal", "local", "in_memory"]:
+                self.brokers[broker["id"]] = InMemoryBroker()
             elif broker["type"] == "redis":
-                self.brokers[broker["id"]] = RedisMessageBroker(**broker.get("settings", {}))
-            elif broker["type"] == "gcp":
-                self.brokers[broker["id"]] = GCPMessageBroker(**broker.get("settings", {}))
+                settings = broker.get("settings", {})
+                self.brokers[broker["id"]] = RedisBroker(**settings)
+            elif broker["type"] in ["gcp", "gcp_pubsub"]:
+                settings = broker.get("settings", {})
+                project = settings.get("project") or settings.get("gcp_project")
+                if project:
+                    self.brokers[broker["id"]] = GCPPubSubBroker(project)
+                else:
+                    print(f"Warning: GCP broker {broker['id']} missing project configuration")
 
     def _make_secret_constructor(self, secrets_dict):
         def secret_constructor(loader, node):
@@ -1911,7 +1938,12 @@ Adapt your approach based on the user's needs, drawing from your combined expert
     
     def _initialize_retrievers(self):
         for retriever in self.config_data.get("retrievers", []):
-            self.retrievers[retriever["id"]] = self._initialize_component(retriever, ChromaDBAdapter)
+            try:
+                from langswarm.memory.adapters._langswarm.chromadb.main import ChromaDBAdapter
+                self.retrievers[retriever["id"]] = self._initialize_component(retriever, ChromaDBAdapter)
+            except ImportError:
+                print(f"Warning: ChromaDB not available, skipping retriever {retriever['id']}")
+                continue
         
     def _initialize_tools(self):
         self.tools_metadata = {}  # New dict for storing metadata explicitly
@@ -2166,7 +2198,14 @@ Adapt your approach based on the user's needs, drawing from your combined expert
     def _initialize_plugins(self):
         for plugin in self.config_data.get("plugins", []):
             if plugin["type"].lower() == "processtoolkit":
-                self.plugins[plugin["id"]] = self._initialize_component(plugin, ProcessToolkit)
+                try:
+                    # ProcessToolkit import would go here if it exists
+                    # For now, skip since it's not defined
+                    print(f"Warning: ProcessToolkit not available, skipping plugin {plugin['id']}")
+                    continue
+                except ImportError:
+                    print(f"Warning: ProcessToolkit not available, skipping plugin {plugin['id']}")
+                    continue
 
     def _initialize_component(self, config, cls):
         # For MCP tools, ensure all required fields are provided
@@ -2338,6 +2377,8 @@ Adapt your approach based on the user's needs, drawing from your combined expert
             plugins=_lookup_many(agent.get("plugins", []), self.plugins)
         )
     
+
+
     def _load_prompt_fragments(self, agent):
         """Load conditional prompt fragments based on agent configuration"""
         fragments = []

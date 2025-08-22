@@ -1,0 +1,262 @@
+# Complete Dynamic Permissions Demo
+# ==================================
+# Shows the complete solution where agents automatically receive 
+# their filesystem permissions in their system prompt
+
+version: "1.0"
+project_name: "complete-dynamic-permissions"
+
+# === Tools with Custom Permissions ===
+tools:
+  # Production filesystem with strict permissions
+  - id: production_fs
+    type: mcpfilesystem
+    description: "Production filesystem with strict permission boundaries"
+    gcs_project_id: "production-project-123"
+    
+    permissions:
+      # Local filesystem - very restricted in production
+      "/": "read_only"
+      "~/": "read_only"
+      "~/app_workspace/": "read_write"
+      "~/logs/": "read_only"
+      "~/sensitive/": "forbidden"
+      "~/private/": "forbidden"
+      "/tmp/app_temp/": "read_write"
+      
+      # Cloud storage - production buckets
+      "gs://": "read_only"
+      "gs://prod-data/": "read_only"
+      "gs://prod-outputs/": "read_write"
+      "gs://user-uploads/": "read_write"
+      "gs://system-backups/": "forbidden"
+      "gs://financial-data/": "forbidden"
+      "gs://hr-records/": "forbidden"
+
+  # Development filesystem with relaxed permissions
+  - id: dev_fs
+    type: mcpfilesystem
+    description: "Development filesystem with relaxed permissions"
+    gcs_project_id: "dev-project-456"
+    
+    permissions:
+      # Local filesystem - more permissive for development
+      "/": "read_only"
+      "~/": "read_only"
+      "~/dev_workspace/": "read_write"
+      "~/projects/": "read_write"
+      "~/experiments/": "read_write"
+      "/tmp/": "read_write"
+      
+      # Cloud storage - development buckets
+      "gs://": "read_only"
+      "gs://dev-data/": "read_write"
+      "gs://test-outputs/": "read_write"
+      "gs://experiments/": "read_write"
+      "gs://staging-data/": "read_only"
+
+# === Agents - NO MANUAL PERMISSION LISTING NEEDED ===
+agents:
+  # Production agent - automatically gets production permissions
+  - id: production_agent
+    agent_type: openai
+    model: gpt-4o
+    # Notice: NO manual permission listing in system prompt!
+    # LangSwarm automatically injects the production_fs permissions above
+    system_prompt: |
+      You are a production file management agent.
+      
+      Your filesystem permissions are automatically provided above.
+      You operate in a production environment with strict security boundaries.
+      
+      Key behaviors:
+      - Always respect permission boundaries - security is paramount
+      - Use ~/app_workspace/ for application files and outputs
+      - Read from prod-data buckets, write to prod-outputs buckets
+      - Never attempt operations on forbidden paths
+      - Provide clear explanations when operations are restricted
+      - Log all significant file operations
+      
+      When users request file operations:
+      1. Check your permission boundaries first
+      2. Choose the most appropriate location based on security level
+      3. Explain your choices and any limitations
+      4. Handle errors gracefully with helpful suggestions
+    
+    tools:
+      - production_fs
+
+  # Development agent - automatically gets development permissions
+  - id: dev_agent
+    agent_type: openai
+    model: gpt-4o-mini
+    # Notice: NO manual permission listing needed here either!
+    # LangSwarm automatically injects the dev_fs permissions above
+    system_prompt: |
+      You are a development environment file assistant.
+      
+      Your filesystem permissions are automatically provided above.
+      You work in a development environment with more flexibility.
+      
+      Key behaviors:
+      - Use your expanded permissions for rapid development
+      - Experiment freely within your workspace boundaries
+      - Save experiments to appropriate development buckets
+      - Test new approaches in your sandbox areas
+      - Document your findings and share results
+      
+      You have broader access than production agents, but still respect boundaries.
+    
+    tools:
+      - dev_fs
+
+  # Multi-environment agent with both tools
+  - id: multi_env_agent
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You are a multi-environment file coordinator.
+      
+      Your filesystem permissions for BOTH environments are provided above.
+      You can work across development and production boundaries.
+      
+      Key behaviors:
+      - Use development tools for testing and experimentation
+      - Use production tools for final outputs and deployment
+      - Never mix development and production data inappropriately
+      - Clearly indicate which environment you're using for each operation
+      - Help users understand the differences between environments
+    
+    tools:
+      - dev_fs
+      - production_fs
+
+# === Example Workflows ===
+workflows:
+  # Production deployment workflow
+  production_workflow:
+    steps:
+      - agent: production_agent
+        input: |
+          Handle this production request with security in mind: ${user_input}
+          
+          Use your automatically provided permission information to:
+          - Choose appropriate secure locations
+          - Respect all forbidden boundaries  
+          - Explain any security limitations
+        output:
+          to: user
+
+  # Development workflow
+  development_workflow:
+    steps:
+      - agent: dev_agent
+        input: |
+          Work on this development task: ${user_input}
+          
+          Use your expanded development permissions to:
+          - Experiment in your workspace areas
+          - Try different approaches freely
+          - Document your process
+        output:
+          to: user
+
+  # Cross-environment workflow
+  dev_to_prod_workflow:
+    steps:
+      # Development phase
+      - agent: dev_agent
+        input: |
+          Develop and test this request: ${user_input}
+          
+          Work in your development environment first.
+        output:
+          to: next_step
+      
+      # Production deployment
+      - agent: production_agent
+        input: |
+          Deploy this tested solution to production: ${previous_output}
+          
+          Use your production permissions to deploy safely.
+        output:
+          to: user
+
+# =================================================================
+# WHAT EACH AGENT AUTOMATICALLY RECEIVES:
+# =================================================================
+
+# ## 📁 Filesystem Access Information
+# 
+# You have access to filesystem tools with the following permissions:
+# 
+# ### [Tool Name] ([tool_id])
+# 
+# **Local Filesystem:**
+# - **📝 Read/Write Access**: ~/app_workspace/, /tmp/app_temp/
+#   - You can create, read, update, and delete files in these paths
+# - **👁️ Read-Only Access**: /, ~/, ~/logs/
+#   - You can list directories and read files, but cannot modify them  
+# - **🚫 Forbidden Paths**: ~/sensitive/, ~/private/
+#   - These paths are off-limits - operations will fail
+# 
+# **Google Cloud Storage** (Project: production-project-123):
+# - **📝 Read/Write GCS Paths**: gs://prod-outputs/, gs://user-uploads/
+#   - Full CRUD operations on these GCS buckets/paths
+# - **👁️ Read-Only GCS Paths**: gs://, gs://prod-data/
+#   - Can list and read from these GCS buckets/paths
+# - **🚫 Forbidden GCS Paths**: gs://system-backups/, gs://financial-data/, gs://hr-records/
+#   - These GCS paths are off-limits
+# 
+# **Usage Guidelines for [tool_id]:**
+# - Always respect permission boundaries - operations outside allowed paths will fail
+# - Use read/write paths for saving outputs, creating files, and data processing
+# - Use read-only paths for accessing source data and reference materials
+# - Never attempt operations on forbidden paths
+# - For GCS paths, use format: `gs://bucket-name/path/to/object`
+
+# =================================================================
+# EXAMPLE INTERACTIONS:
+# =================================================================
+
+# Example 1: Production Agent
+# User: "Save this analysis report"
+# Agent: "I'll save it to ~/app_workspace/reports/analysis.json where I have write access, 
+#         and backup to gs://prod-outputs/ for team access. I cannot use ~/sensitive/ as 
+#         it's forbidden in my permissions."
+
+# Example 2: Development Agent  
+# User: "Let me test different data processing approaches"
+# Agent: "Perfect! I have access to ~/experiments/ where I can create different test files, 
+#         and gs://experiments/ for cloud testing. I'll document each approach in 
+#         ~/dev_workspace/results/."
+
+# Example 3: Multi-Environment Agent
+# User: "Move this from development to production"
+# Agent: "I'll read from gs://dev-data/ using my dev_fs tool, then deploy to 
+#         gs://prod-outputs/ using my production_fs tool. This ensures proper 
+#         environment separation."
+
+# =================================================================
+# BENEFITS OF AUTOMATIC INJECTION:
+# =================================================================
+
+# ✅ **Zero Manual Configuration**: No need to list permissions in system prompts
+# ✅ **Always Accurate**: Permissions sync automatically with tool configuration  
+# ✅ **Environment-Specific**: Different tools = different permission sets
+# ✅ **Maintainable**: Change once in tool config, affects all agents
+# ✅ **Secure**: Prevents permission drift between config and prompts
+# ✅ **Scalable**: Works with any number of filesystem tools and agents
+# ✅ **User-Friendly**: Clear visual formatting and usage guidelines
+# ✅ **Multi-Tool Support**: Agents with multiple filesystem tools get all permissions
+
+# =================================================================
+# MIGRATION CHECKLIST:
+# =================================================================
+
+# ✅ Define permissions in tool configuration (not system prompts)
+# ✅ Remove manual permission listings from agent system prompts  
+# ✅ Let LangSwarm auto-inject permission information
+# ✅ Agents automatically understand their boundaries
+# ✅ Maintain single source of truth for permissions
+# ✅ Enjoy consistent, maintainable permission management!

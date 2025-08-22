@@ -1,0 +1,208 @@
+workflows:
+  # Main workflow for comprehensive message queue operations
+  use_message_queue_tool:
+    - steps:
+      - agent: input_normalizer
+        input: "${user_input}"
+        output:
+          to: action_classifier
+      
+      - agent: action_classifier
+        input: "${previous_output}"
+        output:
+          to: message_preparer
+      
+      - agent: message_preparer
+        input: |
+          Action: ${previous_output.action}
+          Original input: ${input_normalizer.output}
+        output:
+          to: parameter_builder
+      
+      - agent: parameter_builder
+        input: |
+          Action: ${action_classifier.output.action}
+          Prepared message: ${previous_output}
+          Original request: ${input_normalizer.output}
+        output:
+          to: tool
+      
+      - tool: message_queue_publisher
+        input: |
+          {
+            "method": "${action_classifier.output.action}",
+            "params": ${parameter_builder.output}
+          }
+        output:
+          to: response_formatter
+      
+      - agent: response_formatter
+        input: |
+          Tool result: ${previous_output}
+          Original action: ${action_classifier.output.action}
+        output:
+          to: user
+
+  # Direct message publishing workflow (faster for known operations)
+  direct_publish_workflow:
+    - steps:
+      - agent: message_preparer
+        input: "${user_input}"
+        output:
+          to: tool
+      
+      - tool: message_queue_publisher
+        input: |
+          {
+            "method": "publish_message",
+            "params": ${previous_output.structured_message}
+          }
+        output:
+          to: response_formatter
+      
+      - agent: response_formatter
+        input: "${previous_output}"
+        output:
+          to: user
+
+  # Channel management workflow
+  channel_management_workflow:
+    - steps:
+      - agent: action_classifier
+        input: "${user_input}"
+        output:
+          to: tool
+      
+      - tool: message_queue_publisher
+        input: |
+          {
+            "method": "${previous_output.action}",
+            "params": {}
+          }
+        output:
+          to: response_formatter
+      
+      - agent: response_formatter
+        input: "${previous_output}"
+        output:
+          to: user
+
+  # Error handling workflow
+  error_handling_workflow:
+    - steps:
+      - agent: input_normalizer
+        input: "${user_input}"
+        output:
+          to: error_handler
+        on_error:
+          to: error_handler
+      
+      - agent: error_handler
+        input: |
+          Error context: ${error_context}
+          Original input: ${user_input}
+          Failed step: ${failed_step}
+        output:
+          to: user
+
+  # Batch message publishing workflow
+  batch_publish_workflow:
+    - steps:
+      - agent: input_normalizer
+        input: "${user_input}"
+        output:
+          to: message_preparer
+      
+      - agent: message_preparer
+        input: |
+          Batch operation: ${previous_output}
+          Expected format: Array of messages to publish
+        output:
+          to: parameter_builder
+      
+      - agent: parameter_builder
+        input: |
+          Batch messages: ${previous_output}
+          Create multiple publish_message calls
+        output:
+          to: tool
+      
+      - tool: message_queue_publisher
+        input: "${previous_output}"
+        output:
+          to: response_formatter
+        loop: true  # Process each message in batch
+      
+      - agent: response_formatter
+        input: |
+          Batch results: ${previous_output}
+          Format as summary of all operations
+        output:
+          to: user
+
+# Workflow routing based on intent
+workflow_routes:
+  # Route based on detected action
+  publish_message: "direct_publish_workflow"
+  list_channels: "channel_management_workflow" 
+  get_broker_stats: "channel_management_workflow"
+  
+  # Route based on input complexity
+  simple_publish: "direct_publish_workflow"
+  complex_publish: "use_message_queue_tool"
+  batch_operations: "batch_publish_workflow"
+  
+  # Route based on error conditions
+  error_recovery: "error_handling_workflow"
+
+# Intent detection patterns
+intent_patterns:
+  publish_message:
+    keywords: ["send", "publish", "post", "queue", "message", "notify", "dispatch"]
+    phrases: [
+      "send message to",
+      "publish to queue", 
+      "notify via channel",
+      "dispatch task to",
+      "queue message for"
+    ]
+    
+  list_channels:
+    keywords: ["list", "show", "channels", "queues", "available"]
+    phrases: [
+      "list channels",
+      "show queues",
+      "available channels",
+      "what channels exist"
+    ]
+    
+  get_broker_stats:
+    keywords: ["stats", "statistics", "status", "health", "broker", "info"]
+    phrases: [
+      "broker status",
+      "queue statistics", 
+      "system health",
+      "broker info"
+    ]
+
+# Example usage patterns for different message types
+usage_examples:
+  task_notification:
+    input: "Send a task completion notification to the workers queue"
+    workflow: "use_message_queue_tool"
+    expected_output: "Task notification sent to workers channel"
+    
+  system_alert:
+    input: "Publish an error alert: Database connection failed"
+    workflow: "direct_publish_workflow"
+    expected_output: "Alert published to system monitoring"
+    
+  agent_communication:
+    input: "Send workflow results to the analysis-agent channel"
+    workflow: "use_message_queue_tool"
+    expected_output: "Results forwarded to analysis-agent"
+    
+  batch_notifications:
+    input: "Send completion notifications for tasks: [task1, task2, task3]"
+    workflow: "batch_publish_workflow"
+    expected_output: "Batch notifications sent successfully"

@@ -1,0 +1,273 @@
+# Tool Call Chaining Example
+# =========================
+# Shows how agents can chain multiple tool calls within a single workflow step
+
+version: "1.0"
+project_name: "tool-call-chaining-demo"
+
+# === Tools Configuration ===
+tools:
+  # Filesystem tool with get_allowed_paths capability
+  - id: smart_filesystem
+    type: mcpfilesystem
+    description: "Smart filesystem with self-discovery capabilities"
+    gcs_project_id: "demo-project"
+    permissions:
+      "/": "read_only"
+      "~/workspace/": "read_write"
+      "~/sensitive/": "forbidden"
+      "gs://public-data/": "read_only"
+      "gs://outputs/": "read_write"
+      "gs://confidential/": "forbidden"
+
+  # Tasklist tool for demonstration
+  - id: smart_tasklist
+    type: mcptasklist
+    description: "Smart task management with persistence"
+
+# === Agents with Tool Call Chaining ===
+agents:
+  # Agent that chains tool calls in single workflow step
+  - id: chaining_agent
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You are a smart agent capable of chaining tool calls efficiently.
+      
+      **TOOL CALL CHAINING WORKFLOW:**
+      
+      When you need to work with files:
+      1. FIRST: Call get_allowed_paths to discover your permissions
+      2. THEN: Use that information to make informed file operations
+      3. FINALLY: Provide results to user with permission context
+      
+      **CHAINING EXAMPLE:**
+      ```json
+      {
+        "response": "I'll first discover my filesystem permissions, then create the file you requested.",
+        "mcp": {
+          "tool": "smart_filesystem",
+          "method": "get_allowed_paths",
+          "params": {}
+        }
+      }
+      ```
+      
+      After getting the response, continue with:
+      ```json
+      {
+        "response": "Based on my permissions (showing read/write: ~/workspace/), I'll save the file there.",
+        "mcp": {
+          "tool": "smart_filesystem", 
+          "method": "write_file",
+          "params": {
+            "path": "~/workspace/analysis.json",
+            "content": "...",
+            "create_dirs": true
+          }
+        }
+      }
+      ```
+      
+      **KEY PRINCIPLE**: Use information from one tool call to inform the next.
+      This creates intelligent, context-aware behavior within a single workflow step.
+      
+    tools:
+      - smart_filesystem
+      - smart_tasklist
+
+  # Agent that demonstrates complex chaining
+  - id: advanced_chaining_agent
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You are an advanced agent that performs complex tool call sequences.
+      
+      **ADVANCED CHAINING PATTERNS:**
+      
+      1. **Discovery → Analysis → Action**
+         - Discover capabilities/permissions
+         - Analyze available options
+         - Take informed action
+      
+      2. **Validate → Execute → Confirm**
+         - Check if operation is possible
+         - Execute the operation
+         - Confirm success and provide feedback
+      
+      3. **Read → Process → Write**
+         - Read source data/configuration
+         - Process and transform information
+         - Write results to appropriate location
+      
+      **EXAMPLE COMPLEX CHAIN:**
+      User: "Create a project report with my current tasks"
+      
+      Response Chain:
+      1. get_allowed_paths (filesystem) → discover write locations
+      2. list_tasks (tasklist) → get current tasks  
+      3. get_file_info (filesystem) → check if report template exists
+      4. read_file (filesystem) → read template if exists
+      5. write_file (filesystem) → create report with tasks
+      6. create_task (tasklist) → add "report created" task
+      
+      Each call builds on the previous one's results.
+      
+    tools:
+      - smart_filesystem
+      - smart_tasklist
+
+  # Agent optimized for efficient workflows
+  - id: efficient_agent
+    agent_type: openai
+    model: gpt-4o-mini
+    system_prompt: |
+      You are optimized for efficient tool call sequences.
+      
+      **EFFICIENCY PRINCIPLES:**
+      
+      1. **Front-load Discovery**: Get all needed info early
+      2. **Batch Related Operations**: Group similar calls together
+      3. **Cache Information**: Remember results within the conversation
+      4. **Plan Ahead**: Think through the full sequence before starting
+      
+      **EFFICIENT PATTERNS:**
+      
+      ✅ GOOD:
+      - get_allowed_paths → analyze options → execute optimal sequence
+      - Explain your plan, then execute it step by step
+      
+      ❌ INEFFICIENT:
+      - Trial and error with individual calls
+      - Repeating discovery calls unnecessarily
+      
+    tools:
+      - smart_filesystem
+      - smart_tasklist
+
+# === Workflow Examples ===
+workflows:
+  # Simple chaining workflow
+  discovery_then_action:
+    steps:
+      - agent: chaining_agent
+        input: |
+          Handle this request by first discovering your capabilities: ${user_input}
+          
+          Use tool call chaining:
+          1. Discover your filesystem permissions
+          2. Use that knowledge to complete the task efficiently
+        output:
+          to: user
+
+  # Complex multi-step workflow  
+  advanced_chaining_workflow:
+    steps:
+      - agent: advanced_chaining_agent
+        input: |
+          Execute this complex request: ${user_input}
+          
+          Use advanced chaining patterns:
+          - Discovery → Analysis → Action
+          - Validate → Execute → Confirm
+          - Read → Process → Write
+          
+          Chain your tool calls intelligently within this single step.
+        output:
+          to: user
+
+  # Efficient workflow demonstration
+  efficient_workflow:
+    steps:
+      - agent: efficient_agent
+        input: |
+          Complete this task efficiently: ${user_input}
+          
+          Front-load your discovery, plan your approach, then execute.
+          Minimize unnecessary tool calls while being thorough.
+        output:
+          to: user
+
+# =================================================================
+# TOOL CALL CHAINING EXAMPLES:
+# =================================================================
+
+# Example 1: Basic Discovery → Action Chain
+# User: "Save my analysis to a file"
+# 
+# Agent Response 1:
+# {
+#   "response": "I'll first discover my filesystem permissions to choose the best location.",
+#   "mcp": {
+#     "tool": "smart_filesystem",
+#     "method": "get_allowed_paths", 
+#     "params": {}
+#   }
+# }
+#
+# Agent Response 2 (after getting permissions):
+# {
+#   "response": "Based on my permissions showing write access to ~/workspace/, I'll save your analysis there.",
+#   "mcp": {
+#     "tool": "smart_filesystem",
+#     "method": "write_file",
+#     "params": {
+#       "path": "~/workspace/analysis.json",
+#       "content": "...",
+#       "create_dirs": true
+#     }
+#   }
+# }
+
+# Example 2: Complex Multi-Tool Chain
+# User: "Create a project status report"
+#
+# Agent Response Sequence:
+# 1. get_allowed_paths (filesystem) → discover where I can save
+# 2. list_tasks (tasklist) → get current project tasks
+# 3. read_file (filesystem) → check for existing reports
+# 4. write_file (filesystem) → create new status report
+# 5. create_task (tasklist) → add "report generated" task
+
+# Example 3: Validation Chain
+# User: "Delete old backup files"
+#
+# Agent Response Sequence:  
+# 1. get_allowed_paths (filesystem) → check delete permissions
+# 2. list_directory (filesystem) → find backup files
+# 3. get_file_info (filesystem) → check file ages
+# 4. delete_file (filesystem) → remove old files (if permitted)
+
+# =================================================================
+# BENEFITS OF TOOL CALL CHAINING:
+# =================================================================
+
+# ✅ **Intelligent Behavior**: Each call informs the next
+# ✅ **Context Awareness**: Agent understands its capabilities  
+# ✅ **Error Prevention**: Validate before executing
+# ✅ **Efficient Execution**: Plan optimal sequence
+# ✅ **User Transparency**: Clear explanation of actions
+# ✅ **Flexible Adaptation**: Adjust based on discovered constraints
+
+# =================================================================
+# TECHNICAL DETAILS:
+# =================================================================
+
+# **How Chaining Works in LangSwarm:**
+
+# 1. **Single Workflow Step**: All chaining happens within one agent step
+# 2. **Sequential Execution**: Each tool call gets response before next call
+# 3. **Context Preservation**: Agent remembers all previous responses
+# 4. **Error Handling**: Agent can adapt if any call fails
+# 5. **Final Response**: Agent provides comprehensive result to user
+
+# **Agent Conversation Flow:**
+# User Request → Agent Analysis → Tool Call 1 → Response 1 → 
+# Tool Call 2 (using Response 1) → Response 2 → ... → Final User Response
+
+# **LangSwarm Support:**
+# - Agents can make multiple tool calls per workflow step
+# - Each response is available for the next tool call
+# - Full conversation context maintained
+# - Error recovery and adaptation supported
+# - Efficient single-step completion of complex tasks

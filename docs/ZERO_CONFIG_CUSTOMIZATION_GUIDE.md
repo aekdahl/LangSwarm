@@ -176,8 +176,11 @@ def _load_tool_registry(self) -> Dict[str, Dict[str, Any]]:
             "resource_usage": "low",
             "always_available": True
         },
-        "message_queue_publisher": {
-            "type": "message_queue_publisher",
+                    "message_queue_publisher": {
+                "type": "message_queue_publisher",
+            },
+            "message_queue_consumer": {
+                "type": "message_queue_consumer",
             "capabilities": ["messaging"],
             "resource_usage": "medium",
             "requires_queue": True

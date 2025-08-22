@@ -1,0 +1,312 @@
+version: "1.0"
+project_name: "distributed_workflow_executor_example"
+
+# Advanced distributed configuration with multiple remote workflow executors
+memory: "production"
+
+tools:
+  # Local workflow executor for simple tasks
+  - id: local_workflow_executor
+    type: mcpworkflow_executor
+    description: "Local workflow execution for simple tasks"
+
+  # Primary remote workflow executor (high-performance instance)
+  - id: primary_workflow_executor
+    type: mcpremote
+    mcp_url: "http://primary-workflow-server:4020"
+    headers:
+      Authorization: "Bearer ${WORKFLOW_EXECUTOR_TOKEN}"
+      X-Instance-Type: "primary"
+    timeout: 600
+    retry_count: 5
+    description: "Primary high-performance workflow executor"
+
+  # GPU-enabled workflow executor for ML workloads
+  - id: gpu_workflow_executor
+    type: mcpremote
+    mcp_url: "http://gpu-workflow-server:4020"
+    headers:
+      Authorization: "Bearer ${GPU_EXECUTOR_TOKEN}"
+      X-Instance-Type: "gpu"
+    timeout: 1200
+    retry_count: 3
+    description: "GPU-enabled workflow executor for ML and AI workloads"
+
+  # European workflow executor for GDPR compliance
+  - id: eu_workflow_executor
+    type: mcpremote
+    mcp_url: "https://eu-workflow-server.example.com:4020"
+    headers:
+      Authorization: "Bearer ${EU_EXECUTOR_TOKEN}"
+      X-Region: "eu-west-1"
+      X-Compliance: "gdpr"
+    timeout: 450
+    retry_count: 5
+    description: "European workflow executor for GDPR-compliant processing"
+
+  # High-memory workflow executor for big data
+  - id: bigdata_workflow_executor
+    type: mcpremote
+    mcp_url: "http://bigdata-workflow-server:4020"
+    headers:
+      Authorization: "Bearer ${BIGDATA_EXECUTOR_TOKEN}"
+      X-Instance-Type: "high-memory"
+    timeout: 1800
+    retry_count: 2
+    description: "High-memory workflow executor for big data processing"
+
+agents:
+  # Intelligent workflow router
+  - id: intelligent_router
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You are an Intelligent Workflow Router that selects optimal execution instances based on requirements.
+      
+      **Available Executors:**
+      1. **local_workflow_executor**: Simple tasks, immediate results, development
+      2. **primary_workflow_executor**: General production workloads, balanced performance
+      3. **gpu_workflow_executor**: ML/AI workflows, training, inference, GPU acceleration
+      4. **eu_workflow_executor**: European data, GDPR compliance, data locality
+      5. **bigdata_workflow_executor**: Large datasets, high memory requirements, analytics
+      
+      **Routing Rules:**
+      - **Simple workflows (< 30s, basic tools)** → local_workflow_executor
+      - **Standard workflows (general purpose)** → primary_workflow_executor  
+      - **ML/AI workflows (training, inference)** → gpu_workflow_executor
+      - **European data processing** → eu_workflow_executor
+      - **Big data analytics (>1GB datasets)** → bigdata_workflow_executor
+      
+      **Execution Mode Selection:**
+      - **sync**: Simple, fast workflows needing immediate results
+      - **async**: Long-running workflows, background processing
+      - **isolated**: Sensitive data, resource isolation, fault tolerance
+      
+      Always explain your routing decision and provide execution details.
+    
+    tools:
+      - local_workflow_executor
+      - primary_workflow_executor
+      - gpu_workflow_executor
+      - eu_workflow_executor
+      - bigdata_workflow_executor
+
+  # Local development agent
+  - id: dev_orchestrator
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You are a Development Orchestrator for testing and prototyping workflows locally.
+      
+      Use local_workflow_executor for:
+      - Rapid prototyping and testing
+      - Simple workflow validation
+      - Development and debugging
+      - Quick turnaround workflows
+      
+      Perfect for the development phase before production deployment.
+    
+    tools:
+      - local_workflow_executor
+
+  # Production workload manager
+  - id: production_manager
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You are a Production Workload Manager for enterprise-scale workflow execution.
+      
+      **Execution Strategy:**
+      - Route based on workload characteristics and requirements
+      - Monitor execution across distributed instances
+      - Handle failover and retry logic
+      - Optimize resource utilization
+      
+      **Instance Selection Logic:**
+      - Consider data locality, compliance, and performance requirements
+      - Balance load across available instances
+      - Ensure fault tolerance and high availability
+    
+    tools:
+      - primary_workflow_executor
+      - gpu_workflow_executor
+      - eu_workflow_executor
+      - bigdata_workflow_executor
+
+  # ML/AI specialist
+  - id: ml_specialist
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You are an ML/AI Workflow Specialist for machine learning and artificial intelligence workloads.
+      
+      **Specialized Capabilities:**
+      - Generate ML training and inference workflows
+      - Optimize for GPU utilization and performance
+      - Handle large model deployments
+      - Coordinate distributed training workflows
+      
+      Use gpu_workflow_executor for all ML/AI tasks requiring GPU acceleration.
+    
+    tools:
+      - gpu_workflow_executor
+
+  # Data compliance specialist
+  - id: compliance_specialist
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You are a Data Compliance Specialist ensuring regulatory compliance in workflow execution.
+      
+      **Compliance Focus:**
+      - GDPR compliance for European data
+      - Data locality requirements
+      - Privacy and security regulations
+      - Audit trail and logging requirements
+      
+      Always use eu_workflow_executor for European customer data and GDPR-regulated workflows.
+    
+    tools:
+      - eu_workflow_executor
+
+  # Big data analyst
+  - id: bigdata_analyst
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You are a Big Data Analyst specializing in large-scale data processing workflows.
+      
+      **Data Processing Expertise:**
+      - Large dataset analysis (multi-GB files)
+      - ETL pipeline orchestration
+      - Real-time data processing
+      - Distributed analytics workflows
+      
+      Use bigdata_workflow_executor for all large-scale data processing tasks.
+    
+    tools:
+      - bigdata_workflow_executor
+
+workflows:
+  # Intelligent routing workflow
+  intelligent_workflow_routing:
+    description: "Intelligently route workflows to optimal execution instances"
+    steps:
+      - agent: intelligent_router
+        input: "${user_input}"
+        output:
+          to: user
+
+  # Development and testing
+  development_workflow:
+    description: "Local development and testing of workflows"
+    steps:
+      - agent: dev_orchestrator
+        input: "${user_input}"
+        output:
+          to: user
+
+  # Production workload management
+  production_workload:
+    description: "Manage production workloads across distributed instances"
+    steps:
+      - agent: production_manager
+        input: "${user_input}"
+        output:
+          to: user
+
+  # ML/AI workflow processing
+  ml_ai_workflow:
+    description: "Execute ML/AI workflows on GPU-enabled instances"
+    steps:
+      - agent: ml_specialist
+        input: "${user_input}"
+        output:
+          to: user
+
+  # Compliance-focused workflows
+  compliance_workflow:
+    description: "Execute workflows with strict compliance requirements"
+    steps:
+      - agent: compliance_specialist
+        input: "${user_input}"
+        output:
+          to: user
+
+  # Big data analytics
+  bigdata_analytics:
+    description: "Process large datasets with specialized infrastructure"
+    steps:
+      - agent: bigdata_analyst
+        input: "${user_input}"
+        output:
+          to: user
+
+  # Multi-instance orchestration
+  multi_instance_orchestration:
+    description: "Complex orchestration across multiple execution instances"
+    steps:
+      - agent: intelligent_router
+        input: "Analyze requirements: ${user_input}"
+        
+      - agent: production_manager
+        input: "Execute based on routing analysis: ${intelligent_router.output}"
+        output:
+          to: user
+
+  # Load balancing workflow
+  load_balanced_execution:
+    description: "Distribute workflow execution for optimal performance"
+    steps:
+      - agent: intelligent_router
+        input: "Plan load distribution: ${user_input}"
+        
+      - agent: production_manager
+        input: "Execute distributed plan: ${intelligent_router.output}"
+        output:
+          to: user
+
+  # Failover and recovery
+  failover_workflow:
+    description: "Handle failover and recovery across instances"
+    steps:
+      - agent: production_manager
+        input: "Primary execution: ${user_input}"
+        
+      - agent: intelligent_router
+        input: "Handle failover if needed: ${production_manager.output}"
+        output:
+          to: user
+
+  # Cross-region processing
+  cross_region_processing:
+    description: "Process data across multiple regions with compliance"
+    steps:
+      - agent: compliance_specialist
+        input: "Analyze compliance requirements: ${user_input}"
+        
+      - agent: intelligent_router
+        input: "Route based on compliance: ${compliance_specialist.output}"
+        
+      - agent: production_manager
+        input: "Execute cross-region workflow: ${intelligent_router.output}"
+        output:
+          to: user
+
+# Environment-specific configurations
+environments:
+  development:
+    # Override to use only local execution in development
+    agents:
+      - id: intelligent_router
+        tools: [local_workflow_executor]
+  
+  staging:
+    # Use primary instance for staging
+    agents:
+      - id: intelligent_router
+        tools: [primary_workflow_executor]
+  
+  production:
+    # Full distributed setup for production
+    # Uses all configured instances

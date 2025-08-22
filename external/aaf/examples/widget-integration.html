@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AAF Widget Integration Example</title>
+    
+    <!-- Recommended CSP for security -->
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self';
+        script-src 'self' https://cdn.algorithma.dev 'unsafe-inline';
+        connect-src 'self' https://api.algorithma.dev wss://api.algorithma.dev;
+        img-src 'self' data: https:;
+        style-src 'self' 'unsafe-inline' https://cdn.algorithma.dev;
+        font-src 'self' https://fonts.gstatic.com;
+    ">
+    
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        
+        .integration-examples {
+            display: grid;
+            gap: 30px;
+            margin-top: 30px;
+        }
+        
+        .example {
+            border: 1px solid #e1e5e9;
+            border-radius: 8px;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        
+        .example h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        
+        pre {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .demo-section {
+            margin-top: 40px;
+            padding: 20px;
+            background: #e3f2fd;
+            border-radius: 8px;
+            border-left: 4px solid #2196f3;
+        }
+        
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 AAF Widget Integration Examples</h1>
+        
+        <p>This page demonstrates various ways to integrate the AAF chat widget into your website.</p>
+        
+        <div class="integration-examples">
+            <!-- Basic Integration -->
+            <div class="example">
+                <h3>1. Basic Widget Integration</h3>
+                <p>The simplest way to add AAF chat to your website:</p>
+                <pre><code>&lt;!-- Add this script tag to your website --&gt;
+&lt;script
+  src="https://cdn.algorithma.dev/aaf/aaf.js"
+  async
+  data-tenant="demo"
+  data-env="prod"
+  data-mount="#aaf-chat"
+&gt;&lt;/script&gt;
+
+&lt;!-- Add this div where you want the chat to appear --&gt;
+&lt;div id="aaf-chat"&gt;&lt;/div&gt;</code></pre>
+            </div>
+            
+            <!-- Advanced Integration -->
+            <div class="example">
+                <h3>2. Advanced Configuration</h3>
+                <p>Customize the widget with additional options:</p>
+                <pre><code>&lt;script
+  src="https://cdn.algorithma.dev/aaf/aaf.js"
+  async
+  data-tenant="enterprise"
+  data-env="prod"
+  data-mount="#custom-chat"
+  data-position="bottom-left"
+  data-theme="dark"
+  data-language="en"
+&gt;&lt;/script&gt;
+
+&lt;div id="custom-chat"&gt;&lt;/div&gt;</code></pre>
+            </div>
+            
+            <!-- JavaScript API -->
+            <div class="example">
+                <h3>3. JavaScript API Integration</h3>
+                <p>For more control, use the JavaScript API:</p>
+                <pre><code>&lt;script type="module"&gt;
+import { AAFWidget } from 'https://cdn.algorithma.dev/aaf/aaf.esm.js';
+
+const widget = new AAFWidget({
+  tenant: 'demo',
+  environment: 'production',
+  container: '#programmatic-chat',
+  config: {
+    brand: { primary: '#1a73e8' },
+    features: { attachments: true },
+    copy: { title: 'Custom Chat Title' }
+  }
+});
+
+// Initialize and control the widget
+await widget.initialize();
+
+// Widget API methods
+widget.open();           // Open chat window
+widget.close();          // Close chat window
+widget.sendMessage('Hello!'); // Send a message
+widget.on('message', (msg) => console.log('Received:', msg));
+&lt;/script&gt;
+
+&lt;div id="programmatic-chat"&gt;&lt;/div&gt;</code></pre>
+            </div>
+            
+            <!-- React Integration -->
+            <div class="example">
+                <h3>4. React Component Integration</h3>
+                <p>For React applications:</p>
+                <pre><code>import { AAFWidget } from '@algorithma/aaf-widget';
+
+function ChatComponent() {
+  const [widget, setWidget] = useState(null);
+  
+  useEffect(() => {
+    const initWidget = async () => {
+      const w = new AAFWidget({
+        tenant: 'demo',
+        container: '#react-chat'
+      });
+      await w.initialize();
+      setWidget(w);
+    };
+    
+    initWidget();
+    
+    return () => widget?.destroy();
+  }, []);
+  
+  return (
+    &lt;div&gt;
+      &lt;div id="react-chat"&gt;&lt;/div&gt;
+      &lt;button onClick={() => widget?.open()}&gt;
+        Open Chat
+      &lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+            </div>
+        </div>
+        
+        <div class="demo-section">
+            <h3>🧪 Live Demo</h3>
+            <p>Try the widget integration on this page:</p>
+            
+            <button onclick="loadBasicWidget()">Load Basic Widget</button>
+            <button onclick="loadCustomWidget()">Load Custom Widget</button>
+            <button onclick="openWidget()">Open Widget</button>
+            <button onclick="closeWidget()">Close Widget</button>
+            <button onclick="sendTestMessage()">Send Test Message</button>
+            
+            <div id="widget-status" class="status" style="display: none;"></div>
+        </div>
+    </div>
+    
+    <!-- Chat widget container -->
+    <div id="aaf-chat"></div>
+    
+    <script>
+        // Demo functionality
+        let currentWidget = null;
+        
+        function showStatus(message, isError = false) {
+            const status = document.getElementById('widget-status');
+            status.textContent = message;
+            status.className = `status ${isError ? 'error' : 'success'}`;
+            status.style.display = 'block';
+            
+            setTimeout(() => {
+                status.style.display = 'none';
+            }, 3000);
+        }
+        
+        function loadBasicWidget() {
+            // Remove existing widget
+            const container = document.getElementById('aaf-chat');
+            container.innerHTML = '';
+            
+            // Load basic widget (simulated)
+            showStatus('Loading basic widget...');
+            
+            setTimeout(() => {
+                container.innerHTML = `
+                    <div style="
+                        position: fixed;
+                        bottom: 20px;
+                        right: 20px;
+                        width: 60px;
+                        height: 60px;
+                        background: #007bff;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: white;
+                        cursor: pointer;
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                        font-size: 24px;
+                        z-index: 1000;
+                    " onclick="toggleWidget()">
+                        💬
+                    </div>
+                `;
+                showStatus('Basic widget loaded! (Demo mode)');
+            }, 1000);
+        }
+        
+        function loadCustomWidget() {
+            // Remove existing widget
+            const container = document.getElementById('aaf-chat');
+            container.innerHTML = '';
+            
+            showStatus('Loading custom widget...');
+            
+            setTimeout(() => {
+                container.innerHTML = `
+                    <div style="
+                        position: fixed;
+                        bottom: 20px;
+                        left: 20px;
+                        width: 60px;
+                        height: 60px;
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: white;
+                        cursor: pointer;
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                        font-size: 24px;
+                        z-index: 1000;
+                    " onclick="toggleWidget()">
+                        🤖
+                    </div>
+                `;
+                showStatus('Custom widget loaded! (Demo mode)');
+            }, 1000);
+        }
+        
+        let widgetOpen = false;
+        
+        function toggleWidget() {
+            widgetOpen = !widgetOpen;
+            if (widgetOpen) {
+                openWidget();
+            } else {
+                closeWidget();
+            }
+        }
+        
+        function openWidget() {
+            const container = document.getElementById('aaf-chat');
+            
+            // Add chat window (simulated)
+            let chatWindow = document.getElementById('demo-chat-window');
+            if (!chatWindow) {
+                chatWindow = document.createElement('div');
+                chatWindow.id = 'demo-chat-window';
+                chatWindow.innerHTML = `
+                    <div style="
+                        position: fixed;
+                        bottom: 90px;
+                        right: 20px;
+                        width: 350px;
+                        height: 500px;
+                        background: white;
+                        border-radius: 12px;
+                        box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+                        z-index: 1001;
+                        display: flex;
+                        flex-direction: column;
+                        overflow: hidden;
+                        animation: slideUp 0.3s ease;
+                    ">
+                        <div style="
+                            background: #007bff;
+                            color: white;
+                            padding: 16px 20px;
+                            font-weight: 600;
+                        ">
+                            AAF Chat Demo
+                        </div>
+                        <div style="
+                            flex: 1;
+                            padding: 20px;
+                            overflow-y: auto;
+                        ">
+                            <div style="
+                                background: #f1f3f4;
+                                padding: 12px 16px;
+                                border-radius: 18px 18px 18px 4px;
+                                margin-bottom: 16px;
+                                max-width: 80%;
+                            ">
+                                Hi! I'm your AAF assistant. How can I help you today?
+                            </div>
+                        </div>
+                        <div style="
+                            padding: 16px 20px;
+                            border-top: 1px solid #e9ecef;
+                        ">
+                            <div style="
+                                display: flex;
+                                align-items: center;
+                                background: #f8f9fa;
+                                border: 1px solid #e9ecef;
+                                border-radius: 24px;
+                                padding: 8px 16px;
+                            ">
+                                <input type="text" placeholder="Type your message..." style="
+                                    flex: 1;
+                                    border: none;
+                                    outline: none;
+                                    background: transparent;
+                                    padding: 8px;
+                                " id="demo-chat-input">
+                                <button onclick="sendDemoMessage()" style="
+                                    background: #007bff;
+                                    color: white;
+                                    border: none;
+                                    border-radius: 50%;
+                                    width: 36px;
+                                    height: 36px;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    cursor: pointer;
+                                    margin: 0;
+                                ">
+                                    ➤
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(chatWindow);
+            }
+            
+            chatWindow.style.display = 'block';
+            widgetOpen = true;
+            showStatus('Chat window opened');
+        }
+        
+        function closeWidget() {
+            const chatWindow = document.getElementById('demo-chat-window');
+            if (chatWindow) {
+                chatWindow.style.display = 'none';
+            }
+            widgetOpen = false;
+            showStatus('Chat window closed');
+        }
+        
+        function sendTestMessage() {
+            openWidget();
+            setTimeout(() => {
+                const input = document.getElementById('demo-chat-input');
+                if (input) {
+                    input.value = 'Hello, this is a test message!';
+                    sendDemoMessage();
+                }
+            }, 500);
+        }
+        
+        function sendDemoMessage() {
+            const input = document.getElementById('demo-chat-input');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Add user message to chat
+            const chatContent = document.querySelector('#demo-chat-window > div > div:nth-child(2)');
+            if (chatContent) {
+                const userMessage = document.createElement('div');
+                userMessage.style.cssText = `
+                    background: #007bff;
+                    color: white;
+                    padding: 12px 16px;
+                    border-radius: 18px 18px 4px 18px;
+                    margin-bottom: 16px;
+                    max-width: 80%;
+                    margin-left: auto;
+                    text-align: right;
+                `;
+                userMessage.textContent = message;
+                chatContent.appendChild(userMessage);
+                
+                // Simulate bot response
+                setTimeout(() => {
+                    const botMessage = document.createElement('div');
+                    botMessage.style.cssText = `
+                        background: #f1f3f4;
+                        padding: 12px 16px;
+                        border-radius: 18px 18px 18px 4px;
+                        margin-bottom: 16px;
+                        max-width: 80%;
+                    `;
+                    botMessage.textContent = `Thanks for your message: "${message}". This is a demo response from the AAF assistant!`;
+                    chatContent.appendChild(botMessage);
+                    
+                    // Scroll to bottom
+                    chatContent.scrollTop = chatContent.scrollHeight;
+                }, 1000);
+                
+                // Scroll to bottom
+                chatContent.scrollTop = chatContent.scrollHeight;
+            }
+            
+            input.value = '';
+            showStatus('Message sent! (Demo mode)');
+        }
+        
+        // Add CSS animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideUp {
+                from { transform: translateY(20px); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        // Allow Enter key to send message
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && e.target.id === 'demo-chat-input') {
+                sendDemoMessage();
+            }
+        });
+    </script>
+</body>
+</html>

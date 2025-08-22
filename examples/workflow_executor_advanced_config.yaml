@@ -1,0 +1,149 @@
+version: "1.0"
+project_name: "workflow_executor_advanced_example"
+
+# Advanced configuration with multiple specialized agents
+memory: "production"
+
+tools:
+  - id: workflow_orchestrator
+    type: mcpworkflow_executor
+    description: "Dynamic workflow execution and generation"
+
+agents:
+  # Main orchestrator for workflow execution
+  - id: workflow_orchestrator
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You are the main Workflow Orchestrator responsible for executing and coordinating workflows.
+      
+      Your primary role is to:
+      - Execute pre-written workflows efficiently
+      - Coordinate with other agents for complex operations
+      - Manage execution modes (sync, async, isolated)
+      - Handle workflow parameters and configuration overrides
+      
+      Use structured responses with the workflow_orchestrator tool.
+    tools:
+      - workflow_orchestrator
+
+  # Specialized generator for dynamic workflows
+  - id: workflow_generator
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You are a Workflow Generator that creates LangSwarm workflow configurations from natural language.
+      
+      Your expertise includes:
+      - Analyzing requirements and complexity
+      - Designing optimal agent architectures
+      - Selecting appropriate tools and execution patterns
+      - Creating valid, efficient workflow configurations
+      
+      Focus on generating practical, well-structured workflows that solve real problems.
+    tools:
+      - workflow_orchestrator
+
+  # Monitor for tracking executions
+  - id: execution_monitor
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You are an Execution Monitor responsible for tracking workflow progress and status.
+      
+      Your responsibilities:
+      - Monitor running workflow executions
+      - Provide status updates and progress reports
+      - Handle execution cancellation when needed
+      - Analyze performance and execution metrics
+      
+      Focus on clear, actionable status information.
+    tools:
+      - workflow_orchestrator
+
+  # Advisor for best practices
+  - id: workflow_advisor
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You are a Workflow Advisor providing guidance on workflow design and execution strategies.
+      
+      Your advisory areas:
+      - Execution mode selection (sync vs async vs isolated)
+      - Performance optimization recommendations
+      - Best practices for workflow design
+      - Architecture and complexity guidance
+      
+      Provide strategic advice based on requirements and constraints.
+    tools:
+      - workflow_orchestrator
+
+workflows:
+  # Simple workflow execution
+  simple_execution:
+    description: "Execute workflows with basic orchestration"
+    steps:
+      - agent: workflow_orchestrator
+        input: "${user_input}"
+        output:
+          to: user
+
+  # Advanced workflow generation with advisory
+  advanced_generation:
+    description: "Generate workflows with expert guidance"
+    steps:
+      - agent: workflow_advisor
+        input: "Analyze requirements and provide recommendations: ${user_input}"
+        
+      - agent: workflow_generator
+        input: "Generate workflow based on analysis: ${workflow_advisor.output} Original request: ${user_input}"
+        
+      - agent: workflow_orchestrator
+        input: "Execute generated workflow: ${workflow_generator.output}"
+        output:
+          to: user
+
+  # Async workflow with monitoring
+  async_with_monitoring:
+    description: "Execute long-running workflows with real-time monitoring"
+    steps:
+      - agent: workflow_orchestrator
+        input: "Start async execution: ${user_input}"
+        
+      - agent: execution_monitor
+        input: "Monitor execution: ${workflow_orchestrator.output}"
+        output:
+          to: user
+
+  # Complex orchestration pipeline
+  complex_orchestration:
+    description: "Full workflow lifecycle with generation, execution, and monitoring"
+    steps:
+      - agent: workflow_advisor
+        input: "Analyze and recommend approach: ${user_input}"
+        
+      - agent: workflow_generator
+        input: "Generate optimized workflow: ${workflow_advisor.output}"
+        
+      - agent: workflow_orchestrator
+        input: "Execute with optimal settings: ${workflow_generator.output}"
+        
+      - agent: execution_monitor
+        input: "Track and report progress: ${workflow_orchestrator.output}"
+        output:
+          to: user
+
+  # Batch processing workflow
+  batch_processing:
+    description: "Process multiple workflows in parallel"
+    steps:
+      - agent: workflow_advisor
+        input: "Plan batch processing strategy: ${user_input}"
+        
+      - agent: workflow_orchestrator
+        input: "Execute batch workflows: ${workflow_advisor.output}"
+        
+      - agent: execution_monitor
+        input: "Monitor all batch executions: ${workflow_orchestrator.output}"
+        output:
+          to: user

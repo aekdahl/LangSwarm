@@ -1,0 +1,227 @@
+# Dynamic Filesystem Permissions Example
+# =======================================
+# Shows how LangSwarm automatically injects filesystem permissions into agent system prompts
+
+version: "1.0"
+project_name: "dynamic-permissions-demo"
+
+# === Tools Configuration ===
+tools:
+  # Enhanced filesystem tool with custom permissions
+  - id: my_filesystem
+    type: mcpfilesystem
+    description: "Enhanced filesystem with role-based permissions"
+    gcs_project_id: "my-company-project"
+    
+    # Define custom permission zones
+    permissions:
+      # Local development environment
+      "/": "read_only"
+      "~/": "read_only"
+      "~/workspace/": "read_write"
+      "~/projects/": "read_write"
+      "~/sensitive/": "forbidden"
+      "/tmp/": "read_write"
+      
+      # Cloud storage buckets
+      "gs://": "read_only"
+      "gs://company-public-data/": "read_only"
+      "gs://dev-workspace/": "read_write"
+      "gs://prod-outputs/": "read_write"
+      "gs://hr-confidential/": "forbidden"
+      "gs://financial-data/": "forbidden"
+
+# === Agents Configuration ===
+agents:
+  # Agent that automatically receives permission info
+  - id: auto_aware_agent
+    agent_type: openai
+    model: gpt-4o
+    # NO NEED TO SPECIFY PERMISSIONS IN SYSTEM PROMPT!
+    # LangSwarm will automatically inject them
+    system_prompt: |
+      You are a helpful file management assistant.
+      
+      Your filesystem permissions are automatically provided above.
+      Always respect these permission boundaries when working with files.
+      
+      When users ask you to work with files:
+      1. Check your available read/write paths
+      2. Choose appropriate locations based on the task
+      3. Explain your choices to users
+      4. Handle permission errors gracefully
+      
+      Be proactive in suggesting appropriate file locations based on your permissions.
+    
+    tools:
+      - my_filesystem
+
+  # Data processing agent with automatic path awareness
+  - id: data_processor
+    agent_type: openai
+    model: gpt-4o-mini
+    system_prompt: |
+      You process data files and generate reports.
+      
+      Your filesystem access is detailed above. Use this information to:
+      - Read source data from read-only locations
+      - Save processed results to read/write locations
+      - Suggest alternative approaches when paths are restricted
+      
+      Always explain where you're reading from and where you're saving to.
+    
+    tools:
+      - my_filesystem
+
+  # Report generator with cloud storage integration
+  - id: cloud_reporter
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You generate reports and save them to appropriate cloud storage locations.
+      
+      Based on your filesystem permissions above:
+      - Read source data from company-public-data bucket
+      - Save reports to dev-workspace or prod-outputs buckets
+      - Use local workspace for temporary processing
+      
+      Always choose the most appropriate storage location for each type of content.
+    
+    tools:
+      - my_filesystem
+
+# === Example Workflows ===
+workflows:
+  # Simple file processing workflow
+  file_processing_workflow:
+    steps:
+      - agent: auto_aware_agent
+        input: |
+          Process this request with awareness of your filesystem permissions: ${user_input}
+        output:
+          to: user
+
+  # Data analysis with cloud storage
+  cloud_analysis_workflow:
+    steps:
+      - agent: data_processor
+        input: |
+          Analyze data request: ${user_input}
+          
+          Use your read-only access to source data and read/write access for outputs.
+        output:
+          to: next_step
+      
+      - agent: cloud_reporter
+        input: |
+          Generate a report based on this analysis: ${previous_output}
+          
+          Save to appropriate cloud storage location.
+        output:
+          to: user
+
+# ===================================================================
+# WHAT AGENTS AUTOMATICALLY RECEIVE IN THEIR SYSTEM PROMPT:
+# ===================================================================
+
+# ## 📁 Filesystem Access Information
+# 
+# You have access to filesystem tools with the following permissions:
+# 
+# ### EnhancedFilesystemMCPTool-my_filesystem (my_filesystem)
+# 
+# **Local Filesystem:**
+# - **📝 Read/Write Access**: ~/workspace/, ~/projects/, /tmp/
+#   - You can create, read, update, and delete files in these paths
+# - **👁️ Read-Only Access**: /, ~/
+#   - You can list directories and read files, but cannot modify them
+# - **🚫 Forbidden Paths**: ~/sensitive/
+#   - These paths are off-limits - operations will fail
+# 
+# **Google Cloud Storage** (Project: my-company-project):
+# - **📝 Read/Write GCS Paths**: gs://dev-workspace/, gs://prod-outputs/
+#   - Full CRUD operations on these GCS buckets/paths
+# - **👁️ Read-Only GCS Paths**: gs://, gs://company-public-data/
+#   - Can list and read from these GCS buckets/paths
+# - **🚫 Forbidden GCS Paths**: gs://hr-confidential/, gs://financial-data/
+#   - These GCS paths are off-limits
+# 
+# **Usage Guidelines for my_filesystem:**
+# - Always respect permission boundaries - operations outside allowed paths will fail
+# - Use read/write paths for saving outputs, creating files, and data processing
+# - Use read-only paths for accessing source data and reference materials
+# - Never attempt operations on forbidden paths
+# - For GCS paths, use format: `gs://bucket-name/path/to/object`
+
+# ===================================================================
+# BENEFITS OF AUTOMATIC PERMISSION INJECTION:
+# ===================================================================
+
+# ✅ **Zero Configuration**: No need to manually list permissions in system prompts
+# ✅ **Always Current**: Permissions are extracted directly from tool configuration
+# ✅ **Consistent**: Same format across all agents with filesystem tools
+# ✅ **Maintainable**: Change permissions in one place (tool config), affects all agents
+# ✅ **Comprehensive**: Includes both local and cloud storage information
+# ✅ **User-Friendly**: Clear visual indicators and usage guidelines
+
+# ===================================================================
+# EXAMPLE AGENT INTERACTIONS:
+# ===================================================================
+
+# Example 1: File Creation Request
+# User: "Save this analysis as a JSON file"
+# Agent: "I'll save it to ~/workspace/analysis.json since I have read/write access to ~/workspace/. 
+#         Would you also like me to backup to gs://dev-workspace/ for cloud access?"
+
+# Example 2: Data Access Request  
+# User: "Read the company sales data"
+# Agent: "I can access company data from gs://company-public-data/. Let me check what's available there.
+#         I cannot access financial or HR data as those buckets are forbidden."
+
+# Example 3: Permission Error Handling
+# User: "Delete everything in ~/sensitive/"
+# Agent: "I cannot access ~/sensitive/ as it's marked as forbidden in my permissions.
+#         I can help you manage files in ~/workspace/ or ~/projects/ instead."
+
+# ===================================================================
+# MIGRATION FROM MANUAL TO AUTOMATIC:
+# ===================================================================
+
+# BEFORE (Manual permission listing):
+# system_prompt: |
+#   You have filesystem access with these permissions:
+#   - Read/Write: ~/workspace/, ~/projects/
+#   - Read-Only: /, ~/
+#   - Forbidden: ~/sensitive/
+#   - GCS Read/Write: gs://dev-workspace/
+#   - GCS Read-Only: gs://company-public-data/
+#   [... manual maintenance required]
+
+# AFTER (Automatic injection):
+# system_prompt: |
+#   You are a helpful assistant.
+#   Your filesystem permissions are automatically provided above.
+#   [... permissions injected automatically by LangSwarm]
+
+# ===================================================================
+# ADVANCED: MULTIPLE FILESYSTEM TOOLS
+# ===================================================================
+
+# If an agent has multiple filesystem tools, each will be listed separately:
+
+# tools:
+#   - id: local_fs
+#     type: mcpfilesystem
+#     permissions: { ... local permissions ... }
+#   
+#   - id: cloud_fs  
+#     type: mcpfilesystem
+#     gcs_project_id: "different-project"
+#     permissions: { ... different GCS permissions ... }
+
+# agents:
+#   - id: multi_fs_agent
+#     tools:
+#       - local_fs
+#       - cloud_fs
+#     # Will receive permission info for BOTH tools automatically

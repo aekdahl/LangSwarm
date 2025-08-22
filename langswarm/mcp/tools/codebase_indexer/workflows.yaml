@@ -1,0 +1,214 @@
+# Enhanced Codebase Indexer MCP Tool - Workflows Configuration
+# Intelligent workflows for comprehensive code analysis
+
+workflows:
+  # Comprehensive Codebase Analysis
+  comprehensive_analysis_workflow:
+    steps:
+      - agent: architecture_analyst
+        input: |
+          Perform comprehensive architecture analysis: ${user_input}
+          
+          Start with get_codebase_overview to understand the big picture,
+          then use analyze_patterns and get_dependencies for deeper insights.
+        output:
+          to: next_step
+      
+      - agent: code_quality_inspector
+        input: |
+          Analyze code quality and metrics for: ${user_input}
+          
+          Previous architecture analysis: ${previous_output}
+          
+          Use get_code_metrics to assess quality and identify improvement areas.
+        output:
+          to: next_step
+      
+      - agent: integration_coordinator
+        input: |
+          Integrate and summarize findings: ${user_input}
+          
+          Architecture analysis: ${architecture_analyst.output}
+          Quality analysis: ${previous_output}
+          
+          Provide comprehensive recommendations and action items.
+        output:
+          to: user
+
+  # Code Discovery and Navigation
+  code_discovery_workflow:
+    steps:
+      - agent: code_navigator
+        input: |
+          Help navigate and understand: ${user_input}
+          
+          Start with get_codebase_overview and use semantic_search
+          to create a guided tour of the relevant code areas.
+        output:
+          to: next_step
+      
+      - agent: code_search_specialist
+        input: |
+          Find specific code implementations: ${user_input}
+          
+          Navigation context: ${previous_output}
+          
+          Use semantic_search to locate relevant implementations
+          and explain their relationships.
+        output:
+          to: user
+
+  # Architecture Review and Patterns
+  architecture_review_workflow:
+    steps:
+      - agent: architecture_analyst
+        input: |
+          Review architecture and patterns: ${user_input}
+          
+          Focus on:
+          1. Overall architecture assessment
+          2. Design pattern detection and evaluation
+          3. Structural recommendations
+        output:
+          to: next_step
+      
+      - agent: dependency_mapper
+        input: |
+          Analyze dependencies and relationships: ${user_input}
+          
+          Architecture context: ${previous_output}
+          
+          Map critical dependencies and identify potential issues.
+        output:
+          to: user
+
+  # Code Quality Assessment
+  quality_assessment_workflow:
+    steps:
+      - agent: code_quality_inspector
+        input: |
+          Assess code quality: ${user_input}
+          
+          Perform comprehensive quality analysis using get_code_metrics
+          and identify specific improvement opportunities.
+        output:
+          to: next_step
+      
+      - agent: dependency_mapper
+        input: |
+          Analyze dependency complexity: ${user_input}
+          
+          Quality context: ${previous_output}
+          
+          Focus on dependency-related quality issues and refactoring opportunities.
+        output:
+          to: user
+
+  # Semantic Code Search
+  semantic_search_workflow:
+    steps:
+      - agent: code_search_specialist
+        input: |
+          Perform semantic search: ${user_input}
+          
+          Use semantic_search to find code by meaning and context.
+          Explain search strategy and result relevance.
+        output:
+          to: user
+
+  # New Developer Onboarding
+  onboarding_workflow:
+    steps:
+      - agent: code_navigator
+        input: |
+          Create onboarding guide: ${user_input}
+          
+          Help new developers understand the codebase structure,
+          entry points, and key components. Make it approachable and clear.
+        output:
+          to: next_step
+      
+      - agent: architecture_analyst
+        input: |
+          Explain architecture and patterns: ${user_input}
+          
+          Navigation context: ${previous_output}
+          
+          Provide architectural context and explain design decisions
+          to help new developers understand the system design.
+        output:
+          to: user
+
+  # Refactoring Planning
+  refactoring_planning_workflow:
+    steps:
+      - agent: dependency_mapper
+        input: |
+          Analyze refactoring impact: ${user_input}
+          
+          Map dependencies and identify potential impacts of proposed changes.
+          Focus on safety and risk assessment.
+        output:
+          to: next_step
+      
+      - agent: code_quality_inspector
+        input: |
+          Assess refactoring benefits: ${user_input}
+          
+          Dependency analysis: ${previous_output}
+          
+          Evaluate quality improvements and provide refactoring recommendations.
+        output:
+          to: next_step
+      
+      - agent: integration_coordinator
+        input: |
+          Create refactoring plan: ${user_input}
+          
+          Dependency impact: ${dependency_mapper.output}
+          Quality assessment: ${previous_output}
+          
+          Coordinate findings into actionable refactoring plan with clear steps.
+        output:
+          to: user
+
+# Intent-based routing workflow
+route_by_intent:
+  steps:
+    - agent: input_normalizer
+      input: "${user_input}"
+      output:
+        to: intent_router
+    
+    - agent: intent_router
+      input: "${previous_output}"
+      output:
+        to: execution_agent
+    
+    - agent: execution_agent
+      input: |
+        Intent: ${intent_router.output.intent}
+        Original input: ${input_normalizer.output}
+        
+        Route to appropriate specialized agent based on intent.
+      output:
+        to: user
+
+# Multi-tool integration example
+integrated_analysis_workflow:
+  steps:
+    - agent: integration_coordinator
+      input: |
+        Perform integrated analysis: ${user_input}
+        
+        Use codebase_indexer for semantic analysis,
+        filesystem for file operations,
+        and github for evolution context.
+        
+        Example workflow:
+        1. codebase_indexer.semantic_search() → find relevant code
+        2. filesystem.read_file() → get implementation details
+        3. codebase_indexer.get_dependencies() → understand relationships
+        4. github.get_file_history() → see evolution
+      output:
+        to: user

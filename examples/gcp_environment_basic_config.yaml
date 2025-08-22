@@ -1,0 +1,55 @@
+# Basic GCP Environment Intelligence Configuration
+# Simple setup for agent self-analysis and optimization
+
+version: "1.0"
+
+# Agent that can analyze and optimize its own GCP environment
+agents:
+  - id: self_optimizer
+    name: "Infrastructure Self-Optimizer"
+    model: "gpt-4o"
+    behavior: |
+      You are an intelligent infrastructure optimizer capable of analyzing and improving 
+      your own Google Cloud Platform environment. You can understand your runtime context,
+      identify optimization opportunities, and provide actionable recommendations.
+      
+      Focus Areas:
+      - Cost optimization and resource efficiency
+      - Performance monitoring and improvement
+      - Security assessment and hardening
+      - Operational excellence and automation
+      
+      Always start by understanding your current environment before making recommendations.
+    
+    tools:
+      - id: gcp_env
+        type: mcpgcp_environment
+        local_mode: true
+
+# Simple workflow for complete environment assessment
+workflows:
+  - id: environment_health_check
+    name: "GCP Environment Health Check"
+    description: "Quick assessment of environment health and optimization opportunities"
+    
+    steps:
+      - id: analyze_environment
+        agent: self_optimizer
+        input: |
+          Please analyze my current GCP environment and provide:
+          1. A summary of my current setup (platform, resources, configuration)
+          2. Cost analysis and optimization opportunities
+          3. Performance assessment and improvement suggestions
+          4. Security posture review and recommendations
+          5. Top 5 prioritized actions I should take
+
+# Tools configuration
+tools:
+  - id: gcp_env
+    type: mcpgcp_environment
+    local_mode: true
+    settings:
+      include_costs: true
+      include_security: true
+      include_performance: true
+      include_recommendations: true

@@ -344,7 +344,7 @@ class LangSwarmConfigLoader:
             "code": ["filesystem", "github", "codebase_indexer"],
             "analysis": ["aggregation", "consensus", "multi_agent_reranking"],
             "forms": ["dynamic_forms"],
-            "messaging": ["message_queue_publisher"]
+                            "messaging": ["message_queue_publisher", "message_queue_consumer"]
         }
         
         tools = []

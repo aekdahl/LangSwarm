@@ -1,4 +1,0 @@
-mcp:
-  enabled: true
-  strategy: push
-  default_queue: internal_queue

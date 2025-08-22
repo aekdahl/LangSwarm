@@ -1,0 +1,265 @@
+workflows:
+  - id: intelligent_search_workflow
+    description: "Complete workflow for processing natural language knowledge base search requests"
+    steps:
+      - id: normalize_input
+        agent: input_normalizer
+        input: |
+          user_input: ${user_input}
+          user_query: ${user_query}
+        output:
+          to: normalized_input
+
+      - id: classify_intent
+        agent: search_intent_classifier
+        input: |
+          User request: ${context.step_outputs.normalize_input}
+          
+          Determine what knowledge base operation the user wants to perform.
+        output:
+          to: search_intent
+
+      - id: extract_search_params
+        agent: query_extractor
+        input: |
+          User request: ${context.step_outputs.normalize_input}
+          Action type: ${context.step_outputs.classify_intent}
+          
+          Extract the relevant search parameters for this ${context.step_outputs.classify_intent} operation.
+        output:
+          to: search_details
+
+      - id: enhance_query
+        condition: "${context.step_outputs.classify_intent} == 'similarity_search'"
+        agent: context_enhancer
+        input: |
+          Original query: ${context.step_outputs.extract_search_params.query}
+          
+          Enhance this query for better vector search results.
+        output:
+          to: enhanced_query
+
+      - id: build_search_params
+        agent: parameter_builder
+        input: |
+          Action: ${context.step_outputs.classify_intent}
+          Details: ${context.step_outputs.extract_search_params}
+          Enhanced query: ${context.step_outputs.enhance_query}
+          
+          Build the MCP tool call parameters.
+        output:
+          to: mcp_params
+
+      - id: execute_search
+        tool: bigquery_vector_search
+        input: "${context.step_outputs.build_search_params}"
+        output:
+          to: search_result
+
+      - id: format_response
+        agent: search_response_formatter
+        input: |
+          Operation: ${context.step_outputs.classify_intent}
+          Raw result: ${context.step_outputs.execute_search}
+          Original request: ${context.step_outputs.normalize_input}
+          
+          Format this into a comprehensive, user-friendly response.
+        output:
+          to: final_response
+
+    # Error handling workflow
+    error_handling:
+      - condition: "search_result contains 'error'"
+        steps:
+          - id: handle_search_error
+            agent: error_handler
+            input: |
+              Error details: ${context.step_outputs.execute_search}
+              User request: ${context.step_outputs.normalize_input}
+              Attempted action: ${context.step_outputs.classify_intent}
+              
+              Provide helpful error guidance to the user.
+            output:
+              to: final_response
+
+  - id: direct_search_workflow
+    description: "Simplified workflow for direct MCP tool calls with structured input"
+    steps:
+      - id: execute_direct_search
+        tool: bigquery_vector_search
+        input: "${user_input}"
+        output:
+          to: direct_result
+
+      - id: format_direct_response
+        agent: search_response_formatter
+        input: |
+          Operation: direct_call
+          Raw result: ${context.step_outputs.execute_direct_search}
+          
+          Format this result for the user.
+        output:
+          to: final_response
+
+  - id: quick_search_workflow
+    description: "Fast similarity search workflow for simple questions"
+    steps:
+      - id: enhance_quick_query
+        agent: context_enhancer
+        input: |
+          Original query: ${user_input}
+          
+          Enhance this query for better vector search results.
+        output:
+          to: enhanced_query
+
+      - id: perform_similarity_search
+        tool: bigquery_vector_search
+        input: |
+          {
+            "query": "${context.step_outputs.enhance_quick_query}",
+            "limit": 5,
+            "similarity_threshold": 0.7
+          }
+        output:
+          to: search_results
+
+      - id: format_quick_answer
+        agent: search_response_formatter
+        input: |
+          Operation: similarity_search
+          Raw result: ${context.step_outputs.perform_similarity_search}
+          Original question: ${user_input}
+          
+          Provide a clear, concise answer based on the search results.
+        output:
+          to: final_response
+
+  - id: browse_knowledge_workflow
+    description: "Workflow for exploring available knowledge base content"
+    steps:
+      - id: list_available_datasets
+        tool: bigquery_vector_search
+        input: |
+          {
+            "pattern": ""
+          }
+        output:
+          to: dataset_list
+
+      - id: format_knowledge_overview
+        agent: search_response_formatter
+        input: |
+          Operation: list_datasets
+          Raw result: ${context.step_outputs.list_available_datasets}
+          
+          Present an overview of available knowledge sources.
+        output:
+          to: final_response
+
+  - id: document_retrieval_workflow
+    description: "Workflow for retrieving specific documents by ID"
+    steps:
+      - id: extract_document_id
+        agent: query_extractor
+        input: |
+          User request: ${user_input}
+          Action type: get_content
+          
+          Extract the document ID and any other parameters.
+        output:
+          to: doc_params
+
+      - id: retrieve_document
+        tool: bigquery_vector_search
+        input: "${context.step_outputs.extract_document_id}"
+        output:
+          to: document_content
+
+      - id: format_document_response
+        agent: search_response_formatter
+        input: |
+          Operation: get_content
+          Raw result: ${context.step_outputs.retrieve_document}
+          Original request: ${user_input}
+          
+          Present the document content in a clear, readable format.
+        output:
+          to: final_response
+
+  - id: dataset_inspection_workflow
+    description: "Workflow for inspecting dataset metadata and structure"
+    steps:
+      - id: extract_dataset_params
+        agent: query_extractor
+        input: |
+          User request: ${user_input}
+          Action type: dataset_info
+          
+          Extract the dataset and table names to inspect.
+        output:
+          to: inspection_params
+
+      - id: get_dataset_info
+        tool: bigquery_vector_search
+        input: "${context.step_outputs.extract_dataset_params}"
+        output:
+          to: dataset_metadata
+
+      - id: format_dataset_info
+        agent: search_response_formatter
+        input: |
+          Operation: dataset_info
+          Raw result: ${context.step_outputs.get_dataset_info}
+          Original request: ${user_input}
+          
+          Present the dataset information in a comprehensive, organized format.
+        output:
+          to: final_response
+
+  # Main routing workflow
+  - id: main_knowledge_search
+    description: "Main routing workflow that determines the best approach for knowledge base interactions"
+    steps:
+      - id: normalize_main_input
+        agent: input_normalizer
+        input: |
+          user_input: ${user_input}
+          user_query: ${user_query}
+        output:
+          to: clean_input
+
+      - id: determine_search_approach
+        agent: search_intent_classifier
+        input: |
+          User request: ${context.step_outputs.normalize_main_input}
+          
+          Classify the type of knowledge base operation needed.
+        output:
+          to: operation_type
+
+      - id: route_to_appropriate_workflow
+        condition_router:
+          conditions:
+            - condition: "${context.step_outputs.determine_search_approach} == 'similarity_search'"
+              workflow: quick_search_workflow
+              input: "${context.step_outputs.normalize_main_input}"
+            
+            - condition: "${context.step_outputs.determine_search_approach} == 'list_datasets'"
+              workflow: browse_knowledge_workflow
+              input: "${context.step_outputs.normalize_main_input}"
+            
+            - condition: "${context.step_outputs.determine_search_approach} == 'get_content'"
+              workflow: document_retrieval_workflow
+              input: "${context.step_outputs.normalize_main_input}"
+            
+            - condition: "${context.step_outputs.determine_search_approach} == 'dataset_info'"
+              workflow: dataset_inspection_workflow
+              input: "${context.step_outputs.normalize_main_input}"
+            
+            - default:
+              workflow: intelligent_search_workflow
+              input:
+                user_input: "${context.step_outputs.normalize_main_input}"
+        output:
+          to: final_response

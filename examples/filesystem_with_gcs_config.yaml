@@ -1,0 +1,367 @@
+# Enhanced Filesystem MCP Tool with Google Cloud Storage (GCS) Support
+# ========================================================================
+# Demonstrates hybrid local + GCS filesystem operations with permission control
+
+version: "1.0"
+project_name: "filesystem-gcs-demo"
+
+# === Enhanced Filesystem with GCS Support ===
+tools:
+  - id: hybrid_filesystem
+    type: mcpfilesystem
+    description: "Hybrid filesystem supporting both local paths and Google Cloud Storage"
+    
+    # GCS Configuration
+    gcs_project_id: "your-gcp-project-id"  # Optional: defaults to environment
+    
+    # Hybrid Permission Configuration (Local + GCS)
+    permissions:
+      # Local filesystem permissions
+      "/": "read_only"                       # Local root read-only
+      "~/": "read_only"                      # Local home read-only
+      "~/agent_workspace/": "read_write"     # Local agent workspace full CRUD
+      "/tmp/": "read_write"                  # Local temp full CRUD
+      
+      # GCS permissions
+      "gs://": "read_only"                   # All GCS buckets read-only by default
+      "gs://my-data-bucket/": "read_only"    # Data bucket read-only
+      "gs://agent-workspace/": "read_write"  # Agent GCS workspace full CRUD
+      "gs://output-bucket/": "read_write"    # Output bucket full CRUD
+      "gs://sensitive-bucket/": "forbidden"  # Sensitive bucket blocked
+      
+      # Specific GCS paths with granular control
+      "gs://shared-docs/public/": "read_only"
+      "gs://shared-docs/private/": "forbidden"
+      "gs://agent-workspace/temp/": "read_write"
+      "gs://agent-workspace/logs/": "read_write"
+
+# === Agent Configurations ===
+
+agents:
+  # Hybrid file manager with local + GCS access
+  - id: hybrid_file_manager
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You are a hybrid file management assistant with access to both local filesystem and Google Cloud Storage.
+      
+      **SUPPORTED PATH TYPES:**
+      
+      **Local Paths:**
+      - ~/agent_workspace/ (read_write) - Local agent workspace
+      - ~/Documents/ (read_only) - Local documents
+      - /tmp/ (read_write) - Local temporary files
+      
+      **GCS Paths:**
+      - gs://my-data-bucket/ (read_only) - Data storage bucket
+      - gs://agent-workspace/ (read_write) - Agent cloud workspace
+      - gs://output-bucket/ (read_write) - Output storage bucket
+      
+      **Path Examples:**
+      - Local: "~/agent_workspace/output.txt"
+      - GCS: "gs://agent-workspace/reports/summary.json"
+      
+      **Operations Available:**
+      - list_directory: Works with both local directories and GCS "folders"
+      - read_file: Read from local files or GCS objects
+      - write_file: Create files locally or upload to GCS
+      - get_file_info: Get metadata from local files or GCS objects
+      
+      **Best Practices:**
+      1. Use get_file_info to check permissions and existence
+      2. Read data from read_only sources (local docs, GCS data bucket)
+      3. Write outputs to read_write areas (local workspace, GCS workspace)
+      4. Handle both local and GCS paths seamlessly
+      
+      **Example MCP Calls:**
+      
+      Read from GCS:
+      {
+        "mcp": {
+          "tool": "hybrid_filesystem",
+          "method": "read_file",
+          "params": {
+            "path": "gs://my-data-bucket/datasets/data.csv"
+          }
+        }
+      }
+      
+      Write to GCS:
+      {
+        "mcp": {
+          "tool": "hybrid_filesystem", 
+          "method": "write_file",
+          "params": {
+            "path": "gs://agent-workspace/outputs/analysis.json",
+            "content": "{\"result\": \"analysis complete\"}"
+          }
+        }
+      }
+      
+      Always specify full paths and handle errors gracefully.
+      
+    tools:
+      - hybrid_filesystem
+  
+  # Data processor with GCS integration
+  - id: gcs_data_processor
+    agent_type: openai
+    model: gpt-4o-mini
+    system_prompt: |
+      You process data from GCS buckets and save results to cloud storage.
+      
+      **Your workflow:**
+      1. Read source data from gs://my-data-bucket/ (read-only)
+      2. Process and analyze the data
+      3. Save results to gs://agent-workspace/ (read-write)
+      4. Optionally cache locally in ~/agent_workspace/
+      
+      **Focus on cloud-first operations with local fallback.**
+      
+    tools:
+      - hybrid_filesystem
+
+  # Document sync agent (local <-> GCS)
+  - id: document_sync_agent
+    agent_type: openai
+    model: gpt-4o-mini
+    system_prompt: |
+      You synchronize documents between local filesystem and GCS.
+      
+      **Sync Operations:**
+      - Read from local ~/Documents/ and upload to gs://output-bucket/
+      - Download from gs://my-data-bucket/ to local workspace
+      - Keep local and cloud copies in sync
+      
+      **Always check file existence and permissions first.**
+      
+    tools:
+      - hybrid_filesystem
+
+# === Workflow Configurations ===
+
+workflows:
+  # Cloud data processing workflow
+  cloud_data_processing_workflow:
+    steps:
+      - agent: gcs_data_processor
+        input: "${user_input}"
+        output:
+          to: user
+  
+  # Hybrid file operations workflow
+  hybrid_file_workflow:
+    steps:
+      - agent: hybrid_file_manager
+        input: "${user_input}"
+        output:
+          to: user
+  
+  # Multi-step cloud processing
+  advanced_cloud_processing_workflow:
+    steps:
+      # Step 1: Read data from GCS
+      - agent: gcs_data_processor
+        input: |
+          Read and analyze the data from GCS: ${user_input}
+          
+          Use GCS paths like gs://my-data-bucket/datasets/
+        output:
+          to: next_step
+      
+      # Step 2: Process and save results
+      - agent: hybrid_file_manager
+        input: |
+          Process this data and save results to both local and GCS:
+          
+          ${previous_output}
+          
+          Save to:
+          - Local: ~/agent_workspace/results/
+          - GCS: gs://agent-workspace/outputs/
+        output:
+          to: user
+
+# === Environment Variables ===
+# Set these environment variables for GCS authentication:
+
+# Option 1: Service Account Key File
+# export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account-key.json"
+
+# Option 2: Default Application Credentials (if running on GCP)
+# gcloud auth application-default login
+
+# Option 3: Environment-based project ID
+# export GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
+
+# === Usage Examples ===
+
+# Example 1: List GCS bucket contents
+# Input: "List the contents of gs://my-data-bucket/datasets/"
+# 
+# Agent will call:
+# {
+#   "mcp": {
+#     "tool": "hybrid_filesystem",
+#     "method": "list_directory", 
+#     "params": {"path": "gs://my-data-bucket/datasets/"}
+#   }
+# }
+
+# Example 2: Read GCS object
+# Input: "Read the file gs://my-data-bucket/config.json"
+#
+# Agent will call:
+# {
+#   "mcp": {
+#     "tool": "hybrid_filesystem",
+#     "method": "read_file",
+#     "params": {"path": "gs://my-data-bucket/config.json"}
+#   }
+# }
+
+# Example 3: Hybrid data processing
+# Input: "Read data from gs://my-data-bucket/sales.csv, analyze it, and save results to both local workspace and gs://agent-workspace/reports/"
+#
+# Agent will:
+# 1. Read from GCS: read_file(gs://my-data-bucket/sales.csv)
+# 2. Process data locally
+# 3. Save locally: write_file(~/agent_workspace/analysis.json)
+# 4. Save to GCS: write_file(gs://agent-workspace/reports/analysis.json)
+
+# Example 4: Check GCS object info
+# Input: "Check the details of gs://agent-workspace/important.txt"
+#
+# Agent will call:
+# {
+#   "mcp": {
+#     "tool": "hybrid_filesystem",
+#     "method": "get_file_info",
+#     "params": {"path": "gs://agent-workspace/important.txt"}
+#   }
+# }
+
+---
+
+# === Alternative Configuration: GCS-First Setup ===
+# For cloud-native workflows with minimal local storage
+
+version: "1.0"
+project_name: "gcs-first-filesystem"
+
+tools:
+  - id: gcs_first_filesystem
+    type: mcpfilesystem
+    description: "GCS-first filesystem with minimal local access"
+    gcs_project_id: "your-gcp-project-id"
+    
+    # GCS-focused permissions
+    permissions:
+      # Minimal local access
+      "~/agent_workspace/": "read_write"    # Small local workspace
+      "/tmp/": "read_write"                 # Temp files only
+      "/": "forbidden"                      # Block other local access
+      
+      # Extensive GCS access
+      "gs://": "read_only"                  # Default GCS read-only
+      "gs://data-lake/": "read_only"        # Data lake access
+      "gs://ml-models/": "read_only"        # Model storage access
+      "gs://agent-workspace/": "read_write" # Agent cloud workspace
+      "gs://outputs/": "read_write"         # Output storage
+      "gs://cache/": "read_write"           # Cache storage
+
+agents:
+  - id: cloud_native_agent
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You are a cloud-native agent that primarily works with GCS storage.
+      
+      **Primary Storage:** Google Cloud Storage buckets
+      **Local Storage:** Minimal (only ~/agent_workspace/ and /tmp/)
+      
+      **Preferred workflow:**
+      1. Read data from GCS buckets
+      2. Process in memory or use minimal local temp files
+      3. Save outputs directly to GCS
+      4. Use local storage only for temporary operations
+      
+    tools:
+      - gcs_first_filesystem
+
+---
+
+# === Security Configuration Example ===
+# For environments requiring strict GCS access control
+
+version: "1.0"
+project_name: "secure-gcs-filesystem"
+
+tools:
+  - id: secure_gcs_filesystem
+    type: mcpfilesystem
+    description: "Secure filesystem with strict GCS permission control"
+    gcs_project_id: "secure-project-id"
+    
+    # Security-focused permissions
+    permissions:
+      # Local (minimal access)
+      "/": "forbidden"                       # Block local root
+      "~/": "forbidden"                      # Block local home
+      "~/agent_workspace/temp/": "read_write" # Only temp workspace
+      
+      # GCS (granular control)
+      "gs://": "forbidden"                   # Block default GCS access
+      "gs://public-data/": "read_only"       # Public data only
+      "gs://approved-workspace/": "read_write" # Approved workspace only
+      
+      # Specific project paths
+      "gs://public-data/datasets/": "read_only"
+      "gs://public-data/models/": "read_only" 
+      "gs://approved-workspace/agent-{agent_id}/": "read_write"  # Per-agent workspace
+
+agents:
+  - id: secure_agent
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You operate in a highly secure environment with restricted access.
+      
+      **ALLOWED AREAS:**
+      - gs://public-data/ (read_only) - Approved public datasets
+      - gs://approved-workspace/ (read_write) - Your designated workspace
+      - ~/agent_workspace/temp/ (read_write) - Minimal local temp
+      
+      **SECURITY REQUIREMENTS:**
+      - Never attempt to access forbidden areas
+      - Always verify permissions before operations
+      - Log all file operations for audit
+      
+    tools:
+      - secure_gcs_filesystem
+
+# === Dependencies ===
+# Install required packages:
+# pip install google-cloud-storage
+
+# === GCS Setup Requirements ===
+# 1. Create GCS buckets:
+#    - gsutil mb gs://my-data-bucket
+#    - gsutil mb gs://agent-workspace
+#    - gsutil mb gs://output-bucket
+#
+# 2. Set up authentication:
+#    - Create service account
+#    - Download key file
+#    - Set GOOGLE_APPLICATION_CREDENTIALS
+#
+# 3. Configure bucket permissions:
+#    - Grant appropriate IAM roles
+#    - Set bucket policies as needed
+
+# === Monitoring and Logging ===
+# Enable Cloud Logging for audit trails:
+# - File access logs
+# - Permission denial logs  
+# - Upload/download activity
+# - Error tracking

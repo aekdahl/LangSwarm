@@ -1,0 +1,24 @@
+# AAF Orchestrator Dependencies
+
+# FastAPI and web framework
+fastapi==0.115.12
+uvicorn==0.34.2
+aiohttp==3.11.18
+pydantic==2.11.4
+
+# Google Cloud
+google-cloud-firestore==2.16.0
+google-cloud-functions==1.16.3
+google-cloud-run==0.10.0
+google-cloud-resource-manager>=1.12.0
+google-cloud-service-usage>=1.13.0
+google-cloud-artifact-registry>=1.11.0
+google-cloud-iam>=2.15.0
+google-cloud-secret-manager>=2.16.0
+google-cloud-bigquery>=3.11.0
+google-auth==2.23.4
+requests>=2.31.0
+
+# Utilities
+python-multipart==0.0.6
+python-dotenv==1.0.0
