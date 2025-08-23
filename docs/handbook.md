@@ -1,6 +1,73 @@
-# 🚀 LangSwarm Simplified - Complete User Guide
+# 🚀 LangSwarm Handbook
 
 **Welcome to the new LangSwarm!** This guide shows you how to build powerful multi-agent AI systems in minutes, not hours.
+
+<!--
+## Handbook Outline
+1.  Introduction to LangSwarm
+    -   What is LangSwarm?
+    -   Core Concepts
+2.  Getting Started
+    -   Installation
+    -   Your First LangSwarm Agent
+3.  Core Features
+    -   Configuration
+    -   Agents
+    -   Tools
+    -   Memory
+### Sessions
+
+LangSwarm provides a powerful session management system that allows you to control how memory and context are shared between agents.
+
+**Key Session Settings:**
+
+-   **`unified_memory`**: (boolean, default: `false`) When `true`, enables shared conversation context across all agents in the session. This is the key to enabling collaborative multi-agent workflows.
+-   **`scope`**: (string, default: `workflow`) Defines the boundary of memory sharing.
+    -   `workflow`: Memory is isolated to a single workflow execution.
+    -   `user`: Memory is shared across all workflows for a specific user.
+    -   `global`: Memory is shared across all users and workflows (e.g., for a company-wide knowledge base).
+-   **`sharing_strategy`**: (string, default: `all`) Controls how much context is shared between agents.
+    -   `all`: Each agent sees the complete session history.
+    -   `sequential`: Each agent sees only the output of the immediately preceding agent. This is great for linear pipelines and can significantly reduce token costs.
+    -   `selective`: Agents see only relevant context based on smart criteria.
+-   **`context_window_management`**: (string, default: `auto`) Manages the context window to prevent token overflow.
+    -   `auto`: Automatically truncates the oldest messages when approaching the model's token limit.
+    -   `smart_truncate`: Intelligently removes the least relevant context.
+    -   `summarize`: Compresses older parts of the conversation into summaries.
+
+**Example Session Configuration:**
+```yaml
+session:
+  unified_memory: true
+  scope: "user"
+  sharing_strategy: "sequential"
+  context_window_management: "smart_truncate"
+  session_timeout: 3600 # 1 hour
+```
+
+### Response Modes
+
+When an agent provides both a user response AND a tool call in the same JSON structure, LangSwarm supports two different modes for handling this situation: `"integrated"` (the default) and `"streaming"`.
+
+**`"integrated"` Mode (Default):**
+The user response is combined with tool results before being shown to the user. This is ideal for APIs and batch processing where a single, concise response is desired.
+
+**`"streaming"` Mode:**
+The user sees the agent's immediate response first, then the tool results are shown separately. This is great for chat interfaces and interactive tools where transparency and a conversational flow are important.
+
+**Configuration:**
+```yaml
+agents:
+  - id: my_agent
+    response_mode: "streaming"
+```
+4.  Advanced Topics
+    -   MCP (Multi-Controller Pattern)
+    -   Zero-Config Customization
+5.  Integration Guide
+6.  Migration Guide
+7.  Examples
+-->
 
 ---
 
@@ -88,6 +155,24 @@ LangSwarm automatically detects your environment and selects the optimal backend
 - **Redis Available** → Redis (ultra-fast access, proven reliability)
 - **Local/Development** → SQLite (zero-config, instant start)
 - **Production Fallback** → ChromaDB (vector search, self-contained)
+
+### Session-Scoped Unified Memory
+
+Session-Scoped Unified Memory provides **automatic context sharing** between agents within a defined scope, creating seamless collaboration.
+
+**How It Works**
+```yaml
+# langswarm.yaml
+session:
+  unified_memory: true
+  scope: "workflow"
+  sharing_strategy: "all"
+```
+
+**Key Characteristics**
+- **Automatic Context Sharing**: Agents see the full conversation history.
+- **Natural Collaboration**: Agents can build on each other's work without complex setup.
+- **Context Window Management**: Automatic handling of token limits to prevent overflow.
 
 ### **Memory Usage Examples**
 
@@ -403,7 +488,91 @@ tools:
 
 ---
 
-## 🔧 **Migration Guide: From Complex to Simple**
+## 5. Integration Guide
+
+This section explains how to integrate LangSwarm's features, like the Intelligent Workflow Navigation system, into your existing codebase.
+
+### Integration Strategy
+
+LangSwarm features are designed for phased integration to ensure compatibility and a smooth transition.
+
+1.  **Standalone Module**: Features are developed as independent modules with their own core functionality and tests.
+2.  **Workflow Integration**: New features are integrated into the existing workflow execution engine, often by adding new step types while maintaining backward compatibility.
+3.  **UI Integration**: New UI components, like dashboards and visualizations, are added to the existing UI.
+4.  **Advanced Features**: A/B testing, machine learning optimization, and advanced analytics are added in later phases.
+
+### Core Integration Points
+
+-   **Workflow Step Type Registration**: New features often introduce new step types (e.g., a `navigation` step) that need to be registered in `langswarm/core/config.py`.
+-   **Tool Registration**: New tools provided by features are registered in `langswarm/core/wrappers/generic.py`.
+-   **Configuration Schema Updates**: The configuration schema in `langswarm/core/config.py` is updated to validate the new step types and their parameters.
+-   **Database Integration**: New tables are added to the database to track feature-specific data, like navigation decisions, in `langswarm/core/session/models.py`.
+-   **Analytics Integration**: New analytics hooks are added to track the performance and usage of new features.
+
+### Backward Compatibility
+
+All new features are designed to be fully backward compatible. Existing workflows and configurations will continue to work without any changes. New features are enabled through new configuration options, so you can adopt them at your own pace.
+
+## 6. Migration Guide
+
+This section helps existing LangSwarm users migrate from complex multi-file configurations to the new simplified system while preserving all functionality.
+
+### Migration Overview
+
+- **8 config files → 1 unified file** (87.5% file reduction)
+- **22+ agent parameters → 1 config object** (95% parameter reduction)
+- **15+ line workflows → 1 line syntax** (90% complexity reduction)
+- **20+ memory settings → 3 simple tiers** (95% configuration reduction)
+
+**You can migrate at your own pace - old and new syntax work side by side.**
+
+### Quick Migration (5 Minutes)
+
+1.  **Backup Your Current Configuration**: `cp -r your_langswarm_project your_langswarm_project_backup`
+2.  **Create Simplified Configuration**: Create a single `langswarm.yaml` with the new, simplified syntax.
+3.  **Test Migration**: Use `LangSwarmConfigLoader` to load the new config and ensure it works.
+4.  **Update Your Code**: Switch from complex agent constructors to the new simple factory functions like `create_chat_agent`.
+
+### Agent Configuration Migration
+
+**Before (agents.yaml):**
+```yaml
+agents:
+  - id: customer_support
+    agent_type: langchain-openai
+    model: gpt-4o
+    system_prompt: "You are a helpful customer support agent..."
+    # ... 15+ more parameters
+```
+
+**After (langswarm.yaml):**
+```yaml
+agents:
+  - id: customer_support
+    model: gpt-4o
+    behavior: helpful
+    tools: [filesystem, knowledge_base]
+    memory_enabled: true
+```
+
+### Workflow Migration
+
+**Before (workflows.yaml):**
+```yaml
+workflows:
+  - id: support_escalation_workflow
+    name: "Customer Support Escalation"
+    steps:
+      - id: initial_classification
+        agent: classifier_agent
+        # ... complex step definition
+```
+
+**After (langswarm.yaml):**
+```yaml
+workflows:
+  - "classifier -> (faq_bot | specialist | expert) -> user"
+```
 
 ### **Before & After Comparisons**
 
@@ -611,7 +780,164 @@ workflows:
 
 ---
 
-## 🚀 **Advanced Features (Still Simple)**
+## 4. Advanced Topics
+
+### MCP (Multi-Controller Pattern)
+
+**Local MCP Mode** enables zero-latency tool execution directly within LangSwarm without containers, external servers, or complex deployment. This revolutionary approach delivers 1000x faster tool calls while maintaining full MCP compatibility.
+
+#### How Local MCP Works
+
+```mermaid
+graph LR
+    A[Workflow YAML] --> B[WorkflowExecutor]
+    B --> C[mcp_call function]
+    C --> D{URL Type?}
+    D -->|local://| E[Local Server Registry]
+    D -->|http://| F[HTTP Request]
+    D -->|stdio://| G[External Process]
+    E --> H[Direct Function Call]
+    H --> I[0ms Response]
+```
+
+#### Performance Comparison
+
+| Mode | Latency | Setup | Use Case |
+|------|---------|-------|----------|
+| **Local Mode** | **0.0ms** | Zero setup | Development, simple tools |
+| HTTP Mode | 50-100ms | Docker/uvicorn | Production deployment |
+| Stdio Mode | 20-50ms | External process | Complex external tools |
+
+#### Building Custom Local Tools
+
+**Step 1: Create Tool Implementation**
+
+```python
+# my_tools/calculator.py
+from langswarm.mcp.server_base import BaseMCPToolServer
+from pydantic import BaseModel
+
+class CalculateInput(BaseModel):
+    expression: str
+
+class CalculateOutput(BaseModel):
+    result: float
+    expression: str
+
+def calculate_handler(expression: str):
+    """Safely evaluate mathematical expressions"""
+    try:
+        # Use a safe evaluator in production
+        result = eval(expression)  # Note: Use ast.literal_eval for safety
+        return {"result": result, "expression": expression}
+    except Exception as e:
+        return {"result": 0, "expression": f"Error: {e}"}
+
+# Create local MCP server
+calculator_server = BaseMCPToolServer(
+    name="calculator",
+    description="Mathematical calculator tool",
+    local_mode=True  # 🔧 Enable local mode
+)
+
+calculator_server.add_task(
+    name="calculate",
+    description="Evaluate a mathematical expression",
+    input_model=CalculateInput,
+    output_model=CalculateOutput,
+    handler=calculate_handler
+)
+
+# Auto-register when imported
+app = calculator_server.build_app()
+```
+
+**Step 2: Use in Workflows**
+
+```yaml
+# workflows.yaml
+workflows:
+  main_workflow:
+    - id: math_workflow
+      steps:
+        - id: calculate_result
+          function: langswarm.core.utils.workflows.functions.mcp_call
+          args:
+            mcp_url: "local://calculator"  # Matches server name
+            task: "calculate"
+            params: {"expression": "2 + 2 * 3"}
+          output:
+            to: user
+```
+
+#### Remote MCP Tools
+
+LangSwarm also supports connecting to remote MCP (Model-Compatible Protocol) servers through HTTP/HTTPS endpoints. This enables integration with external services, third-party tool providers, and cloud-hosted MCP servers.
+
+**Basic Remote MCP Tool Configuration**
+
+```yaml
+# tools.yaml
+tools:
+  - id: remote_service
+    type: mcpremote
+    description: "Remote MCP service for data processing"
+    mcp_url: "https://your-mcp-server.com/api"
+    headers:
+      Authorization: "Bearer ${API_TOKEN}"
+    timeout: 30
+    retry_count: 3
+```
+
+**Authentication**
+
+Use environment variables for sensitive information like API keys and tokens.
+
+```yaml
+tools:
+  - id: secure_service
+    type: mcpremote
+    mcp_url: "https://api.service.com/mcp"
+    headers:
+      x-api-key: "${SERVICE_API_KEY}"
+```
+
+### Zero-Config Customization
+
+The zero-config system provides intelligent defaults, but you can easily customize them to match your specific needs.
+
+#### Behavior Profiles
+
+The primary way to customize is by editing **Behavior Profiles** in `langswarm/core/defaults.py`. These profiles define default settings for different agent behaviors like "coding", "research", etc.
+
+```python
+# langswarm/core/defaults.py
+"coding": BehaviorProfile(
+    name="Coding Assistant",
+    preferred_models=["gpt-4o", "claude-3-5-sonnet-20241022"],
+    max_tokens=8000,
+    temperature=0.1,
+    tools=["filesystem", "github", "codebase_indexer"],
+),
+```
+
+You can add new profiles or modify existing ones to change the default model, temperature, tools, and more for a given behavior.
+
+#### Configuration File Override
+
+You can also override defaults directly in your `langswarm.yaml` file for per-agent customization without changing the global defaults.
+
+```yaml
+# langswarm.yaml
+version: "1.0"
+agents:
+  - id: "custom-coder"
+    behavior: "coding"
+    model: "claude-3-5-sonnet-20241022"  # Override default model
+    temperature: 0.05                    # Override default temperature
+```
+
+### **Environment-Specific Configurations**
 
 ### **Environment-Specific Configurations**
 
@@ -698,4 +1024,4 @@ agents:
 
 ---
 
-**Welcome to the simplified LangSwarm! Build powerful AI systems with ease.** 🚀 
+**Welcome to the simplified LangSwarm! Build powerful AI systems with ease.** 🚀
