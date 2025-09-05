@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.54.dev8] - 2025-01-17
+
+### 🚀 **Critical BigQuery Tool Execution Fix**
+- **Fixed Tool Execution Hang**: Resolved async/sync bridge issue causing BigQuery tool to hang indefinitely
+  - Added proper event loop detection and thread-based execution
+  - Tools now work correctly in both sync and async contexts
+  - Eliminated "asyncio.run() cannot be called from a running event loop" errors
+
+### 🤖 **Enhanced BigQuery Tool Functionality**
+- **Automatic Embedding Generation**: Tool now generates embeddings automatically from text queries
+  - No more "query_embedding is required" errors
+  - Seamless OpenAI integration for vector search
+  - Support for multiple input formats (string, dict, structured MCP)
+
+### 🔧 **System Prompt Template Fix**
+- **Fixed Tool Instructions**: Resolved template path resolution preventing tool instructions from appearing in agent prompts
+  - Tools now properly inject usage instructions into agent system prompts
+  - Agents automatically know how to use their tools
+
+### 📊 **Improved Error Handling & Debugging**
+- **Comprehensive Logging**: Added detailed execution tracking and error reporting
+  - Clear input/output type logging
+  - Enhanced error messages for troubleshooting
+  - Better timeout handling for tool execution
+
 ## [0.0.54.dev7] - 2025-01-17
 
 ### 🎯 **BigQuery Vector Search - Built-in Tool**

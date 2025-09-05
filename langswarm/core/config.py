@@ -2390,8 +2390,20 @@ Adapt your approach based on the user's needs, drawing from your combined expert
         return agent
 
     def _render_system_prompt(self, agent):
-        template_path = 'templates/system_prompt_template.md'
-        if not os.path.exists(template_path):
+        # Try multiple template locations
+        template_paths = [
+            'templates/system_prompt_template.md',  # User's custom template
+            'langswarm/core/templates/system_prompt_template.md',  # LangSwarm default
+            os.path.join(os.path.dirname(__file__), 'templates/system_prompt_template.md')  # Relative to this file
+        ]
+        
+        template_path = None
+        for path in template_paths:
+            if os.path.exists(path):
+                template_path = path
+                break
+        
+        if not template_path:
             return agent.get("system_prompt", "")
 
         with open(template_path, "r", encoding="utf-8") as f:

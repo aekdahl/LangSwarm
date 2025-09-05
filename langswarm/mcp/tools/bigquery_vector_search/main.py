@@ -468,10 +468,16 @@ try:
             
         async def similarity_search(self, query: str, limit: int = 10, similarity_threshold: float = 0.7, 
                                    dataset_id: str = None, table_name: str = None):
-            """Perform vector similarity search"""
+            """Perform vector similarity search with automatic embedding generation"""
             try:
+                # Generate embedding for the query text
+                logger.info(f"Generating embedding for query: {query[:100]}...")
+                query_embedding = await get_embedding(query)
+                logger.info(f"Embedding generated successfully, dimension: {len(query_embedding)}")
+                
                 search_input = SimilaritySearchInput(
                     query=query,
+                    query_embedding=query_embedding,  # Add the generated embedding
                     limit=limit,
                     similarity_threshold=similarity_threshold,
                     dataset_id=dataset_id or self.default_config["dataset_id"],
@@ -479,11 +485,15 @@ try:
                 )
                 
                 # Use the global handler functions defined above
+                logger.info(f"Executing BigQuery search with {len(query_embedding)}-dim embedding...")
                 result = similarity_search(search_input)
+                logger.info(f"BigQuery search completed: {result.total_results} results found")
                 return result.dict()
                 
             except Exception as e:
                 logger.error(f"BigQuery similarity search failed: {e}")
+                import traceback
+                traceback.print_exc()
                 return {"success": False, "error": str(e)}
         
         async def get_content(self, document_id: str, dataset_id: str = None, table_name: str = None):
@@ -532,18 +542,110 @@ try:
                 logger.error(f"BigQuery dataset info failed: {e}")
                 return {"success": False, "error": str(e)}
         
-        async def run(self, method: str, params: dict):
-            """Generic run method for MCP tool calls"""
-            if method == "similarity_search":
-                return await self.similarity_search(**params)
-            elif method == "get_content":
-                return await self.get_content(**params)
-            elif method == "list_datasets":
-                return await self.list_datasets(**params)
-            elif method == "dataset_info":
-                return await self.dataset_info(**params)
-            else:
-                return {"success": False, "error": f"Unknown method: {method}"}
+        def run(self, input_data=None):
+            """Generic run method for MCP tool calls (handles both sync and async contexts)"""
+            import asyncio
+            
+            logger.info(f"BigQuery tool run() called with input: {input_data}")
+            logger.info(f"Input type: {type(input_data)}")
+            
+            try:
+                # Check if we're already in an event loop
+                try:
+                    loop = asyncio.get_running_loop()
+                    # We're in an async context, need to create a task
+                    logger.info("Running in async context, creating task")
+                    
+                    # Create a new task in the current loop
+                    task = loop.create_task(self._async_run(input_data))
+                    
+                    # Since we can't await in a sync function, we need to run until complete
+                    # This is a bit hacky but necessary for sync/async bridge
+                    import concurrent.futures
+                    import threading
+                    
+                    # Run the async function in a separate thread with its own event loop
+                    def run_in_thread():
+                        new_loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(new_loop)
+                        try:
+                            return new_loop.run_until_complete(self._async_run(input_data))
+                        finally:
+                            new_loop.close()
+                    
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(run_in_thread)
+                        return future.result(timeout=30)  # 30 second timeout
+                        
+                except RuntimeError:
+                    # No event loop running, safe to use asyncio.run()
+                    logger.info("No event loop running, using asyncio.run()")
+                    return asyncio.run(self._async_run(input_data))
+                    
+            except Exception as e:
+                logger.error(f"BigQuery tool run() failed: {e}")
+                import traceback
+                traceback.print_exc()
+                return {"success": False, "error": str(e)}
+        
+        async def _async_run(self, input_data=None):
+            """Internal async implementation of run method"""
+            try:
+                # Handle different input formats
+                if isinstance(input_data, dict):
+                    # Check for structured MCP format
+                    if "method" in input_data and "params" in input_data:
+                        method = input_data["method"]
+                        params = input_data["params"]
+                        logger.info(f"Structured MCP call: method={method}, params={params}")
+                    elif "method" in input_data:
+                        method = input_data["method"]
+                        params = {k: v for k, v in input_data.items() if k != "method"}
+                        logger.info(f"Semi-structured call: method={method}, params={params}")
+                    else:
+                        # Assume it's a direct method call (most common for agents)
+                        # Try to infer method from parameters or default to similarity_search
+                        if "query" in input_data:
+                            method = "similarity_search"
+                            params = input_data
+                            logger.info(f"Inferred similarity_search from query parameter")
+                        elif "document_id" in input_data:
+                            method = "get_content"
+                            params = input_data
+                            logger.info(f"Inferred get_content from document_id parameter")
+                        else:
+                            return {"success": False, "error": f"Cannot infer method from input: {input_data}"}
+                else:
+                    # Handle string input (simple query)
+                    if isinstance(input_data, str):
+                        method = "similarity_search"
+                        params = {"query": input_data}
+                        logger.info(f"String input converted to similarity_search: {input_data[:100]}...")
+                    else:
+                        return {"success": False, "error": f"Unsupported input type: {type(input_data)}"}
+                
+                # Route to appropriate method
+                if method == "similarity_search":
+                    logger.info(f"Calling similarity_search with params: {params}")
+                    return await self.similarity_search(**params)
+                elif method == "get_content":
+                    logger.info(f"Calling get_content with params: {params}")
+                    return await self.get_content(**params)
+                elif method == "list_datasets":
+                    logger.info(f"Calling list_datasets with params: {params}")
+                    return await self.list_datasets(**params)
+                elif method == "dataset_info":
+                    logger.info(f"Calling dataset_info with params: {params}")
+                    return await self.dataset_info(**params)
+                else:
+                    available_methods = ["similarity_search", "get_content", "list_datasets", "dataset_info"]
+                    return {"success": False, "error": f"Unknown method: {method}. Available: {available_methods}"}
+                    
+            except Exception as e:
+                logger.error(f"BigQuery tool _async_run() failed: {e}")
+                import traceback
+                traceback.print_exc()
+                return {"success": False, "error": str(e)}
         
         def configure(self, config: dict):
             """Configure the tool with custom settings"""
