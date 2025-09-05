@@ -543,10 +543,7 @@ try:
                 return {"success": False, "error": str(e)}
         
         def run(self, input_data=None):
-            """Generic run method for MCP tool calls (handles both sync and async contexts)"""
-            import asyncio
-            import concurrent.futures
-            import threading
+            """Simplified synchronous run method matching session storage patterns"""
             import time
             
             logger.info(f"BigQuery tool run() called with input: {input_data}")
@@ -555,53 +552,253 @@ try:
             start_time = time.time()
             
             try:
-                # Simple approach: always use a separate thread with its own event loop
-                # This avoids all the complexity of trying to reuse existing loops
-                logger.info("Starting BigQuery tool execution in separate thread")
+                # Simple synchronous approach - no async complexity
+                logger.info("Starting BigQuery tool execution (synchronous)")
                 
-                def run_async_in_thread():
-                    """Run the async function in a completely separate thread with its own event loop"""
-                    new_loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(new_loop)
-                    try:
-                        logger.info("Created new event loop in thread")
-                        result = new_loop.run_until_complete(self._async_run(input_data))
-                        logger.info(f"Thread execution completed successfully")
-                        return result
-                    except Exception as e:
-                        logger.error(f"Thread execution failed: {e}")
-                        return {"success": False, "error": str(e)}
-                    finally:
-                        # Clean shutdown of the event loop
-                        try:
-                            new_loop.close()
-                            logger.info("Event loop closed cleanly")
-                        except Exception as e:
-                            logger.warning(f"Event loop cleanup warning: {e}")
-                
-                # Execute with timeout in separate thread
-                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                    logger.info("Submitting task to thread pool")
-                    future = executor.submit(run_async_in_thread)
+                # Parse input like async version but execute synchronously
+                if isinstance(input_data, str):
+                    # Simple string query
+                    query = input_data
+                    limit = 10
+                    similarity_threshold = 0.7
+                    dataset_id = self.default_config["dataset_id"]
+                    table_name = self.default_config["table_name"]
                     
-                    try:
-                        # 30 second timeout to prevent hanging
-                        result = future.result(timeout=30)
-                        elapsed = time.time() - start_time
-                        logger.info(f"BigQuery tool completed in {elapsed:.2f}s")
-                        return result
+                elif isinstance(input_data, dict):
+                    # Structured input
+                    if "method" in input_data and "params" in input_data:
+                        # MCP-style call
+                        method = input_data["method"]
+                        params = input_data["params"]
                         
-                    except concurrent.futures.TimeoutError:
-                        elapsed = time.time() - start_time
-                        logger.error(f"BigQuery tool timed out after {elapsed:.2f}s")
-                        return {
-                            "success": False, 
-                            "error": f"Tool execution timed out after {elapsed:.2f} seconds"
-                        }
-                        
+                        if method == "similarity_search":
+                            return self._sync_similarity_search(**params)
+                        elif method == "get_content":
+                            return self._sync_get_content(**params)
+                        elif method == "list_datasets":
+                            return self._sync_list_datasets(**params)
+                        elif method == "dataset_info":
+                            return self._sync_dataset_info(**params)
+                        else:
+                            return {"success": False, "error": f"Unknown method: {method}"}
+                    else:
+                        # Direct parameters
+                        query = input_data.get("query", "")
+                        limit = input_data.get("limit", 10)
+                        similarity_threshold = input_data.get("similarity_threshold", 0.7)
+                        dataset_id = input_data.get("dataset_id", self.default_config["dataset_id"])
+                        table_name = input_data.get("table_name", self.default_config["table_name"])
+                else:
+                    return {"success": False, "error": f"Invalid input type: {type(input_data)}"}
+                
+                # Execute synchronous similarity search
+                result = self._sync_similarity_search(
+                    query=query,
+                    limit=limit,
+                    similarity_threshold=similarity_threshold,
+                    dataset_id=dataset_id,
+                    table_name=table_name
+                )
+                
+                elapsed = time.time() - start_time
+                logger.info(f"BigQuery tool completed in {elapsed:.2f}s")
+                return result
+                
             except Exception as e:
                 elapsed = time.time() - start_time
                 logger.error(f"BigQuery tool execution failed after {elapsed:.2f}s: {e}")
+                return {"success": False, "error": str(e)}
+        
+        def _sync_similarity_search(self, query: str, limit: int = 10, similarity_threshold: float = 0.7, 
+                                   dataset_id: str = None, table_name: str = None):
+            """Synchronous similarity search matching session storage pattern"""
+            try:
+                # Generate embedding using synchronous OpenAI client
+                logger.info(f"Generating embedding for query: {query[:100]}...")
+                
+                import openai
+                api_key = os.getenv('OPENAI_API_KEY')
+                if not api_key:
+                    return {"success": False, "error": "OPENAI_API_KEY environment variable is required"}
+                
+                # Use synchronous OpenAI client (like session storage pattern)
+                client = openai.OpenAI(api_key=api_key)
+                response = client.embeddings.create(
+                    model="text-embedding-3-small",
+                    input=query,
+                    encoding_format="float"
+                )
+                query_embedding = response.data[0].embedding
+                logger.info(f"Embedding generated successfully, dimension: {len(query_embedding)}")
+                
+                # Execute BigQuery search using synchronous client (like session storage)
+                project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
+                dataset_id = dataset_id or self.default_config["dataset_id"]
+                table_name = table_name or self.default_config["table_name"]
+                
+                from google.cloud import bigquery
+                client = bigquery.Client(project=project_id)
+                
+                # Build similarity search query
+                embedding_str = f"[{','.join(map(str, query_embedding))}]"
+                
+                sql_query = f"""
+                WITH query_embedding AS (
+                    SELECT {embedding_str} as query_vector
+                ),
+                similarities AS (
+                    SELECT 
+                        document_id,
+                        content,
+                        url,
+                        title,
+                        metadata,
+                        created_at,
+                        ML.DISTANCE(embedding, (SELECT query_vector FROM query_embedding), 'COSINE') as distance,
+                        (1 - ML.DISTANCE(embedding, (SELECT query_vector FROM query_embedding), 'COSINE')) as similarity
+                    FROM `{project_id}.{dataset_id}.{table_name}`
+                    WHERE embedding IS NOT NULL
+                )
+                SELECT 
+                    document_id,
+                    content,
+                    url,
+                    title,
+                    metadata,
+                    created_at,
+                    similarity
+                FROM similarities
+                WHERE similarity >= {similarity_threshold}
+                ORDER BY similarity DESC
+                LIMIT {limit}
+                """
+                
+                # Execute query synchronously
+                query_job = client.query(sql_query)
+                results = query_job.result()
+                
+                # Format results
+                formatted_results = []
+                for row in results:
+                    formatted_results.append({
+                        "document_id": row.document_id,
+                        "content": row.content,
+                        "url": row.url,
+                        "title": row.title,
+                        "metadata": row.metadata,
+                        "created_at": row.created_at,
+                        "similarity": float(row.similarity)
+                    })
+                
+                return {
+                    "success": True,
+                    "query": query,
+                    "results": formatted_results,
+                    "total_results": len(formatted_results),
+                    "dataset": f"{dataset_id}.{table_name}"
+                }
+                
+            except Exception as e:
+                logger.error(f"Synchronous BigQuery similarity search failed: {e}")
+                return {"success": False, "error": str(e)}
+        
+        def _sync_get_content(self, document_id: str, dataset_id: str = None, table_name: str = None):
+            """Synchronous content retrieval"""
+            try:
+                project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
+                dataset_id = dataset_id or self.default_config["dataset_id"]
+                table_name = table_name or self.default_config["table_name"]
+                
+                from google.cloud import bigquery
+                client = bigquery.Client(project=project_id)
+                
+                sql_query = f"""
+                SELECT document_id, content, url, title, metadata, created_at
+                FROM `{project_id}.{dataset_id}.{table_name}`
+                WHERE document_id = @document_id
+                """
+                
+                job_config = bigquery.QueryJobConfig(
+                    query_parameters=[
+                        bigquery.ScalarQueryParameter("document_id", "STRING", document_id)
+                    ]
+                )
+                
+                query_job = client.query(sql_query, job_config=job_config)
+                results = list(query_job.result())
+                
+                if results:
+                    row = results[0]
+                    return {
+                        "success": True,
+                        "document": {
+                            "document_id": row.document_id,
+                            "content": row.content,
+                            "url": row.url,
+                            "title": row.title,
+                            "metadata": row.metadata,
+                            "created_at": row.created_at
+                        }
+                    }
+                else:
+                    return {"success": False, "error": f"Document {document_id} not found"}
+                    
+            except Exception as e:
+                logger.error(f"Synchronous get content failed: {e}")
+                return {"success": False, "error": str(e)}
+        
+        def _sync_list_datasets(self, pattern: str = None):
+            """Synchronous dataset listing"""
+            try:
+                project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
+                
+                from google.cloud import bigquery
+                client = bigquery.Client(project=project_id)
+                
+                datasets = list(client.list_datasets())
+                
+                dataset_info = []
+                for dataset in datasets:
+                    if pattern is None or pattern in dataset.dataset_id:
+                        dataset_info.append({
+                            "dataset_id": dataset.dataset_id,
+                            "description": dataset.description,
+                            "location": dataset.location
+                        })
+                
+                return {
+                    "success": True,
+                    "datasets": dataset_info,
+                    "total_datasets": len(dataset_info)
+                }
+                
+            except Exception as e:
+                logger.error(f"Synchronous list datasets failed: {e}")
+                return {"success": False, "error": str(e)}
+        
+        def _sync_dataset_info(self, dataset_id: str, table_name: str):
+            """Synchronous dataset info retrieval"""
+            try:
+                project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
+                
+                from google.cloud import bigquery
+                client = bigquery.Client(project=project_id)
+                
+                table_ref = client.dataset(dataset_id).table(table_name)
+                table = client.get_table(table_ref)
+                
+                return {
+                    "success": True,
+                    "dataset_id": dataset_id,
+                    "table_name": table_name,
+                    "total_rows": table.num_rows,
+                    "size_bytes": table.num_bytes,
+                    "created": table.created.isoformat() if table.created else None,
+                    "modified": table.modified.isoformat() if table.modified else None
+                }
+                
+            except Exception as e:
+                logger.error(f"Synchronous dataset info failed: {e}")
                 return {"success": False, "error": str(e)}
         
         async def _async_run(self, input_data=None):

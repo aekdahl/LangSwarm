@@ -61,26 +61,56 @@ class EnhancedSessionStorage(SessionStorage):
                 }
             }
             
-            # Save conversation messages for semantic search
-            message_docs = []
-            for msg in session.history.messages:
-                message_docs.append({
-                    "key": f"message:{msg.id}",
-                    "text": msg.content,
-                    "metadata": {
-                        "type": "message",
-                        "session_id": session.session_id,
-                        "message_id": msg.id,
-                        "role": msg.role.value,
-                        "timestamp": msg.timestamp.isoformat(),
-                        "user_id": session.user_id,
-                        "provider": session.provider,
-                        "model": session.model
-                    }
-                })
+            # Save conversation messages grouped as conversation pairs for BigQuery compatibility
+            conversation_docs = []
+            
+            # Group messages into conversation pairs (user + assistant)
+            conversation_pairs = self._group_messages_into_pairs(session.history.messages)
+            
+            for pair in conversation_pairs:
+                if pair["user_message"] and pair["assistant_message"]:
+                    # Create conversation pair document with user_input and agent_response
+                    conversation_docs.append({
+                        "key": f"conversation:{pair['user_message'].id}_{pair['assistant_message'].id}",
+                        "text": f"{pair['user_message'].content} -> {pair['assistant_message'].content}",
+                        "metadata": {
+                            "type": "conversation",
+                            "session_id": session.session_id,
+                            "user_message_id": pair["user_message"].id,
+                            "assistant_message_id": pair["assistant_message"].id,
+                            "user_timestamp": pair["user_message"].timestamp.isoformat(),
+                            "assistant_timestamp": pair["assistant_message"].timestamp.isoformat(),
+                            "user_id": session.user_id,
+                            "provider": session.provider,
+                            "model": session.model
+                        },
+                        # These fields are crucial for BigQuery compatibility
+                        "user_input": pair["user_message"].content,
+                        "agent_response": pair["assistant_message"].content
+                    })
+                
+                # Also save individual messages for completeness (optional)
+                elif pair["user_message"]:
+                    # Orphaned user message (no assistant response yet)
+                    conversation_docs.append({
+                        "key": f"message:{pair['user_message'].id}",
+                        "text": pair["user_message"].content,
+                        "metadata": {
+                            "type": "message",
+                            "session_id": session.session_id,
+                            "message_id": pair["user_message"].id,
+                            "role": pair["user_message"].role.value,
+                            "timestamp": pair["user_message"].timestamp.isoformat(),
+                            "user_id": session.user_id,
+                            "provider": session.provider,
+                            "model": session.model
+                        },
+                        "user_input": pair["user_message"].content,
+                        "agent_response": None  # No response yet
+                    })
             
             # Store in database adapter
-            all_docs = [session_doc] + message_docs
+            all_docs = [session_doc] + conversation_docs
             self.adapter.add_documents(all_docs)
             
             return True
@@ -326,6 +356,55 @@ class EnhancedSessionStorage(SessionStorage):
         except Exception as e:
             print(f"Error getting conversation analytics: {e}")
             return {}
+    
+    def _group_messages_into_pairs(self, messages):
+        """
+        Group conversation messages into user/assistant pairs for BigQuery compatibility.
+        
+        Returns list of pairs: [{"user_message": msg1, "assistant_message": msg2}, ...]
+        """
+        from langswarm.core.session.models import MessageRole
+        
+        pairs = []
+        current_user_message = None
+        
+        for message in messages:
+            if message.role == MessageRole.USER:
+                # Save previous user message if it didn't get a response
+                if current_user_message:
+                    pairs.append({
+                        "user_message": current_user_message,
+                        "assistant_message": None
+                    })
+                
+                # Start new conversation pair
+                current_user_message = message
+                
+            elif message.role == MessageRole.ASSISTANT:
+                if current_user_message:
+                    # Complete the conversation pair
+                    pairs.append({
+                        "user_message": current_user_message,
+                        "assistant_message": message
+                    })
+                    current_user_message = None
+                else:
+                    # Orphaned assistant message (no user message)
+                    pairs.append({
+                        "user_message": None,
+                        "assistant_message": message
+                    })
+            
+            # Skip SYSTEM messages for now as they're not part of user/assistant conversations
+        
+        # Handle final user message without response
+        if current_user_message:
+            pairs.append({
+                "user_message": current_user_message,
+                "assistant_message": None
+            })
+        
+        return pairs
 
 
 class EnhancedSessionStorageFactory:

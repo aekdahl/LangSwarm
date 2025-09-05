@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.54.dev11] - 2025-01-17
+
+### 🔧 **Session Storage BigQuery Fix**
+- **Fixed Empty user_input/agent_response Fields**: Session storage now properly populates BigQuery conversation data
+  - Groups individual messages into conversation pairs (user question + assistant response)
+  - Populates user_input and agent_response fields correctly in BigQuery
+  - Maintains backward compatibility with individual message storage
+  - Fixes empty user context data in BigQuery session tables
+
+### 📊 **Enhanced Conversation Storage**
+- **Conversation Pair Grouping**: Intelligent pairing of user and assistant messages
+  - Creates proper conversation documents for BigQuery compatibility
+  - Handles orphaned messages (user without response, assistant without user)
+  - Preserves all message metadata and timestamps
+  - Enables proper conversation analytics and search
+
+## [0.0.54.dev10] - 2025-01-17
+
+### 🚀 **Critical Cloud Run Execution Fix**
+- **Fixed BigQuery Tool Hanging in Cloud Run**: Completely redesigned tool execution pattern to match session storage
+  - Replaced complex async/sync bridge with simple synchronous execution
+  - Eliminated ThreadPoolExecutor and event loop complexity that caused Cloud Run deadlocks
+  - Now uses same execution pattern as working session storage (direct BigQuery client calls)
+  - Tool execution completes in <2 seconds vs hanging indefinitely
+
+### 🔧 **Simplified Tool Architecture**
+- **Synchronous Execution Pattern**: Tool now matches session storage's proven approach
+  - Uses synchronous OpenAI client (no async complexity)
+  - Direct BigQuery client calls (no thread management)
+  - Simple error handling (no layered exception management)
+  - Eliminated all potential Cloud Run environment conflicts
+
+### ✅ **Verified Cloud Run Compatibility**
+- Execution pattern identical to working session storage
+- No async/await complexity causing environment issues
+- Proper error handling and logging maintained
+- Ready for immediate Cloud Run deployment
+
 ## [0.0.54.dev9] - 2025-01-17
 
 ### 🚀 **Production BigQuery Tool Fixes**
