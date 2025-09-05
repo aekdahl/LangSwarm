@@ -1,0 +1,428 @@
+workflows:
+  - id: use_daytona_environment_tool
+    description: "Complete workflow for processing natural language Daytona environment requests"
+    steps:
+      - id: normalize_input
+        agent: input_normalizer
+        input: |
+          user_input: ${user_input}
+          user_query: ${user_query}
+        output:
+          to: normalized_input
+
+      - id: classify_action
+        agent: action_classifier
+        input: |
+          User request: ${context.step_outputs.normalize_input}
+          
+          Determine what Daytona environment operation the user wants to perform.
+        output:
+          to: action_type
+
+      - id: extract_details
+        agent: sandbox_manager
+        condition: "${context.step_outputs.classify_action} in ['create_sandbox', 'delete_sandbox', 'get_sandbox_info']"
+        input: |
+          User request: ${context.step_outputs.normalize_input}
+          Action type: ${context.step_outputs.classify_action}
+          
+          Extract the relevant sandbox management details for this ${context.step_outputs.classify_action} operation.
+        output:
+          to: sandbox_details
+
+      - id: extract_code_details
+        agent: code_executor
+        condition: "${context.step_outputs.classify_action} in ['execute_code', 'execute_shell']"
+        input: |
+          User request: ${context.step_outputs.normalize_input}
+          Action type: ${context.step_outputs.classify_action}
+          
+          Extract the relevant code execution details for this ${context.step_outputs.classify_action} operation.
+        output:
+          to: code_details
+
+      - id: extract_file_details
+        agent: file_manager
+        condition: "${context.step_outputs.classify_action} == 'file_operation'"
+        input: |
+          User request: ${context.step_outputs.normalize_input}
+          Action type: ${context.step_outputs.classify_action}
+          
+          Extract the relevant file operation details.
+        output:
+          to: file_details
+
+      - id: extract_git_details
+        agent: git_manager
+        condition: "${context.step_outputs.classify_action} == 'git_operation'"
+        input: |
+          User request: ${context.step_outputs.normalize_input}
+          Action type: ${context.step_outputs.classify_action}
+          
+          Extract the relevant git operation details.
+        output:
+          to: git_details
+
+      - id: build_parameters
+        agent: parameter_builder
+        input: |
+          Action: ${context.step_outputs.classify_action}
+          Sandbox Details: ${context.step_outputs.extract_details}
+          Code Details: ${context.step_outputs.extract_code_details}
+          File Details: ${context.step_outputs.extract_file_details}
+          Git Details: ${context.step_outputs.extract_git_details}
+          
+          Build the MCP tool call parameters for the ${context.step_outputs.classify_action} operation.
+        output:
+          to: mcp_params
+
+      - id: execute_daytona_operation
+        tool: daytona_environment
+        input: "${context.step_outputs.build_parameters}"
+        output:
+          to: daytona_result
+
+      - id: format_response
+        agent: response_formatter
+        input: |
+          Operation: ${context.step_outputs.classify_action}
+          Raw result: ${context.step_outputs.execute_daytona_operation}
+          Original request: ${context.step_outputs.normalize_input}
+          
+          Format this into a user-friendly response.
+        output:
+          to: final_response
+
+    # Error handling workflow
+    error_handling:
+      - condition: "daytona_result contains 'error'"
+        steps:
+          - id: handle_error
+            agent: error_handler
+            input: |
+              Error details: ${context.step_outputs.execute_daytona_operation}
+              User request: ${context.step_outputs.normalize_input}
+              Attempted action: ${context.step_outputs.classify_action}
+              
+              Provide helpful error guidance to the user.
+            output:
+              to: final_response
+
+  - id: create_development_environment
+    description: "Specialized workflow for creating development environments"
+    steps:
+      - id: optimize_environment
+        agent: environment_optimizer
+        input: |
+          User request: ${user_input}
+          
+          Analyze the development needs and suggest optimal environment configuration.
+        output:
+          to: environment_config
+
+      - id: extract_sandbox_config
+        agent: sandbox_manager
+        input: |
+          User request: ${user_input}
+          Optimization suggestions: ${context.step_outputs.optimize_environment}
+          Action type: create_sandbox
+          
+          Extract and optimize sandbox creation parameters.
+        output:
+          to: sandbox_config
+
+      - id: create_sandbox
+        tool: daytona_environment
+        input: |
+          {
+            "method": "create_sandbox",
+            "params": ${context.step_outputs.extract_sandbox_config}
+          }
+        output:
+          to: creation_result
+
+      - id: suggest_workflow
+        agent: workflow_advisor
+        input: |
+          User request: ${user_input}
+          Created sandbox: ${context.step_outputs.create_sandbox}
+          
+          Provide workflow recommendations for this new development environment.
+        output:
+          to: workflow_suggestions
+
+      - id: format_creation_response
+        agent: response_formatter
+        input: |
+          Operation: create_sandbox
+          Raw result: ${context.step_outputs.creation_result}
+          Environment optimization: ${context.step_outputs.optimize_environment}
+          Workflow suggestions: ${context.step_outputs.suggest_workflow}
+          
+          Format comprehensive environment creation response.
+        output:
+          to: final_response
+
+  - id: execute_code_workflow
+    description: "Dedicated workflow for code execution in environments"
+    steps:
+      - id: extract_execution_details
+        agent: code_executor
+        input: |
+          User request: ${user_input}
+          Action type: execute_code
+          
+          Extract code execution parameters.
+        output:
+          to: execution_config
+
+      - id: execute_code
+        tool: daytona_environment
+        input: |
+          {
+            "method": "execute_code",
+            "params": ${context.step_outputs.extract_execution_details}
+          }
+        output:
+          to: execution_result
+
+      - id: format_execution_response
+        agent: response_formatter
+        input: |
+          Operation: execute_code
+          Raw result: ${context.step_outputs.execution_result}
+          Original request: ${user_input}
+          
+          Format code execution response with output and status.
+        output:
+          to: final_response
+
+  - id: manage_files_workflow
+    description: "Workflow for file operations in sandboxes"
+    steps:
+      - id: extract_file_operation
+        agent: file_manager
+        input: |
+          User request: ${user_input}
+          Action type: file_operation
+          
+          Extract file operation parameters.
+        output:
+          to: file_config
+
+      - id: perform_file_operation
+        tool: daytona_environment
+        input: |
+          {
+            "method": "file_operation",
+            "params": ${context.step_outputs.extract_file_operation}
+          }
+        output:
+          to: file_result
+
+      - id: format_file_response
+        agent: response_formatter
+        input: |
+          Operation: file_operation
+          Raw result: ${context.step_outputs.file_result}
+          Original request: ${user_input}
+          
+          Format file operation response.
+        output:
+          to: final_response
+
+  - id: git_workflow
+    description: "Workflow for git operations in sandboxes"
+    steps:
+      - id: extract_git_operation
+        agent: git_manager
+        input: |
+          User request: ${user_input}
+          Action type: git_operation
+          
+          Extract git operation parameters.
+        output:
+          to: git_config
+
+      - id: perform_git_operation
+        tool: daytona_environment
+        input: |
+          {
+            "method": "git_operation",
+            "params": ${context.step_outputs.extract_git_operation}
+          }
+        output:
+          to: git_result
+
+      - id: format_git_response
+        agent: response_formatter
+        input: |
+          Operation: git_operation
+          Raw result: ${context.step_outputs.git_result}
+          Original request: ${user_input}
+          
+          Format git operation response.
+        output:
+          to: final_response
+
+  - id: list_environments_workflow
+    description: "Quick workflow for listing all sandboxes"
+    steps:
+      - id: list_all_sandboxes
+        tool: daytona_environment
+        input: |
+          {
+            "method": "list_sandboxes",
+            "params": {}
+          }
+        output:
+          to: sandbox_list
+
+      - id: format_sandbox_list
+        agent: response_formatter
+        input: |
+          Operation: list_sandboxes
+          Raw result: ${context.step_outputs.list_all_sandboxes}
+          
+          Format the sandbox list in a clear, readable table.
+        output:
+          to: final_response
+
+  - id: sandbox_info_workflow
+    description: "Workflow for getting detailed sandbox information"
+    steps:
+      - id: extract_sandbox_id
+        agent: sandbox_manager
+        input: |
+          User request: ${user_input}
+          Action type: get_sandbox_info
+          
+          Extract the sandbox ID for information retrieval.
+        output:
+          to: sandbox_id_config
+
+      - id: get_sandbox_details
+        tool: daytona_environment
+        input: |
+          {
+            "method": "get_sandbox_info",
+            "params": ${context.step_outputs.extract_sandbox_id}
+          }
+        output:
+          to: sandbox_info
+
+      - id: format_sandbox_info
+        agent: response_formatter
+        input: |
+          Operation: get_sandbox_info
+          Raw result: ${context.step_outputs.get_sandbox_details}
+          
+          Format detailed sandbox information.
+        output:
+          to: final_response
+
+  - id: full_development_cycle
+    description: "Complete development workflow: create environment, clone code, develop, test"
+    steps:
+      - id: create_dev_environment
+        agent: environment_optimizer
+        input: |
+          User request: ${user_input}
+          
+          Optimize environment for development workflow.
+        output:
+          to: env_config
+
+      - id: create_sandbox
+        tool: daytona_environment
+        input: |
+          {
+            "method": "create_sandbox",
+            "params": ${context.step_outputs.create_dev_environment}
+          }
+        output:
+          to: new_sandbox
+
+      - id: setup_repository
+        condition: "git_repo in user_input"
+        tool: daytona_environment
+        input: |
+          {
+            "method": "git_operation",
+            "params": {
+              "sandbox_id": "${context.step_outputs.new_sandbox.sandbox_id}",
+              "operation": "clone",
+              "repository_url": "${extracted_git_repo}",
+              "working_directory": "/workspace"
+            }
+          }
+        output:
+          to: repo_setup
+
+      - id: provide_workflow_guidance
+        agent: workflow_advisor
+        input: |
+          Created sandbox: ${context.step_outputs.new_sandbox}
+          Repository setup: ${context.step_outputs.setup_repository}
+          User request: ${user_input}
+          
+          Provide comprehensive development workflow guidance.
+        output:
+          to: workflow_guidance
+
+      - id: format_development_response
+        agent: response_formatter
+        input: |
+          Sandbox creation: ${context.step_outputs.new_sandbox}
+          Repository setup: ${context.step_outputs.repo_setup}
+          Workflow guidance: ${context.step_outputs.workflow_guidance}
+          
+          Format comprehensive development environment setup response.
+        output:
+          to: final_response
+
+  - id: cleanup_workflow
+    description: "Workflow for cleaning up and managing sandbox lifecycle"
+    steps:
+      - id: list_current_sandboxes
+        tool: daytona_environment
+        input: |
+          {
+            "method": "list_sandboxes",
+            "params": {}
+          }
+        output:
+          to: current_sandboxes
+
+      - id: identify_cleanup_targets
+        agent: sandbox_manager
+        input: |
+          User request: ${user_input}
+          Current sandboxes: ${context.step_outputs.list_current_sandboxes}
+          
+          Identify which sandboxes should be cleaned up based on the request.
+        output:
+          to: cleanup_targets
+
+      - id: perform_cleanup
+        tool: daytona_environment
+        input: |
+          {
+            "method": "delete_sandbox",
+            "params": ${context.step_outputs.identify_cleanup_targets}
+          }
+        output:
+          to: cleanup_result
+
+      - id: format_cleanup_response
+        agent: response_formatter
+        input: |
+          Operation: cleanup
+          Cleanup result: ${context.step_outputs.cleanup_result}
+          Original sandboxes: ${context.step_outputs.current_sandboxes}
+          
+          Format cleanup operation response.
+        output:
+          to: final_response
+
+

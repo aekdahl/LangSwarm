@@ -863,39 +863,40 @@ class WorkflowExecutorMCPTool(BaseTool):
             }
 
 
-# Add health check endpoint for Docker/Kubernetes
-@server.app.get("/health")
-async def health_check():
-    """Health check endpoint for monitoring and load balancers"""
-    return {
-        "status": "healthy",
-        "service": "workflow_executor",
-        "version": "1.0.0",
-        "timestamp": time.time(),
-        "active_executions": len(WORKFLOW_EXECUTIONS),
-        "completed_executions": len([e for e in WORKFLOW_EXECUTIONS.values() if e["status"] == "completed"])
-    }
-
-@server.app.get("/metrics")
-async def metrics():
-    """Metrics endpoint for monitoring"""
-    total_executions = len(WORKFLOW_EXECUTIONS)
-    completed = len([e for e in WORKFLOW_EXECUTIONS.values() if e["status"] == "completed"])
-    failed = len([e for e in WORKFLOW_EXECUTIONS.values() if e["status"] == "failed"])
-    running = len([e for e in WORKFLOW_EXECUTIONS.values() if e["status"] == "running"])
-    
-    return {
-        "total_executions": total_executions,
-        "completed_executions": completed,
-        "failed_executions": failed,
-        "running_executions": running,
-        "success_rate": (completed / total_executions * 100) if total_executions > 0 else 0,
-        "execution_modes": {
-            "sync": len([e for e in WORKFLOW_EXECUTIONS.values() if e.get("mode") == "sync"]),
-            "async": len([e for e in WORKFLOW_EXECUTIONS.values() if e.get("mode") == "async"]),
-            "isolated": len([e for e in WORKFLOW_EXECUTIONS.values() if e.get("mode") == "isolated"])
+# Add health check endpoint for Docker/Kubernetes (only if not in local mode)
+if not server.local_mode and hasattr(server, 'app') and server.app:
+    @server.app.get("/health")
+    async def health_check():
+        """Health check endpoint for monitoring and load balancers"""
+        return {
+            "status": "healthy",
+            "service": "workflow_executor",
+            "version": "1.0.0",
+            "timestamp": time.time(),
+            "active_executions": len(WORKFLOW_EXECUTIONS),
+            "completed_executions": len([e for e in WORKFLOW_EXECUTIONS.values() if e["status"] == "completed"])
         }
-    }
+
+    @server.app.get("/metrics")
+    async def metrics():
+        """Metrics endpoint for monitoring"""
+        total_executions = len(WORKFLOW_EXECUTIONS)
+        completed = len([e for e in WORKFLOW_EXECUTIONS.values() if e["status"] == "completed"])
+        failed = len([e for e in WORKFLOW_EXECUTIONS.values() if e["status"] == "failed"])
+        running = len([e for e in WORKFLOW_EXECUTIONS.values() if e["status"] == "running"])
+        
+        return {
+            "total_executions": total_executions,
+            "completed_executions": completed,
+            "failed_executions": failed,
+            "running_executions": running,
+            "success_rate": (completed / total_executions * 100) if total_executions > 0 else 0,
+            "execution_modes": {
+                "sync": len([e for e in WORKFLOW_EXECUTIONS.values() if e.get("mode") == "sync"]),
+                "async": len([e for e in WORKFLOW_EXECUTIONS.values() if e.get("mode") == "async"]),
+                "isolated": len([e for e in WORKFLOW_EXECUTIONS.values() if e.get("mode") == "isolated"])
+            }
+        }
 
 if __name__ == "__main__":
     import uvicorn

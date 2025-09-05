@@ -241,9 +241,23 @@ class SmartDefaults:
             },
             "message_queue_publisher": {
                 "type": "message_queue_publisher",
-                "capabilities": ["messaging"],
+                "capabilities": ["messaging", "async"],
+                "resource_usage": "low",
+                "requires_api": False
+            },
+            "daytona_environment": {
+                "type": "daytona_environment",
+                "capabilities": ["environments", "code_execution", "development"],
+                "resource_usage": "low",
+                "requires_api": True,
+                "description": "Secure cloud-based development environments with Daytona"
+            },
+            "daytona_self_hosted": {
+                "type": "daytona_self_hosted",
+                "capabilities": ["environments", "code_execution", "development", "on_premises"],
                 "resource_usage": "medium",
-                "requires_queue": True
+                "requires_cli": True,
+                "description": "Self-hosted Daytona development environments"
             }
         }
     

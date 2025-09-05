@@ -835,6 +835,41 @@ class LangSwarmConfigLoader:
         from langswarm.mcp.tools.codebase_indexer.main import CodebaseIndexerMCPTool
         from langswarm.mcp.tools.workflow_executor.main import WorkflowExecutorMCPTool
         
+        # Import BigQuery Vector Search tool (with graceful fallback)
+        try:
+            from langswarm.mcp.tools.bigquery_vector_search.main import BigQueryVectorSearchMCPTool
+            BIGQUERY_TOOL_AVAILABLE = True
+        except ImportError as e:
+            BigQueryVectorSearchMCPTool = None
+            BIGQUERY_TOOL_AVAILABLE = False
+            import logging
+            logging.warning(f"BigQuery Vector Search tool not available: {e}. Install google-cloud-bigquery to enable.")
+        
+        # Import Daytona tools (with graceful fallback)
+        try:
+            from langswarm.mcp.tools.daytona_environment.main import DaytonaEnvironmentMCPTool
+            DAYTONA_CLOUD_AVAILABLE = True
+        except ImportError as e:
+            DaytonaEnvironmentMCPTool = None
+            DAYTONA_CLOUD_AVAILABLE = False
+            import logging
+            logging.warning(f"Daytona Environment tool not available: {e}. Install daytona SDK to enable cloud integration.")
+        
+        try:
+            from langswarm.mcp.tools.daytona_self_hosted.main import SelfHostedDaytonaManager
+            # Create a tool class wrapper for self-hosted (since it doesn't follow the same pattern)
+            class DaytonaSelfHostedMCPTool:
+                def __init__(self, identifier: str, **kwargs):
+                    self.identifier = identifier
+                    self.manager = SelfHostedDaytonaManager()
+                    
+            DAYTONA_SELF_HOSTED_AVAILABLE = True
+        except ImportError as e:
+            DaytonaSelfHostedMCPTool = None
+            DAYTONA_SELF_HOSTED_AVAILABLE = False
+            import logging
+            logging.warning(f"Daytona Self-Hosted tool not available: {e}. Ensure Daytona CLI is installed for self-hosted integration.")
+        
         self.tool_classes = {
             "mcpfilesystem": FilesystemMCPTool,
             "mcpgithubtool": MCPGitHubTool,
@@ -848,6 +883,17 @@ class LangSwarmConfigLoader:
             "mcpgcp_environment": GCPEnvironmentMCPTool,
             # add more here (or via register_tool_class below)
         }
+        
+        # Add BigQuery tool if available
+        if BIGQUERY_TOOL_AVAILABLE:
+            self.tool_classes["mcpbigquery_vector_search"] = BigQueryVectorSearchMCPTool
+        
+        # Add Daytona tools if available
+        if DAYTONA_CLOUD_AVAILABLE:
+            self.tool_classes["daytona_environment"] = DaytonaEnvironmentMCPTool
+            
+        if DAYTONA_SELF_HOSTED_AVAILABLE:
+            self.tool_classes["daytona_self_hosted"] = DaytonaSelfHostedMCPTool
 
     def register_tool_class(self, _type: str, cls: type):
         """Allow adding new tool classes at runtime."""

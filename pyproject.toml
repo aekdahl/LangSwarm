@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "langswarm"
-version = "0.0.54.dev5"
+version = "0.0.54.dev6"
 description = "A multi-agent ecosystem for large language models (LLMs) and autonomous systems."
 readme = "README.md"
 authors = ["Alexander Ekdahl <alexander.ekdahl@gmail.com>"]
@@ -38,6 +38,7 @@ aioredis = "^2.0.1"
 flask = "^3.1.1"
 jinja2 = "^3.1.6"
 pydantic = "^2.11.4"
+websockets = "^13.1"
 
 # Communication dependencies
 discord-py = "^2.5.2"
@@ -55,6 +56,9 @@ ipython = "^8.12.3"
 ipywidgets = "^8.1.7"
 requests = "^2.32.3"
 botbuilder = "^0.0.1"
+
+# Daytona integration
+daytona = {version = "^0.10.5", optional = true}
 
 [tool.poetry.extras]
 dev = [

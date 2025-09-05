@@ -4,6 +4,8 @@
 
 LangSwarm has been **completely transformed** from a complex, expert-only framework into a **beginner-friendly system** that maintains all advanced capabilities. Get started instantly with simple configurations, then scale to enterprise complexity when needed.
 
+🎤 **NEW: OpenAI Realtime API Integration** - Build voice agents with the same simplicity as text agents!
+
 ## 🎉 **LangSwarm Simplification Project - COMPLETE**
 
 ### **🎯 Mission Accomplished: From Complex to Simple**
@@ -59,6 +61,21 @@ print(response)
 
 # Clean up when done
 agent.cleanup()
+```
+
+### **Option 3: Voice Agent (NEW!)**
+```python
+from langswarm.core.wrappers.realtime_wrapper import create_realtime_agent
+
+# Create voice agent with same simplicity
+agent = create_realtime_agent("voice_assistant", voice="alloy", memory_enabled=True)
+
+# Start voice conversation
+async for event in agent.chat_realtime("Hello! Can you help me?"):
+    if event["type"] == "audio_chunk":
+        play_audio(event["data"])  # Voice response
+    elif event["type"] == "transcription":
+        print(f"You: {event['data']}")  # What you said
 ```
 
 **🎉 Congratulations!** You just built a complete multi-agent AI system in 30 seconds.

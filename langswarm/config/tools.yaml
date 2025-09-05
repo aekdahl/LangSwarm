@@ -20,6 +20,40 @@ tools:
       - "Look up company policies and procedures"
       - "Search for technical information"
 
+  # Daytona Cloud Development Environments
+  - name: "daytona_cloud"
+    type: "daytona_environment"
+    description: "Secure cloud-based development environments with lightning-fast setup"
+    priority: 8
+    enabled: true
+    capabilities:
+      - "create_sandbox"
+      - "execute_code"
+      - "file_operations"
+      - "git_operations"
+    usage_examples:
+      - "Create a Python development environment"
+      - "Run this code safely in a sandbox"
+      - "Clone my repository into a new environment"
+      - "Execute tests in an isolated environment"
+
+  # Daytona Self-Hosted Environments (optional)
+  - name: "daytona_onprem"
+    type: "daytona_self_hosted"
+    description: "Self-hosted Daytona environments for on-premises security"
+    priority: 7
+    enabled: false  # Disabled by default, enable when self-hosted instance is available
+    capabilities:
+      - "create_sandbox"
+      - "execute_code"
+      - "file_operations"
+      - "git_operations"
+      - "air_gapped_deployment"
+    usage_examples:
+      - "Create a secure on-premises development environment"
+      - "Execute sensitive code in air-gapped environment"
+      - "Run compliance testing in isolated workspace"
+
 # Global tool settings
 settings:
   max_concurrent_tools: 5

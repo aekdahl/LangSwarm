@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.54.dev6] - 2025-01-17
+
+### 🎤 **Major New Feature: OpenAI Realtime API Integration**
+- **Complete Voice Agent Support**: Native integration with OpenAI's Realtime API for speech-to-speech conversations
+  - **RealtimeMixin**: Core OpenAI Realtime API WebSocket integration with audio/text handling
+  - **RealtimeAgentWrapper**: Enhanced agent wrapper preserving all existing functionality + voice capabilities
+  - **WebRTCRealtimeHandler**: Browser-based realtime connections with direct OpenAI integration
+  - **RealtimeVoiceMCPTool**: Voice-specific MCP tool with TTS, transcription, and optimization
+  - **Factory Function**: `create_realtime_agent()` for instant voice agent creation
+
+### 🛠️ **Seamless MCP Tool Integration**
+- **Universal Tool Support**: All existing MCP tools work automatically in voice conversations
+  - **Function Call Bridge**: OpenAI Realtime function calls → LangSwarm MCP format conversion
+  - **Real-time Tool Execution**: MCP tools execute during voice conversations with audio responses
+  - **Tool Schema Generation**: Automatic OpenAI function schema generation from MCP servers
+  - **Voice + Tools**: "Read my files", "Run workflow", "Add to tasks" all work via voice commands
+
+### 🌐 **Multiple Connection Methods**
+- **WebSocket Connection**: Server-side realtime conversations with low latency
+- **WebRTC Connection**: Direct browser-to-OpenAI connections with LangSwarm tool integration
+- **SIP Integration**: Leverages existing Twilio gateway for telephony voice agents
+- **Hybrid Sessions**: Mix text and voice in same conversation with session continuity
+
+### 📚 **Comprehensive Documentation & Examples**
+- **Complete Integration Guide**: `docs/simplification/05-openai-realtime-api-integration.md`
+- **Working Demo**: `examples/demos/demo_openai_realtime_integration.py` with 4 comprehensive demos
+- **Browser Examples**: Auto-generated HTML/JavaScript for WebRTC integration
+- **Architecture Diagrams**: Visual system overview and integration patterns
+
+### ✅ **Production Ready Features**
+- **Zero Breaking Changes**: All existing LangSwarm code works unchanged
+- **Error Handling**: Comprehensive error handling, debugging, and fallback mechanisms
+- **Configuration Options**: Full voice, audio format, and behavior customization
+- **Performance Optimized**: Efficient audio streaming and tool execution
+- **Backward Compatible**: Existing agents can be enhanced with `configure_realtime()`
+
+### 🎯 **Simple API Design**
+```python
+# Create voice agent in one line
+agent = create_realtime_agent("assistant", voice="alloy", memory_enabled=True)
+
+# Start voice conversation with tool access
+async for event in agent.chat_realtime("What files are in my directory?"):
+    # Handles voice input/output + automatic tool execution
+```
+
 ## [0.0.54.dev1] - 2025-01-17
 
 ### 🐛 Critical Bug Fixes

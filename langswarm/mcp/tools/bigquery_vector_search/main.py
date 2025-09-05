@@ -434,6 +434,128 @@ server.add_task(
 # Create FastAPI app for HTTP mode
 app = server.build_app()
 
+# === LangChain-Compatible Tool Class ===
+try:
+    from langswarm.synapse.tools.base import BaseTool
+    
+    class BigQueryVectorSearchMCPTool(BaseTool):
+        """
+        BigQuery Vector Search MCP tool for semantic knowledge base search.
+        
+        Features:
+        - Vector similarity search using embeddings
+        - Document retrieval by ID
+        - Dataset management and inspection
+        - Configurable similarity thresholds
+        """
+        _is_mcp_tool = True
+        _bypass_pydantic = True  # Bypass Pydantic validation
+        
+        def __init__(self, identifier: str):
+            # Initialize with required BaseTool parameters
+            super().__init__(
+                name="BigQuery Vector Search",
+                description="Search company knowledge base using BigQuery vector similarity",
+                instruction="Use this tool to perform semantic searches on your knowledge base stored in BigQuery. Provide a query and get relevant documents back.",
+                identifier=identifier,
+                brief="BigQuery vector search for semantic knowledge retrieval"
+            )
+            # Use object.__setattr__ to bypass Pydantic validation
+            object.__setattr__(self, 'server', server)
+            
+            # Configure default settings
+            object.__setattr__(self, 'default_config', DEFAULT_CONFIG.copy())
+            
+        async def similarity_search(self, query: str, limit: int = 10, similarity_threshold: float = 0.7, 
+                                   dataset_id: str = None, table_name: str = None):
+            """Perform vector similarity search"""
+            try:
+                search_input = SimilaritySearchInput(
+                    query=query,
+                    limit=limit,
+                    similarity_threshold=similarity_threshold,
+                    dataset_id=dataset_id or self.default_config["dataset_id"],
+                    table_name=table_name or self.default_config["table_name"]
+                )
+                
+                # Use the global handler functions defined above
+                result = similarity_search(search_input)
+                return result.dict()
+                
+            except Exception as e:
+                logger.error(f"BigQuery similarity search failed: {e}")
+                return {"success": False, "error": str(e)}
+        
+        async def get_content(self, document_id: str, dataset_id: str = None, table_name: str = None):
+            """Get document content by ID"""
+            try:
+                content_input = GetContentInput(
+                    document_id=document_id,
+                    dataset_id=dataset_id or self.default_config["dataset_id"],
+                    table_name=table_name or self.default_config["table_name"]
+                )
+                
+                # Use the global handler functions defined above
+                result = get_content(content_input)
+                return result.dict()
+                
+            except Exception as e:
+                logger.error(f"BigQuery get content failed: {e}")
+                return {"success": False, "error": str(e)}
+        
+        async def list_datasets(self, pattern: str = None):
+            """List available datasets"""
+            try:
+                list_input = ListDatasetsInput(pattern=pattern)
+                
+                # Use the global handler functions defined above
+                result = list_datasets(list_input)
+                return result.dict()
+                
+            except Exception as e:
+                logger.error(f"BigQuery list datasets failed: {e}")
+                return {"success": False, "error": str(e)}
+        
+        async def dataset_info(self, dataset_id: str, table_name: str):
+            """Get dataset information"""
+            try:
+                info_input = DatasetInfoInput(
+                    dataset_id=dataset_id,
+                    table_name=table_name
+                )
+                
+                # Use the global handler functions defined above
+                result = dataset_info(info_input)
+                return result.dict()
+                
+            except Exception as e:
+                logger.error(f"BigQuery dataset info failed: {e}")
+                return {"success": False, "error": str(e)}
+        
+        async def run(self, method: str, params: dict):
+            """Generic run method for MCP tool calls"""
+            if method == "similarity_search":
+                return await self.similarity_search(**params)
+            elif method == "get_content":
+                return await self.get_content(**params)
+            elif method == "list_datasets":
+                return await self.list_datasets(**params)
+            elif method == "dataset_info":
+                return await self.dataset_info(**params)
+            else:
+                return {"success": False, "error": f"Unknown method: {method}"}
+        
+        def configure(self, config: dict):
+            """Configure the tool with custom settings"""
+            if config:
+                self.default_config.update(config)
+                logger.info(f"BigQuery tool configured: {self.default_config}")
+
+except ImportError:
+    # BaseTool not available - tool will only work in server mode
+    BigQueryVectorSearchMCPTool = None
+    logger.warning("BigQuery Vector Search MCP tool class not available - BaseTool import failed")
+
 if __name__ == "__main__":
     if server.local_mode:
         print(f"✅ {server.name} ready for local mode usage")

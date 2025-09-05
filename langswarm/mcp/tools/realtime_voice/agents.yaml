@@ -1,0 +1,33 @@
+version: "1.0"
+agents:
+  - id: "voice_processor"
+    type: "mcp_tool"
+    name: "Voice Processing Agent"
+    description: "Specialized agent for voice operations including TTS and transcription"
+    tool: "realtime_voice"
+    capabilities:
+      - text_to_speech
+      - transcribe_audio  
+      - optimize_voice_response
+      - configure_voice
+    settings:
+      local_mode: true
+      voice_models:
+        - "tts-1"
+        - "tts-1-hd"
+        - "whisper-1"
+      supported_voices:
+        - "alloy"
+        - "echo" 
+        - "fable"
+        - "onyx"
+        - "nova"
+        - "shimmer"
+      audio_formats:
+        - "mp3"
+        - "opus"
+        - "aac"
+        - "flac"
+        - "pcm16"
+
+
