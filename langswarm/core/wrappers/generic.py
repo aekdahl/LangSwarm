@@ -1245,6 +1245,35 @@ Do not include any text outside the JSON structure."""
             return response.get("generated_text", "")
         return str(response)
 
+    def has_tools(self) -> bool:
+        """
+        Check if the agent has tools available.
+        
+        Returns:
+        - bool: True if the agent has tools, False otherwise.
+        """
+        if not hasattr(self, 'tool_registry') or not self.tool_registry:
+            return False
+            
+        # Check different tool registry implementations
+        if hasattr(self.tool_registry, 'list_tools'):
+            try:
+                tools = self.tool_registry.list_tools()
+                return len(tools) > 0
+            except Exception:
+                pass
+                
+        # Fallback: check if tool_registry has tools dict
+        if hasattr(self.tool_registry, 'tools'):
+            tools_dict = getattr(self.tool_registry, 'tools', {})
+            return len(tools_dict) > 0
+            
+        # Fallback: check if tool_registry is a dict itself
+        if isinstance(self.tool_registry, dict):
+            return len(self.tool_registry) > 0
+            
+        return False
+
     def __getattr__(self, name: str) -> Any:
         """
         Delegate attribute access to the wrapped agent.

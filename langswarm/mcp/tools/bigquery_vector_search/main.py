@@ -545,47 +545,63 @@ try:
         def run(self, input_data=None):
             """Generic run method for MCP tool calls (handles both sync and async contexts)"""
             import asyncio
+            import concurrent.futures
+            import threading
+            import time
             
             logger.info(f"BigQuery tool run() called with input: {input_data}")
             logger.info(f"Input type: {type(input_data)}")
             
+            start_time = time.time()
+            
             try:
-                # Check if we're already in an event loop
-                try:
-                    loop = asyncio.get_running_loop()
-                    # We're in an async context, need to create a task
-                    logger.info("Running in async context, creating task")
-                    
-                    # Create a new task in the current loop
-                    task = loop.create_task(self._async_run(input_data))
-                    
-                    # Since we can't await in a sync function, we need to run until complete
-                    # This is a bit hacky but necessary for sync/async bridge
-                    import concurrent.futures
-                    import threading
-                    
-                    # Run the async function in a separate thread with its own event loop
-                    def run_in_thread():
-                        new_loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(new_loop)
+                # Simple approach: always use a separate thread with its own event loop
+                # This avoids all the complexity of trying to reuse existing loops
+                logger.info("Starting BigQuery tool execution in separate thread")
+                
+                def run_async_in_thread():
+                    """Run the async function in a completely separate thread with its own event loop"""
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        logger.info("Created new event loop in thread")
+                        result = new_loop.run_until_complete(self._async_run(input_data))
+                        logger.info(f"Thread execution completed successfully")
+                        return result
+                    except Exception as e:
+                        logger.error(f"Thread execution failed: {e}")
+                        return {"success": False, "error": str(e)}
+                    finally:
+                        # Clean shutdown of the event loop
                         try:
-                            return new_loop.run_until_complete(self._async_run(input_data))
-                        finally:
                             new_loop.close()
+                            logger.info("Event loop closed cleanly")
+                        except Exception as e:
+                            logger.warning(f"Event loop cleanup warning: {e}")
+                
+                # Execute with timeout in separate thread
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    logger.info("Submitting task to thread pool")
+                    future = executor.submit(run_async_in_thread)
                     
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        future = executor.submit(run_in_thread)
-                        return future.result(timeout=30)  # 30 second timeout
+                    try:
+                        # 30 second timeout to prevent hanging
+                        result = future.result(timeout=30)
+                        elapsed = time.time() - start_time
+                        logger.info(f"BigQuery tool completed in {elapsed:.2f}s")
+                        return result
                         
-                except RuntimeError:
-                    # No event loop running, safe to use asyncio.run()
-                    logger.info("No event loop running, using asyncio.run()")
-                    return asyncio.run(self._async_run(input_data))
-                    
+                    except concurrent.futures.TimeoutError:
+                        elapsed = time.time() - start_time
+                        logger.error(f"BigQuery tool timed out after {elapsed:.2f}s")
+                        return {
+                            "success": False, 
+                            "error": f"Tool execution timed out after {elapsed:.2f} seconds"
+                        }
+                        
             except Exception as e:
-                logger.error(f"BigQuery tool run() failed: {e}")
-                import traceback
-                traceback.print_exc()
+                elapsed = time.time() - start_time
+                logger.error(f"BigQuery tool execution failed after {elapsed:.2f}s: {e}")
                 return {"success": False, "error": str(e)}
         
         async def _async_run(self, input_data=None):
