@@ -3,7 +3,14 @@ from datetime import datetime
 from typing import Type, Any, Optional, Dict, Callable, List
 
 from langswarm.memory.adapters.database_adapter import DatabaseAdapter
-from langswarm.synapse.tools.message_queue_publisher.brokers import MessageBroker
+try:
+    from langswarm.mcp.tools.message_queue_publisher.brokers import MessageBroker
+except ImportError:
+    # Fallback for backwards compatibility
+    try:
+        from langswarm.synapse.tools.message_queue_publisher.brokers import MessageBroker
+    except ImportError:
+        MessageBroker = None
 from langswarm.core.session.manager import LangSwarmSessionManager
 from langswarm.core.session.models import SessionControl
 from langswarm.core.session.hybrid_manager import HybridSessionManager, HybridSessionManagerFactory

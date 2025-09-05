@@ -2222,17 +2222,25 @@ Adapt your approach based on the user's needs, drawing from your combined expert
             expanded_tools = []
             for tool in tools:
                 if isinstance(tool, str):
-                    # Check if this tool is available
-                    preset = self._environment_detector.get_tool_preset(tool)
-                    if preset:
-                        status = self._environment_detector._check_tool_availability(preset)
-                        if status["available"]:
-                            expanded_tools.append(tool)
-                        else:
-                            missing = status.get("missing_env_vars", []) + status.get("missing_dependencies", [])
-                            print(f"   ⚠️  Skipping tool '{tool}' for agent '{agent_config.get('id', 'unnamed')}': Missing {', '.join(missing)}")
+                    # First check if this is a defined tool ID in the tools section
+                    tools_config = self.config_data.get("tools", [])
+                    tool_ids = {t.get("id") for t in tools_config if isinstance(t, dict) and "id" in t}
+                    
+                    if tool in tool_ids:
+                        # This is a reference to a defined tool, keep it as-is
+                        expanded_tools.append(tool)
                     else:
-                        print(f"   ⚠️  Unknown tool '{tool}' for agent '{agent_config.get('id', 'unnamed')}'")
+                        # Check if this tool is available as a preset
+                        preset = self._environment_detector.get_tool_preset(tool)
+                        if preset:
+                            status = self._environment_detector._check_tool_availability(preset)
+                            if status["available"]:
+                                expanded_tools.append(tool)
+                            else:
+                                missing = status.get("missing_env_vars", []) + status.get("missing_dependencies", [])
+                                print(f"   ⚠️  Skipping tool '{tool}' for agent '{agent_config.get('id', 'unnamed')}': Missing {', '.join(missing)}")
+                        else:
+                            print(f"   ⚠️  Unknown tool '{tool}' for agent '{agent_config.get('id', 'unnamed')}'")
                 else:
                     # Tool is already in full format
                     expanded_tools.append(tool)

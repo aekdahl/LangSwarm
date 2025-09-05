@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.54.dev7] - 2025-01-17
+
+### 🎯 **BigQuery Vector Search - Built-in Tool**
+- **New Built-in Tool Type**: `mcpbigquery_vector_search` - No manual registration required!
+  - **Semantic Search**: Vector similarity search over BigQuery embeddings
+  - **Document Retrieval**: Get content by document ID
+  - **Dataset Management**: List datasets and inspect table information  
+  - **Smart Configuration**: Auto-detection with graceful dependency fallback
+  - **Production Ready**: Full error handling, logging, and performance optimization
+
+### 🔧 **Critical Bug Fixes**
+- **Tool Resolution Fix**: Agents can now properly use tools defined in `tools` section
+  - Fixed issue where `tools: ["tool_name"]` was only checking environment presets
+  - Now correctly prioritizes defined tools over auto-discovery
+- **Import Path Fixes**: Resolved MessageBroker import issues during MCP migration
+  - Added graceful fallback imports for backward compatibility
+  - Fixed agent initialization failures due to missing synapse paths
+
+### 🛠️ **Workflow Executor Improvements**  
+- **Local Mode Fix**: Resolved `server.app` attribute errors in local mode
+  - Health check endpoints now only register in HTTP mode
+  - Prevents crashes during agent initialization
+
+### 📦 **Package Improvements**
+- **BigQuery Integration**: Added optional `google-cloud-bigquery` dependencies
+  - Install with: `pip install langswarm[bigquery]`
+  - Automatic availability detection and graceful degradation
+
+### 📚 **Documentation**
+- **Complete BigQuery Guide**: `docs/BIGQUERY_VECTOR_SEARCH_INTEGRATION.md`
+  - Quick start examples and configuration reference
+  - Migration guide from manual registration
+  - Performance tuning and troubleshooting
+
 ## [0.0.54.dev6] - 2025-01-17
 
 ### 🎤 **Major New Feature: OpenAI Realtime API Integration**
