@@ -1,182 +1,112 @@
 version: "1.0"
 
 workflows:
-  # Basic consumer management
-  start_queue_consumer:
-    description: "Start a message queue consumer for task processing"
-    steps:
-      - agent: task_consumer_coordinator
-        input: "${user_input}"
-        output:
-          to: user
+  main_workflow:
+    - id: start_queue_consumer
+      description: "Universal workflow for all message queue consumer operations"
+      inputs:
+        - user_input
+        - user_query
+      steps:
+        - id: normalize_input
+          agent: input_normalizer
+          input: |
+            user_input: ${user_input}
+            user_query: ${user_query}
+          output:
+            to: classify_consumer_intent
 
-  # Redis-specific consumer management
-  manage_redis_consumer:
-    description: "Manage Redis-based message queue consumers"
-    steps:
-      - agent: redis_queue_manager
-        input: "${user_input}"
-        output:
-          to: user
+        - id: classify_consumer_intent
+          agent: consumer_intent_classifier
+          input: |
+            User request: ${context.step_outputs.normalize_input}
+            
+            Classify this message queue consumer request as one of:
+            - start_consumer: Start consuming messages from queue(s)
+            - stop_consumer: Stop active consumer processes
+            - consumer_status: Check consumer status and performance
+            - configure_consumer: Set up or modify consumer configuration
+            - process_messages: Process specific messages or batches
+            - monitor_queues: Monitor queue activity and metrics
+            
+            Return the classification and specific parameters.
+          output:
+            to: extract_consumer_config
 
-  # GCP Pub/Sub consumer management
-  manage_pubsub_consumer:
-    description: "Manage GCP Pub/Sub message queue consumers"
-    steps:
-      - agent: gcp_pubsub_manager
-        input: "${user_input}"
-        output:
-          to: user
+        - id: extract_consumer_config
+          agent: consumer_config_extractor
+          input: |
+            Operation: ${context.step_outputs.classify_consumer_intent}
+            User request: ${context.step_outputs.normalize_input}
+            
+            Extract consumer configuration details.
+          output:
+            to: validate_consumer_setup
 
-  # Consumer monitoring and optimization
-  monitor_task_processing:
-    description: "Monitor and optimize task processing performance"
-    steps:
-      - agent: task_processing_monitor
-        input: "${user_input}"
-        output:
-          to: user
+        - id: validate_consumer_setup
+          agent: consumer_validator
+          input: |
+            Operation: ${context.step_outputs.classify_consumer_intent.type}
+            Consumer config: ${context.step_outputs.extract_consumer_config}
+            
+            Validate the consumer configuration.
+          output:
+            to:
+              - condition:
+                  if: "${context.step_outputs.validate_consumer_setup.valid} == true"
+                  then: coordinate_consumer_task
+                  else: request_config_correction
 
-  # Development testing workflow
-  test_queue_functionality:
-    description: "Test message queue consumer functionality in development"
-    steps:
-      - agent: development_queue_tester
-        input: "${user_input}"
-        output:
-          to: user
+        - id: request_config_correction
+          agent: config_correction_agent
+          input: |
+            Validation errors: ${context.step_outputs.validate_consumer_setup.errors}
+            Original request: ${context.step_outputs.normalize_input}
+            
+            Request corrections for consumer configuration.
+          output:
+            to: user
 
-  # Production operations workflow
-  production_queue_operations:
-    description: "Manage production message queue operations"
-    steps:
-      - agent: production_operations_manager
-        input: "${user_input}"
-        output:
-          to: user
+        - id: coordinate_consumer_task
+          agent: task_consumer_coordinator
+          input: |
+            Operation: ${context.step_outputs.classify_consumer_intent.type}
+            Validated config: ${context.step_outputs.validate_consumer_setup}
+            
+            Coordinate the consumer operation.
+          output:
+            to: execute_consumer_operation
 
-  # Comprehensive consumer setup
-  setup_distributed_consumers:
-    description: "Set up multiple consumers for distributed task processing"
-    steps:
-      - agent: production_operations_manager
-        input: "Plan distributed consumer setup: ${user_input}"
-        
-      - agent: task_consumer_coordinator
-        input: "Implement consumer plan: ${production_operations_manager.output}"
-        
-      - agent: task_processing_monitor
-        input: "Monitor initial performance: ${task_consumer_coordinator.output}"
-        output:
-          to: user
+        - id: execute_consumer_operation
+          function: langswarm.core.utils.workflows.functions.mcp_call
+          args:
+            mcp_url: "local://message_queue_consumer"
+            payload: ${context.step_outputs.coordinate_consumer_task}
+          output:
+            to:
+              - condition:
+                  if: "${context.step_outputs.execute_consumer_operation.success} == true"
+                  then: format_consumer_response
+                  else: handle_consumer_error
 
-  # Consumer health check and optimization
-  optimize_consumer_performance:
-    description: "Analyze and optimize consumer performance"
-    steps:
-      - agent: task_processing_monitor
-        input: "Analyze current performance: ${user_input}"
-        
-      - agent: production_operations_manager
-        input: "Recommend optimizations: ${task_processing_monitor.output}"
-        
-      - agent: task_consumer_coordinator
-        input: "Implement optimizations: ${production_operations_manager.output}"
-        output:
-          to: user
+        - id: format_consumer_response
+          agent: consumer_response_formatter
+          input: |
+            Operation: ${context.step_outputs.classify_consumer_intent.type}
+            Consumer result: ${context.step_outputs.execute_consumer_operation}
+            Original request: ${context.step_outputs.normalize_input}
+            
+            Format the consumer response.
+          output:
+            to: user
 
-  # Disaster recovery workflow
-  consumer_disaster_recovery:
-    description: "Handle consumer failures and implement recovery procedures"
-    steps:
-      - agent: task_processing_monitor
-        input: "Assess failure situation: ${user_input}"
-        
-      - agent: production_operations_manager
-        input: "Plan recovery strategy: ${task_processing_monitor.output}"
-        
-      - agent: task_consumer_coordinator
-        input: "Execute recovery plan: ${production_operations_manager.output}"
-        output:
-          to: user
-
-  # Multi-broker consumer management
-  manage_multi_broker_consumers:
-    description: "Manage consumers across different message brokers"
-    steps:
-      - agent: redis_queue_manager
-        input: "Handle Redis consumers: ${user_input}"
-        
-      - agent: gcp_pubsub_manager
-        input: "Handle GCP Pub/Sub consumers: ${user_input}"
-        
-      - agent: task_consumer_coordinator
-        input: "Coordinate across brokers: Redis: ${redis_queue_manager.output}, Pub/Sub: ${gcp_pubsub_manager.output}"
-        output:
-          to: user
-
-  # Load testing workflow
-  load_test_consumers:
-    description: "Perform load testing on message queue consumers"
-    steps:
-      - agent: development_queue_tester
-        input: "Setup load test environment: ${user_input}"
-        
-      - agent: task_processing_monitor
-        input: "Monitor load test performance: ${development_queue_tester.output}"
-        
-      - agent: production_operations_manager
-        input: "Analyze load test results: ${task_processing_monitor.output}"
-        output:
-          to: user
-
-  # Consumer scaling workflow
-  scale_consumer_capacity:
-    description: "Scale consumer capacity based on workload"
-    steps:
-      - agent: task_processing_monitor
-        input: "Assess current workload: ${user_input}"
-        
-      - agent: production_operations_manager
-        input: "Plan scaling strategy: ${task_processing_monitor.output}"
-        
-      - agent: task_consumer_coordinator
-        input: "Execute scaling plan: ${production_operations_manager.output}"
-        
-      - agent: task_processing_monitor
-        input: "Verify scaling results: ${task_consumer_coordinator.output}"
-        output:
-          to: user
-
-  # Queue maintenance workflow
-  perform_queue_maintenance:
-    description: "Perform routine maintenance on message queue consumers"
-    steps:
-      - agent: production_operations_manager
-        input: "Plan maintenance procedure: ${user_input}"
-        
-      - agent: task_consumer_coordinator
-        input: "Execute maintenance plan: ${production_operations_manager.output}"
-        
-      - agent: task_processing_monitor
-        input: "Verify maintenance completion: ${task_consumer_coordinator.output}"
-        output:
-          to: user
-
-  # Consumer migration workflow
-  migrate_consumers:
-    description: "Migrate consumers between different brokers or configurations"
-    steps:
-      - agent: production_operations_manager
-        input: "Plan migration strategy: ${user_input}"
-        
-      - agent: task_consumer_coordinator
-        input: "Stop old consumers gracefully: ${production_operations_manager.output}"
-        
-      - agent: task_consumer_coordinator
-        input: "Start new consumers: ${production_operations_manager.output}"
-        
-      - agent: task_processing_monitor
-        input: "Verify migration success: ${task_consumer_coordinator.output}"
-        output:
-          to: user
+        - id: handle_consumer_error
+          agent: consumer_error_handler
+          input: |
+            Error details: ${context.step_outputs.execute_consumer_operation}
+            Operation attempted: ${context.step_outputs.classify_consumer_intent.type}
+            User request: ${context.step_outputs.normalize_input}
+            
+            Provide helpful error guidance and recovery options.
+          output:
+            to: user

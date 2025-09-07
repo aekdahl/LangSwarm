@@ -173,10 +173,87 @@ After defining agents, create workflows that orchestrate them. Start with the wo
 #### ✅ Standard Workflow Structure
 ```yaml
 workflows:
-  - id: main_workflow
+  main_workflow: "primary_workflow_id"  # REQUIRED: Points to the default workflow
+  
+  - id: primary_workflow_id
     description: "Primary workflow for {tool_name} operations"
     steps:
       # Define individual steps here
+```
+
+**Critical Structure Requirements:**
+- `main_workflow:` must be the first item under `workflows:`
+- **IMPORTANT**: Each tool should have exactly ONE workflow (the main_workflow)
+- Use steps, conditions, and routing within the single workflow for different operations
+- Multiple workflows should only be used in extremely rare circumstances
+- This keeps tools simple, maintainable, and predictable
+
+> 📚 **For detailed conditional routing documentation, see**: `docs/workflow-conditional-routing.md`
+
+#### ✅ Single Workflow Design Patterns
+
+Instead of creating multiple workflows, use these patterns within your main workflow:
+
+**1. Output Conditional Routing (Recommended)**
+```yaml
+- id: classify_intent
+  agent: intent_classifier
+  input: "Classify user request: ${user_input}"
+  output:
+    to:
+      - condition:
+          if: "${context.step_outputs.classify_intent.type} == 'search'"
+          then: handle_search
+          else: handle_other
+
+- id: handle_search
+  tool: search_tool
+  input: "Search query: ${user_input}"
+  output:
+    to: user
+
+- id: handle_other
+  agent: general_handler
+  input: "Process request: ${user_input}"
+  output:
+    to: user
+```
+
+**2. Switch/Case Routing**
+```yaml
+- id: categorize_request
+  agent: categorizer
+  input: "${user_input}"
+  output:
+    to:
+      - condition:
+          switch: "${context.step_outputs.categorize_request.category}"
+          cases:
+            search: search_workflow
+            create: create_workflow
+            update: update_workflow
+          default: general_workflow
+```
+
+**3. Step-Level Conditions (Advanced)**
+```yaml
+- id: optional_step
+  condition: "${context.step_outputs.classify_intent.type} == 'advanced_operation'"
+  agent: specialized_agent
+  input: "Process advanced request: ${user_input}"
+  output:
+    to: next_step
+```
+
+**3. Dynamic Parameter Building**
+```yaml
+- id: build_parameters
+  agent: parameter_builder
+  input: |
+    Operation: ${context.step_outputs.classify_intent}
+    User request: ${user_input}
+    
+    Build appropriate parameters for the ${context.step_outputs.classify_intent} operation.
 ```
 
 ### 4. Workflow Step Types
@@ -193,16 +270,24 @@ When defining workflow steps, understand the different types available:
     to: next_step_id              # ID of the next step (or "user")
 ```
 
-#### Function Call Steps
+#### MCP Tool Call Steps (Correct Syntax)
 ```yaml
-# REQUIRED: Use full function path and correct parameters
+# ✅ CORRECT: Use full function path for MCP tool calls
 - id: step_name
   function: langswarm.core.utils.workflows.functions.mcp_call
   args:
     mcp_url: "local://tool_name"  # REQUIRED: MCP URL
     payload: ${context.step_outputs.previous_step}  # REQUIRED: Payload
   output:
-    to: next_step  # REQUIRED: Modern output format
+    to: next_step  # REQUIRED: Output routing
+```
+
+#### ❌ INVALID: Direct Tool References
+```yaml
+# ❌ WRONG: This syntax is NOT supported
+- id: step_name
+  tool: tool_name  # This is invalid!
+  input: "${context.step_outputs.previous_step}"
 ```
 
 #### General Function Call Standard

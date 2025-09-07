@@ -55,6 +55,20 @@ Individual compliance checklists have been created for each MCP tool, providing 
 |------|--------|-------|
 | **remote** | ✅ Exception | Compliant by design - universal connector |
 
+## 🎯 **MAJOR UPDATE: Single Workflow Standard**
+
+**All workflows have been simplified to use exactly ONE workflow per tool** following the new standard:
+- ✅ **12 tools** updated with single main_workflow pattern
+- ✅ **SQL database tool** added to built-in tools registry  
+- ✅ **Developer Guide** updated with single workflow patterns
+- ✅ **Conditional routing** used instead of multiple workflows
+
+### Key Changes Made:
+- BigQuery: 6 workflows → 1 workflow with routing
+- Codebase Indexer: 5 workflows → 1 workflow with conditional steps
+- Message Queue tools: Multiple workflows → Single workflow with intent classification
+- All tools now use `classify_intent` → conditional steps pattern
+
 ## 📋 Priority Action Plan
 
 ### Phase 1: Critical Fixes (Required for Functionality)

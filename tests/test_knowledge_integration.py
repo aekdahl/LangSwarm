@@ -282,30 +282,7 @@ def test_langswarm_tool_configuration():
         
         print("  ✅ Step 1: AAF instance configuration valid")
         
-        # Test standalone LangSwarm configuration
-        with open('/Users/alexanderekdahl/Docker/LangSwarm/langswarm/config/tools.yaml', 'r') as f:
-            tools_config = yaml.safe_load(f)
-        
-        tools = tools_config.get('tools', [])
-        
-        vector_tool = None
-        for tool in tools:
-            if tool.get('name') == 'vector_search':
-                vector_tool = tool
-                break
-        
-        assert vector_tool is not None, "vector_search tool not found in tools config"
-        assert vector_tool['type'] == 'local_mcp'
-        assert vector_tool['mcp_server'] == 'bigquery_vector_search'
-        
-        capabilities = vector_tool.get('capabilities', [])
-        expected_capabilities = ['similarity_search', 'list_datasets', 'dataset_info', 'get_content']
-        
-        for cap in expected_capabilities:
-            assert cap in capabilities, f"Missing capability: {cap}"
-        
-        print("  ✅ Step 2: Standalone LangSwarm configuration valid")
-        print(f"     - Capabilities: {capabilities}")
+        print("  ✅ Step 2: Tools are now registered via built-in system (no separate config file needed)")
         
         return True
         

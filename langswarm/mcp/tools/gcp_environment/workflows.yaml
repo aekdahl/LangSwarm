@@ -1,270 +1,133 @@
-# GCP Environment Intelligence MCP Tool - Workflow Configurations
-# These workflows demonstrate comprehensive GCP environment analysis and optimization
+# GCP Environment Intelligence MCP Tool - Workflow Configuration
+# Single comprehensive workflow for all GCP environment operations
 
 workflows:
-  # Complete environment assessment workflow
-  - id: gcp_complete_assessment
-    name: "Complete GCP Environment Assessment"
-    description: "Comprehensive analysis of GCP environment with optimization recommendations"
-    
-    steps:
-      - id: environment_detection
-        agent: gcp_optimizer
-        input: "Please detect and summarize the current GCP environment including platform, project, and basic configuration."
-        tools: [gcp_env]
-        
-      - id: comprehensive_analysis
-        agent: gcp_optimizer
-        input: "Perform a comprehensive analysis of the GCP environment including compute resources, storage, performance metrics, costs, and security assessment."
-        tools: [gcp_env]
-        depends_on: [environment_detection]
-        
-      - id: optimization_recommendations
-        agent: gcp_optimizer
-        input: "Based on the comprehensive analysis, provide prioritized optimization recommendations with estimated savings and implementation guidance."
-        tools: [gcp_env]
-        depends_on: [comprehensive_analysis]
-        
-      - id: implementation_roadmap
-        agent: gcp_optimizer
-        input: "Create a detailed implementation roadmap for the top 5 optimization recommendations, including timelines, resources needed, and success metrics."
-        depends_on: [optimization_recommendations]
+  main_workflow:
+    - id: gcp_environment_workflow
+      description: "Universal workflow for GCP environment analysis, optimization, and management"
+      inputs:
+        - user_input
+        - user_query
+      steps:
+        - id: normalize_input
+          agent: input_normalizer
+          input: |
+            user_input: ${user_input}
+            user_query: ${user_query}
+          output:
+            to: classify_gcp_intent
 
-  # Cost optimization focused workflow
-  - id: gcp_cost_optimization
-    name: "GCP Cost Optimization Analysis"
-    description: "Detailed cost analysis and optimization recommendations"
-    
-    steps:
-      - id: cost_baseline
-        agent: gcp_cost_optimizer
-        input: "Analyze current GCP costs and spending patterns. Identify the top cost drivers and spending trends."
-        tools: [gcp_env]
-        
-      - id: resource_utilization
-        agent: gcp_cost_optimizer
-        input: "Analyze resource utilization to identify over-provisioned or underutilized resources that can be optimized for cost savings."
-        tools: [gcp_env]
-        depends_on: [cost_baseline]
-        
-      - id: cost_optimization_plan
-        agent: gcp_cost_optimizer
-        input: "Create a detailed cost optimization plan with specific actions, estimated savings, and implementation priorities."
-        tools: [gcp_env]
-        depends_on: [resource_utilization]
-        
-      - id: savings_forecast
-        agent: gcp_cost_optimizer
-        input: "Provide a 12-month cost savings forecast based on the optimization plan, including monthly milestones and ROI calculations."
-        depends_on: [cost_optimization_plan]
+        - id: classify_gcp_intent
+          agent: gcp_intent_classifier
+          input: |
+            User request: ${context.step_outputs.normalize_input}
+            
+            Classify this GCP request as one of:
+            - environment_assessment: Analyze current GCP setup
+            - cost_optimization: Analyze and optimize costs
+            - security_review: Security assessment and recommendations
+            - performance_optimization: Performance analysis and tuning
+            - resource_management: Manage GCP resources
+            - compliance_check: Compliance and governance review
+            - migration_planning: Plan migrations or deployments
+            
+            Return the classification and specific focus areas.
+          output:
+            to: gather_environment_context
 
-  # Security assessment workflow
-  - id: gcp_security_assessment
-    name: "GCP Security Posture Assessment"
-    description: "Comprehensive security analysis and recommendations"
-    
-    steps:
-      - id: security_baseline
-        agent: gcp_security_advisor
-        input: "Perform a comprehensive security assessment of the GCP environment, including IAM, network security, and compliance status."
-        tools: [gcp_env]
-        
-      - id: risk_analysis
-        agent: gcp_security_advisor
-        input: "Analyze identified security findings and classify them by risk level. Provide business impact assessment for each security risk."
-        depends_on: [security_baseline]
-        
-      - id: security_roadmap
-        agent: gcp_security_advisor
-        input: "Create a prioritized security improvement roadmap with specific remediation steps, timelines, and compliance alignment."
-        depends_on: [risk_analysis]
-        
-      - id: compliance_report
-        agent: gcp_security_advisor
-        input: "Generate a compliance report showing current status and recommendations for meeting SOC2, GDPR, and other relevant standards."
-        depends_on: [security_roadmap]
+        - id: gather_environment_context
+          agent: gcp_context_gatherer
+          input: |
+            Operation type: ${context.step_outputs.classify_gcp_intent}
+            User request: ${context.step_outputs.normalize_input}
+            
+            Gather relevant GCP environment context for this operation.
+          output:
+            to: execute_gcp_analysis
 
-  # Performance optimization workflow
-  - id: gcp_performance_optimization
-    name: "GCP Performance Optimization"
-    description: "Performance analysis and optimization recommendations"
-    
-    steps:
-      - id: performance_baseline
-        agent: gcp_performance_monitor
-        input: "Establish performance baselines by analyzing current metrics including CPU, memory, network, and application performance."
-        tools: [gcp_env]
-        
-      - id: bottleneck_analysis
-        agent: gcp_performance_monitor
-        input: "Identify performance bottlenecks and resource constraints that may be impacting system performance."
-        tools: [gcp_env]
-        depends_on: [performance_baseline]
-        
-      - id: scaling_strategy
-        agent: gcp_performance_monitor
-        input: "Recommend optimal scaling strategies including auto-scaling configuration and load balancing improvements."
-        depends_on: [bottleneck_analysis]
-        
-      - id: monitoring_setup
-        agent: gcp_performance_monitor
-        input: "Design a comprehensive monitoring and alerting strategy to proactively detect and respond to performance issues."
-        depends_on: [scaling_strategy]
+        - id: execute_gcp_analysis
+          agent: gcp_optimizer
+          input: |
+            Operation: ${context.step_outputs.classify_gcp_intent.type}
+            Context: ${context.step_outputs.gather_environment_context}
+            Original request: ${context.step_outputs.normalize_input}
+            
+            Perform the requested GCP analysis or operation.
+          output:
+            to:
+              - condition:
+                  if: "${context.step_outputs.execute_gcp_analysis.success} == true"
+                  then: check_recommendations_needed
+                  else: handle_gcp_error
 
-  # DevOps automation assessment
-  - id: gcp_devops_assessment
-    name: "GCP DevOps Automation Assessment"
-    description: "Assess and improve DevOps practices and automation"
-    
-    steps:
-      - id: current_state_analysis
-        agent: gcp_devops_specialist
-        input: "Analyze the current DevOps practices, deployment processes, and automation level in the GCP environment."
-        tools: [gcp_env]
-        
-      - id: automation_opportunities
-        agent: gcp_devops_specialist
-        input: "Identify opportunities for automation in deployment, monitoring, scaling, and maintenance processes."
-        depends_on: [current_state_analysis]
-        
-      - id: cicd_optimization
-        agent: gcp_devops_specialist
-        input: "Recommend CI/CD pipeline improvements using GCP services like Cloud Build, Cloud Deploy, and Container Registry."
-        depends_on: [automation_opportunities]
-        
-      - id: infrastructure_as_code
-        agent: gcp_devops_specialist
-        input: "Design Infrastructure as Code strategy using Terraform or Cloud Deployment Manager for the current environment."
-        depends_on: [cicd_optimization]
+        - id: check_recommendations_needed
+          agent: recommendation_checker
+          input: |
+            Analysis results: ${context.step_outputs.execute_gcp_analysis}
+            Operation type: ${context.step_outputs.classify_gcp_intent.type}
+            
+            Determine if recommendations should be generated.
+          output:
+            to:
+              - condition:
+                  if: "${context.step_outputs.classify_gcp_intent.type} != 'resource_management'"
+                  then: generate_recommendations
+                  else: check_implementation_needed
 
-  # Migration readiness assessment
-  - id: gcp_migration_assessment
-    name: "GCP Migration Readiness Assessment"
-    description: "Assess readiness for cloud migration or further cloud adoption"
-    
-    steps:
-      - id: current_architecture
-        agent: gcp_migration_specialist
-        input: "Analyze the current architecture and identify applications suitable for migration or modernization."
-        tools: [gcp_env]
-        
-      - id: cloud_readiness
-        agent: gcp_migration_specialist
-        input: "Assess cloud readiness of applications and infrastructure, identifying dependencies and migration blockers."
-        depends_on: [current_architecture]
-        
-      - id: migration_strategy
-        agent: gcp_migration_specialist
-        input: "Recommend migration strategies (lift-and-shift, re-platform, re-architect) for different workloads."
-        depends_on: [cloud_readiness]
-        
-      - id: modernization_roadmap
-        agent: gcp_migration_specialist
-        input: "Create a cloud modernization roadmap including containerization, microservices adoption, and cloud-native features."
-        depends_on: [migration_strategy]
+        - id: generate_recommendations
+          agent: gcp_recommendation_engine
+          input: |
+            Analysis results: ${context.step_outputs.execute_gcp_analysis}
+            Operation type: ${context.step_outputs.classify_gcp_intent.type}
+            
+            Generate specific, actionable recommendations based on the analysis.
+          output:
+            to: check_implementation_needed
 
-  # Self-improvement workflow (Agent analyzing its own environment)
-  - id: agent_self_optimization
-    name: "Agent Self-Environment Optimization"
-    description: "Agent analyzes and optimizes its own GCP runtime environment"
-    
-    steps:
-      - id: self_discovery
-        agent: gcp_optimizer
-        input: "Analyze my own runtime environment. What GCP platform am I running on and what resources am I using?"
-        tools: [gcp_env]
-        
-      - id: resource_analysis
-        agent: gcp_optimizer
-        input: "Analyze my resource usage patterns and performance. Am I optimally configured for my workload?"
-        tools: [gcp_env]
-        depends_on: [self_discovery]
-        
-      - id: self_optimization
-        agent: gcp_optimizer
-        input: "Based on my analysis, what specific optimizations can I recommend for my own environment? Include cost, performance, and security improvements."
-        tools: [gcp_env]
-        depends_on: [resource_analysis]
-        
-      - id: implementation_plan
-        agent: gcp_optimizer
-        input: "Create a specific implementation plan for optimizing my own environment, including configuration changes and infrastructure improvements."
-        depends_on: [self_optimization]
+        - id: check_implementation_needed
+          agent: implementation_checker
+          input: |
+            Operation type: ${context.step_outputs.classify_gcp_intent.type}
+            Recommendations: ${context.step_outputs.generate_recommendations}
+            
+            Determine if an implementation plan is needed.
+          output:
+            to:
+              - condition:
+                  if: "${context.step_outputs.classify_gcp_intent.type} contains 'optimization' || ${context.step_outputs.classify_gcp_intent.type} contains 'migration'"
+                  then: create_implementation_plan
+                  else: format_gcp_response
 
-  # Quick health check workflow
-  - id: gcp_health_check
-    name: "GCP Environment Health Check"
-    description: "Quick assessment of environment health and immediate issues"
-    
-    steps:
-      - id: environment_summary
-        agent: gcp_optimizer
-        input: "Provide a quick summary of the current GCP environment status and any immediate concerns."
-        tools: [gcp_env]
-        
-      - id: critical_issues
-        agent: gcp_security_advisor
-        input: "Identify any critical security or compliance issues that need immediate attention."
-        tools: [gcp_env]
-        
-      - id: performance_alerts
-        agent: gcp_performance_monitor
-        input: "Check for any performance issues or resource constraints that may impact operations."
-        tools: [gcp_env]
-        
-      - id: cost_alerts
-        agent: gcp_cost_optimizer
-        input: "Review recent cost trends and identify any spending anomalies or optimization opportunities."
-        tools: [gcp_env]
+        - id: create_implementation_plan
+          agent: gcp_implementation_planner
+          input: |
+            Recommendations: ${context.step_outputs.generate_recommendations}
+            Operation type: ${context.step_outputs.classify_gcp_intent.type}
+            
+            Create a detailed implementation plan.
+          output:
+            to: format_gcp_response
 
-  # Disaster recovery assessment
-  - id: gcp_disaster_recovery
-    name: "GCP Disaster Recovery Assessment"
-    description: "Assess and improve disaster recovery capabilities"
-    
-    steps:
-      - id: backup_assessment
-        agent: gcp_devops_specialist
-        input: "Assess current backup strategies and data protection measures across all GCP resources."
-        tools: [gcp_env]
-        
-      - id: resilience_analysis
-        agent: gcp_devops_specialist
-        input: "Analyze system resilience and identify single points of failure in the current architecture."
-        depends_on: [backup_assessment]
-        
-      - id: dr_strategy
-        agent: gcp_devops_specialist
-        input: "Design a comprehensive disaster recovery strategy including RTO/RPO requirements and automated failover procedures."
-        depends_on: [resilience_analysis]
-        
-      - id: dr_testing_plan
-        agent: gcp_devops_specialist
-        input: "Create a disaster recovery testing plan with regular validation procedures and improvement processes."
-        depends_on: [dr_strategy]
+        - id: format_gcp_response
+          agent: gcp_response_formatter
+          input: |
+            Operation: ${context.step_outputs.classify_gcp_intent.type}
+            Analysis: ${context.step_outputs.execute_gcp_analysis}
+            Recommendations: ${context.step_outputs.generate_recommendations}
+            Implementation plan: ${context.step_outputs.create_implementation_plan}
+            Original request: ${context.step_outputs.normalize_input}
+            
+            Format a comprehensive response.
+          output:
+            to: user
 
-  # Multi-cloud strategy workflow
-  - id: gcp_multicloud_strategy
-    name: "Multi-Cloud Strategy Development"
-    description: "Develop strategy for multi-cloud or hybrid cloud architecture"
-    
-    steps:
-      - id: vendor_lock_assessment
-        agent: gcp_migration_specialist
-        input: "Assess current vendor lock-in risks and dependencies on GCP-specific services."
-        tools: [gcp_env]
-        
-      - id: portability_analysis
-        agent: gcp_migration_specialist
-        input: "Analyze application and data portability requirements for multi-cloud deployment."
-        depends_on: [vendor_lock_assessment]
-        
-      - id: multicloud_architecture
-        agent: gcp_migration_specialist
-        input: "Design a multi-cloud architecture that leverages GCP strengths while maintaining flexibility."
-        depends_on: [portability_analysis]
-        
-      - id: governance_framework
-        agent: gcp_migration_specialist
-        input: "Create a governance framework for managing resources and costs across multiple cloud providers."
-        depends_on: [multicloud_architecture]
+        - id: handle_gcp_error
+          agent: gcp_error_handler
+          input: |
+            Error details: ${context.step_outputs.execute_gcp_analysis}
+            Operation attempted: ${context.step_outputs.classify_gcp_intent.type}
+            User request: ${context.step_outputs.normalize_input}
+            
+            Provide helpful error guidance and alternative approaches.
+          output:
+            to: user

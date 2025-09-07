@@ -529,7 +529,10 @@ class DatabaseConnection:
             self.connection = None
 
 # === Intent-Based Query Generation ===
+# NOTE: Intent handling is now done in workflows via dedicated agents.
+# The IntentQueryGenerator class has been removed as it's redundant.
 
+# Legacy class kept for reference (will be removed in next version)
 class IntentQueryGenerator:
     """Generates SQL queries from natural language intents"""
     
@@ -885,13 +888,14 @@ server.add_task(
     handler=lambda input_data: get_database_info(input_data, DEFAULT_CONFIG)
 )
 
-server.add_task(
-    name="intent_query",
-    description="Execute queries based on natural language intent with automatic SQL generation",
-    input_model=IntentQueryInput,
-    output_model=IntentQueryOutput,
-    handler=lambda input_data: intent_query(input_data, DEFAULT_CONFIG)
-)
+# NOTE: intent_query task removed - intent handling now done in workflows
+# server.add_task(
+#     name="intent_query",
+#     description="Execute queries based on natural language intent with automatic SQL generation",
+#     input_model=IntentQueryInput,
+#     output_model=IntentQueryOutput,
+#     handler=lambda input_data: intent_query(input_data, DEFAULT_CONFIG)
+# )
 
 # Create FastAPI app
 app = server.build_app()

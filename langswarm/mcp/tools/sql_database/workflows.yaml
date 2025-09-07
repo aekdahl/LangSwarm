@@ -1,51 +1,83 @@
 workflows:
-  - id: sql_query_workflow
-    description: "Constructs and validates parameters for SQL database tool calls based on user requests"
-    steps:
-      - id: build_sql_parameters
-        agent: sql_parameter_builder
-        input: |
-          User request: ${user_input}
-          
-          Analyze this request and build the appropriate parameters for the SQL database tool.
-          
-          Based on the attached readme example, construct parameters like:
-          {
-            "query": "SELECT * FROM orders WHERE user_id = %(user_id)s AND status = %(status)s",
-            "parameters": {
-              "user_id": 123,
-              "status": "completed"
-            }
-          }
-          
-          Or for simpler queries without parameters:
-          {
-            "query": "SELECT COUNT(*) FROM users"
-          }
-        output:
-          to: sql_params
+  main_workflow:
+    - id: sql_query_workflow
+      description: "Universal workflow for SQL database operations with validation and security"
+      inputs:
+        - user_input
+        - user_query
+      steps:
+        - id: normalize_input
+          agent: input_normalizer
+          input: |
+            user_input: ${user_input}
+            user_query: ${user_query}
+          output:
+            to: build_sql_parameters
 
-      - id: validate_sql_query
-        agent: sql_validator
-        input: |
-          Original user request: ${user_input}
-          Constructed SQL parameters: ${context.step_outputs.build_sql_parameters}
-          
-          Please validate this SQL query for:
-          1. Security (SQL injection protection, safe operations)
-          2. Syntax correctness
-          3. Performance considerations (missing LIMIT clauses, etc.)
-          4. Alignment with user intent
-          
-          If valid, return the same parameters unchanged.
-          If issues found, return corrected parameters or explain the problem.
-        output:
-          to: validated_params
+        - id: build_sql_parameters
+          agent: sql_parameter_builder
+          input: |
+            User request: ${context.step_outputs.normalize_input}
+            
+            Build appropriate SQL database tool parameters for this request.
+            Extract the SQL query, operation type, and any additional parameters.
+          output:
+            to: validate_sql_query
 
-      - id: execute_sql_query
-        tool: sql_database
-        input: "${context.step_outputs.validate_sql_query}"
-        output:
-          to: user
+        - id: validate_sql_query
+          agent: sql_validator
+          input: |
+            SQL parameters: ${context.step_outputs.build_sql_parameters}
+            Original request: ${context.step_outputs.normalize_input}
+            
+            Validate the SQL query for security, syntax, and compliance with restrictions.
+            Ensure the query is safe to execute.
+          output:
+            to:
+              - condition:
+                  if: "${context.step_outputs.validate_sql_query.valid} == true"
+                  then: execute_sql_query
+                  else: handle_validation_error
 
+        - id: handle_validation_error
+          agent: sql_error_handler
+          input: |
+            Validation errors: ${context.step_outputs.validate_sql_query.errors}
+            Original request: ${context.step_outputs.normalize_input}
+            
+            Provide helpful feedback about the validation errors and suggest corrections.
+          output:
+            to: user
 
+        - id: execute_sql_query
+          function: langswarm.core.utils.workflows.functions.mcp_call
+          args:
+            mcp_url: "local://sql_database"
+            payload: ${context.step_outputs.validate_sql_query.query_parameters}
+          output:
+            to:
+              - condition:
+                  if: "${context.step_outputs.execute_sql_query.success} == true"
+                  then: format_sql_response
+                  else: handle_execution_error
+
+        - id: format_sql_response
+          agent: sql_response_formatter
+          input: |
+            SQL result: ${context.step_outputs.execute_sql_query}
+            Original request: ${context.step_outputs.normalize_input}
+            
+            Format the SQL query results in a user-friendly way.
+          output:
+            to: user
+
+        - id: handle_execution_error
+          agent: sql_execution_error_handler
+          input: |
+            Execution error: ${context.step_outputs.execute_sql_query}
+            Query attempted: ${context.step_outputs.validate_sql_query.query_parameters}
+            Original request: ${context.step_outputs.normalize_input}
+            
+            Provide helpful error guidance and suggest alternatives.
+          output:
+            to: user
