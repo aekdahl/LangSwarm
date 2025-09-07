@@ -1,0 +1,151 @@
+name: Python Version Compatibility
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test-python-versions:
+    name: Test Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11", "3.12"]
+        
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: latest
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+        
+    - name: Load cached venv
+      id: cached-poetry-dependencies
+      uses: actions/cache@v3
+      with:
+        path: .venv
+        key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
+        
+    - name: Install dependencies
+      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+      run: |
+        poetry install --with dev,bigquery,daytona
+        
+    - name: Run Python compatibility test
+      run: |
+        poetry run python test_python_version_compatibility.py
+        
+    - name: Upload compatibility report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: python-${{ matrix.python-version }}-compatibility-report
+        path: python_*_compatibility_report.txt
+        
+    - name: Run basic tests
+      run: |
+        poetry run python -m pytest tests/ -v --tb=short -x
+        
+    - name: Test BigQuery tool specifically
+      env:
+        # Use dummy credentials for testing (tool should handle missing keys gracefully)
+        GOOGLE_CLOUD_PROJECT: "test-project"
+        OPENAI_API_KEY: "test-key"
+      run: |
+        poetry run python -c "
+        from langswarm.core.config import LangSwarmConfigLoader
+        loader = LangSwarmConfigLoader()
+        if 'mcpbigquery_vector_search' in loader.tool_classes:
+            tool_class = loader.tool_classes['mcpbigquery_vector_search']
+            tool = tool_class('test')
+            result = tool.run('test query')
+            print(f'Tool execution result: {type(result)}')
+            print('✅ BigQuery tool basic execution test passed')
+        else:
+            print('❌ BigQuery tool not available')
+            exit(1)
+        "
+        
+  test-docker-compatibility:
+    name: Test Docker with Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11", "3.12"]
+        
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Create test Dockerfile
+      run: |
+        cat > Dockerfile.test << EOF
+        FROM python:${{ matrix.python-version }}-slim
+        
+        WORKDIR /app
+        COPY . /app/
+        
+        # Install Poetry
+        RUN pip install poetry
+        
+        # Configure Poetry
+        RUN poetry config virtualenvs.create false
+        
+        # Install dependencies
+        RUN poetry install --with bigquery
+        
+        # Run compatibility test
+        CMD ["python", "test_python_version_compatibility.py"]
+        EOF
+        
+    - name: Build and test Docker image
+      run: |
+        docker build -f Dockerfile.test -t langswarm-test:python${{ matrix.python-version }} .
+        docker run --rm langswarm-test:python${{ matrix.python-version }}
+        
+  # Summary job that depends on all test jobs
+  python-compatibility-summary:
+    name: Python Compatibility Summary
+    runs-on: ubuntu-latest
+    needs: [test-python-versions, test-docker-compatibility]
+    if: always()
+    
+    steps:
+    - name: Check test results
+      run: |
+        echo "Python Version Compatibility Test Results:"
+        echo "=========================================="
+        
+        if [[ "${{ needs.test-python-versions.result }}" == "success" ]]; then
+          echo "✅ Python version tests: PASSED"
+        else
+          echo "❌ Python version tests: FAILED"
+        fi
+        
+        if [[ "${{ needs.test-docker-compatibility.result }}" == "success" ]]; then
+          echo "✅ Docker compatibility tests: PASSED"
+        else
+          echo "❌ Docker compatibility tests: FAILED"
+        fi
+        
+        # Fail if any tests failed
+        if [[ "${{ needs.test-python-versions.result }}" != "success" ]] || [[ "${{ needs.test-docker-compatibility.result }}" != "success" ]]; then
+          echo ""
+          echo "💥 Some compatibility tests failed!"
+          echo "Check the individual job logs for details."
+          exit 1
+        fi
+        
+        echo ""
+        echo "🎉 All Python version compatibility tests passed!"

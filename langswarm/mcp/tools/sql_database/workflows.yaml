@@ -1,0 +1,51 @@
+workflows:
+  - id: sql_query_workflow
+    description: "Constructs and validates parameters for SQL database tool calls based on user requests"
+    steps:
+      - id: build_sql_parameters
+        agent: sql_parameter_builder
+        input: |
+          User request: ${user_input}
+          
+          Analyze this request and build the appropriate parameters for the SQL database tool.
+          
+          Based on the attached readme example, construct parameters like:
+          {
+            "query": "SELECT * FROM orders WHERE user_id = %(user_id)s AND status = %(status)s",
+            "parameters": {
+              "user_id": 123,
+              "status": "completed"
+            }
+          }
+          
+          Or for simpler queries without parameters:
+          {
+            "query": "SELECT COUNT(*) FROM users"
+          }
+        output:
+          to: sql_params
+
+      - id: validate_sql_query
+        agent: sql_validator
+        input: |
+          Original user request: ${user_input}
+          Constructed SQL parameters: ${context.step_outputs.build_sql_parameters}
+          
+          Please validate this SQL query for:
+          1. Security (SQL injection protection, safe operations)
+          2. Syntax correctness
+          3. Performance considerations (missing LIMIT clauses, etc.)
+          4. Alignment with user intent
+          
+          If valid, return the same parameters unchanged.
+          If issues found, return corrected parameters or explain the problem.
+        output:
+          to: validated_params
+
+      - id: execute_sql_query
+        tool: sql_database
+        input: "${context.step_outputs.validate_sql_query}"
+        output:
+          to: user
+
+

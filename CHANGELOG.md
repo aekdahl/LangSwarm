@@ -5,6 +5,65 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.54.dev13] - 2025-01-17
+
+### 🔧 **Tool Parameter Validation Fix**
+- **Fixed BigQuery Tool Parameter Mismatch**: Agents were incorrectly using `keyword` instead of expected `query` parameter
+  - Enhanced tool instructions with explicit parameter naming requirements and usage examples
+  - Added parameter validation in BigQuery tool with helpful error messages for common mistakes (`keyword`, `search`, `text` → `query`)
+  - Improved system prompt templates to include complete tool schema information
+  - Enhanced config loader to provide detailed parameter schemas to system prompts for better agent awareness
+
+### 🎯 **Enhanced Agent Tool Integration**
+- **System Prompt Schema Integration**: Agents now receive complete parameter schemas in their system prompts
+- **Better Error Messages**: Clear guidance when agents use incorrect parameter names
+- **Template Improvements**: Added JSON schema blocks to help agents understand exact parameter requirements
+
+### 🔍 **Technical Details**
+The fix addresses the root cause where agents weren't receiving complete parameter schema information. Now system prompts include:
+```
+### Tool: bigquery_vector_search
+Use this tool to perform semantic searches...
+
+Parameters Schema:
+{
+  "similarity_search": {
+    "properties": {
+      "query": {"type": "string"},
+      "limit": {"type": "integer", "default": 10},
+      "similarity_threshold": {"type": "number", "default": 0.7}
+    }
+  }
+}
+```
+
+## [0.0.54.dev12] - 2025-01-17
+
+### 🐍 **Python 3.11 & 3.12 Compatibility**
+- **Added Full Python 3.11/3.12 Support**: LangSwarm now works seamlessly on modern Python versions
+  - New compatibility utilities in `langswarm.core.utils.python_compat` for version-specific handling
+  - Updated event loop management for Python 3.11+ stricter async requirements
+  - Enhanced OpenAI client context management with proper async cleanup
+  - Fixed asyncio.gather() error handling for newer Python versions
+
+### 🔧 **Enhanced Async Patterns**  
+- **EventLoopManager**: Smart event loop detection and creation for all Python versions
+- **OpenAIClientFactory**: Consistent OpenAI client creation with proper lifecycle management
+- **AsyncContextManager**: Python 3.11+ compatible async context managers
+- **Backward Compatibility**: Maintains full compatibility with Python 3.9 deployments
+
+### 🧪 **Comprehensive Testing**
+- **Multi-Version Test Suite**: New compatibility test covers Python 3.9, 3.11, and 3.12
+- **GitHub Actions CI**: Automated testing across all supported Python versions
+- **Docker Compatibility**: Verified container deployment on all Python versions
+- **BigQuery Tool Testing**: Specific validation of tool execution patterns
+
+### 📋 **Migration Guide**
+- **Minimum Python Version**: Updated from 3.8 to 3.9 (3.8 reached EOL)
+- **Cloud Run Users**: Can now use Python 3.11 or 3.12 images safely
+- **Docker Images**: Update Dockerfile to use `python:3.11-slim` or `python:3.12-slim`
+- **Development**: All Python versions supported for local development
+
 ## [0.0.54.dev11] - 2025-01-17
 
 ### 🔧 **Session Storage BigQuery Fix**

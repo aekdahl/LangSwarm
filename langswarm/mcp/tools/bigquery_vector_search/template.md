@@ -21,7 +21,17 @@ Optional configuration:
 
 ## Usage Examples
 
-### Similarity Search
+### Intent-Based Calling (Recommended)
+Express what you want to accomplish:
+```json
+{
+  "tool": "bigquery_vector_search",
+  "intent": "search for refund policy information",
+  "context": "user asking about return procedures"
+}
+```
+
+### Direct Parameter Calling
 Find content similar to a query:
 ```json
 {
@@ -31,6 +41,8 @@ Find content similar to a query:
   "similarity_threshold": 0.8
 }
 ```
+
+**CRITICAL**: Always use `query` parameter, NOT `keyword`, `search`, or `text`.
 
 ### List Available Datasets
 Get all vector datasets:
@@ -60,5 +72,19 @@ The BigQuery table must have the following schema:
 - `metadata` (STRING): JSON metadata
 - `created_at` (TIMESTAMP): Creation timestamp
 
+## Tool Call Patterns
+
+### When to Use Intent-Based
+- Natural language queries: "What's our pricing?"
+- Exploratory searches: "Find information about X"
+- When you don't know exact parameters
+- For user-facing applications
+
+### When to Use Direct Parameters  
+- Programmatic usage with known parameters
+- Precise control over search settings
+- API integrations
+- When you need specific similarity thresholds
+
 ## Integration
-This tool integrates with LangSwarm agents to provide semantic search capabilities over company knowledge bases stored in BigQuery.
+This tool integrates with LangSwarm agents to provide semantic search capabilities over company knowledge bases stored in BigQuery. It supports both intent-based calling for natural interactions and direct parameter calling for precise control.

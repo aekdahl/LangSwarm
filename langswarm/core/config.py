@@ -2423,17 +2423,36 @@ Adapt your approach based on the user's needs, drawing from your combined expert
                 if _id in source:
                     src = source[_id]
                     if hasattr(src, 'get'):  # It's a dict (config)
-                        result.append({
+                        tool_info = {
                             "id": _id, 
                             "description": src.get("description", ""), 
                             "instruction": src.get("instruction", "")
-                        })
+                        }
+                        # Add schema information if available
+                        if "schema" in src:
+                            tool_info["schema"] = src["schema"]
+                        result.append(tool_info)
                     else:  # It's an instance (tool object)
-                        result.append({
+                        tool_info = {
                             "id": _id,
                             "description": getattr(src, 'description', f'{_id} tool'),
                             "instruction": getattr(src, 'instruction', f'Use the {_id} tool')
-                        })
+                        }
+                        # Add schema information for MCP tools
+                        if hasattr(src, 'mcp_server') or hasattr(src, 'server'):
+                            # Try to get schema from MCP server
+                            mcp_server = getattr(src, 'mcp_server', None) or getattr(src, 'server', None)
+                            if mcp_server and hasattr(mcp_server, 'tasks'):
+                                schemas = {}
+                                for task_name, task_meta in mcp_server.tasks.items():
+                                    if hasattr(task_meta["input_model"], "schema"):
+                                        schemas[task_name] = task_meta["input_model"].schema()
+                                if schemas:
+                                    tool_info["schema"] = schemas
+                        # Also check for explicit schema attribute
+                        elif hasattr(src, 'schema'):
+                            tool_info["schema"] = getattr(src, 'schema')
+                        result.append(tool_info)
             return result
 
         return template.render(
@@ -4194,6 +4213,22 @@ class WorkflowExecutor:
         self._config_loader = None
         self._initialize_config_loader()
     
+    @property
+    def context(self):
+        """Access the workflow execution context from the underlying config loader"""
+        if self._config_loader and hasattr(self._config_loader, 'context'):
+            return self._config_loader.context
+        return {}
+    
+    @context.setter  
+    def context(self, value):
+        """Set the workflow execution context on the underlying config loader"""
+        if self._config_loader:
+            self._config_loader.context = value
+        else:
+            # Store for later initialization
+            self._pending_context = value
+    
     def _initialize_config_loader(self):
         """Initialize a config loader instance for workflow execution"""
         try:
@@ -4220,6 +4255,11 @@ class WorkflowExecutor:
             if not hasattr(self._config_loader, 'intelligence'):
                 from langswarm.core.utils.workflows.intelligence import WorkflowIntelligence
                 self._config_loader.intelligence = WorkflowIntelligence()
+            
+            # Apply any pending context that was set before initialization
+            if hasattr(self, '_pending_context'):
+                self._config_loader.context = self._pending_context
+                delattr(self, '_pending_context')
                 
         except Exception as e:
             print(f"⚠️ Warning: Could not fully initialize WorkflowExecutor: {e}")

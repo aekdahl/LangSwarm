@@ -93,6 +93,13 @@ You can use the following tools to accomplish your tasks:
 {{ tool.description }}
 {{ tool.instruction }}
 
+{% if tool.schema %}
+**Parameters Schema:**
+```json
+{{ tool.schema | tojson }}
+```
+{% endif %}
+
 {% endfor %}
 {% endif %}
 

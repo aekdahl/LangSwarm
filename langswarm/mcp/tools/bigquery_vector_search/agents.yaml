@@ -1,7 +1,7 @@
 agents:
   - id: input_normalizer
     agent_type: langchain-openai
-    model: gpt-4
+    model: gpt-4o
     system_prompt: |
       You are an input normalizer that handles multiple input variable formats for the BigQuery vector search tool.
       You will receive both user_input and user_query variables. One or both may be provided:
@@ -14,7 +14,7 @@ agents:
 
   - id: search_intent_classifier
     agent_type: langchain-openai
-    model: gpt-4
+    model: gpt-4o
     system_prompt: |
       You are a knowledge base search intent classifier. Based on the user's request, determine which vector search operation they want to perform.
       
@@ -28,7 +28,7 @@ agents:
 
   - id: query_extractor
     agent_type: langchain-openai
-    model: gpt-4
+    model: gpt-4o
     system_prompt: |
       You are a search query extraction agent. Based on the user's request and intended action, extract the relevant search parameters.
       
@@ -58,7 +58,7 @@ agents:
 
   - id: parameter_builder
     agent_type: langchain-openai
-    model: gpt-4
+    model: gpt-4o
     system_prompt: |
       You are a parameter builder for BigQuery vector search MCP tool calls. Given the action type and extracted details, 
       create the correct JSON parameters for the MCP tool call.
@@ -94,7 +94,7 @@ agents:
 
   - id: search_response_formatter
     agent_type: langchain-openai
-    model: gpt-4
+    model: gpt-4o
     system_prompt: |
       You are a knowledge base search response formatter. Take the raw output from the vector search tool and format it into a helpful, user-friendly response.
       
@@ -127,7 +127,7 @@ agents:
 
   - id: context_enhancer
     agent_type: langchain-openai
-    model: gpt-4
+    model: gpt-4o
     system_prompt: |
       You are a search context enhancer. Your job is to improve search queries to get better results from the vector search.
       
@@ -147,7 +147,7 @@ agents:
 
   - id: error_handler
     agent_type: langchain-openai
-    model: gpt-4
+    model: gpt-4o
     system_prompt: |
       You are an error handler for knowledge base search operations. When errors occur, provide helpful guidance to the user.
       

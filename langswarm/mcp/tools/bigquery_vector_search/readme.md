@@ -43,6 +43,26 @@ The BigQuery Vector Search MCP Tool provides intelligent knowledge base search c
 "What's the structure of the vector_search table?"
 ```
 
+### Intent-Based Calling (Recommended)
+
+**Search for Information:**
+```json
+{
+  "tool": "bigquery_vector_search",
+  "intent": "search for API authentication methods",
+  "context": "user needs documentation on authentication options"
+}
+```
+
+**Browse Available Content:**
+```json
+{
+  "tool": "bigquery_vector_search", 
+  "intent": "list available knowledge bases",
+  "context": "user wants to explore what information is available"
+}
+```
+
 ### Direct API Calls
 
 **Similarity Search:**
@@ -55,6 +75,10 @@ The BigQuery Vector Search MCP Tool provides intelligent knowledge base search c
   "table_name": "api_documentation"
 }
 ```
+
+**⚠️ Parameter Validation**: The tool validates parameter names and provides helpful error messages:
+- ✅ Use `query` for search text
+- ❌ Don't use `keyword`, `search`, or `text` - these will return clear error messages
 
 **List Datasets:**
 ```json
@@ -134,18 +158,45 @@ Tables must include:
 ## Integration with LangSwarm
 
 ### In Agent Configuration
+
+**Simple Configuration:**
 ```yaml
-tools:
-  - name: "knowledge_search"
-    type: "local_mcp"
-    description: "Search company knowledge base"
-    mcp_server: "bigquery_vector_search"
-    enabled: true
+agents:
+  - id: "knowledge_assistant"
+    type: "langchain-openai"
+    model: "gpt-4o"
+    tools: ["bigquery_vector_search"]  # Auto-discovered built-in tool
 ```
 
-### Workflow Usage
+**Advanced Configuration:**
+```yaml
+tools:
+  - id: "bigquery_vector_search"
+    type: "mcpbigquery_vector_search"
+    description: "Search company knowledge base"
+    pattern: "intent"  # Enable intent-based calling
+    settings:
+      dataset_id: "custom_dataset"
+      similarity_threshold: 0.8
+```
+
+### Direct Agent Usage (Simple & Recommended)
 ```python
-# Use in workflow executor
+from langswarm.core.config import LangSwarmConfigLoader
+
+# Load agent with BigQuery tool
+loader = LangSwarmConfigLoader('config.yaml') 
+workflows, agents, *_ = loader.load()
+agent = agents["knowledge_assistant"]
+
+# Intent-based calling (automatic tool chaining)
+response = agent.chat("What are our API rate limits?")
+print(response)  # Agent automatically searches and provides answer
+```
+
+### Workflow Usage (Advanced)
+```python
+# Use in workflow executor for complex multi-agent processes
 executor.run_workflow("intelligent_search_workflow", 
                      user_input="What are our API rate limits?")
 
@@ -164,17 +215,19 @@ Automatically expands queries with related terms:
 - "API docs" → "API documentation endpoints developer guide reference"
 - "refund policy" → "refund return policy money back guarantee cancellation"
 
-### Smart Error Handling
+### Smart Error Handling & Parameter Validation
 Provides contextual help when searches fail:
-- Suggests alternative keywords
-- Explains availability of datasets
-- Guides users to successful searches
+- **Parameter Validation**: Clear error messages for wrong parameter names (e.g., using `keyword` instead of `query`)
+- **Suggests alternative keywords**: Helps users find relevant content
+- **Explains availability of datasets**: Guides users to accessible information
+- **Intent-based fallback**: When direct parameters fail, try intent-based calling
 
-### Multiple Input Formats
-Supports both structured JSON and natural language:
-- Direct API calls with JSON parameters
-- Conversational queries in plain English
-- Mixed input with `user_input` and `user_query`
+### Multiple Calling Patterns
+Supports both intent-based and direct parameter calling:
+- **Intent-based**: Natural language expressions of what you want to accomplish
+- **Direct parameters**: Structured JSON with specific parameters  
+- **Automatic tool chaining**: Agent can make multiple sequential tool calls
+- **Parameter validation**: Helpful error messages for incorrect parameter names
 
 ## Performance Optimization
 
@@ -187,8 +240,9 @@ Supports both structured JSON and natural language:
 
 The tool provides comprehensive error handling:
 - **Connection Issues**: Graceful degradation with retry suggestions
-- **No Results**: Alternative search strategies
-- **Invalid Parameters**: Clear validation messages
+- **No Results**: Alternative search strategies and intent-based fallback
+- **Parameter Name Errors**: Specific guidance for common mistakes (`keyword` → `query`)
+- **Invalid Parameters**: Clear validation messages with examples
 - **Dataset Errors**: Helpful navigation guidance
 
 ## Development and Testing

@@ -484,6 +484,7 @@ class RealtimeVoiceMCPTool(BaseTool):
     - Voice response optimization
     - Voice configuration management
     """
+    _bypass_pydantic = True  # Bypass Pydantic validation
     
     def __init__(self, identifier: str, name: str = None, local_mode: bool = True, 
                  mcp_url: str = None, **kwargs):

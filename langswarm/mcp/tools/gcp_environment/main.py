@@ -564,6 +564,7 @@ class EmptyInput(BaseModel):
 
 class GCPEnvironmentMCPTool(BaseTool):
     """GCP Environment Intelligence MCP Tool"""
+    _bypass_pydantic = True  # Bypass Pydantic validation
     
     def __init__(
         self,
