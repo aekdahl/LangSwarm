@@ -59,7 +59,7 @@ workflows:
         - id: build_tool_parameters
           agent: parameter_builder
           input: |
-            Operation: ${context.step_outputs.classify_intent.type}
+            Operation: ${context.step_outputs.classify_intent}
             Extracted params: ${context.step_outputs.extract_parameters}
             Enhanced query: ${context.step_outputs.enhance_query}
             
@@ -72,7 +72,9 @@ workflows:
           function: langswarm.core.utils.workflows.functions.mcp_call
           args:
             mcp_url: "local://bigquery_vector_search"
-            payload: ${context.step_outputs.build_tool_parameters}
+            payload:
+              name: ${context.step_outputs.classify_intent}
+              arguments: ${context.step_outputs.build_tool_parameters}
           output:
             to:
               - condition:
@@ -83,7 +85,7 @@ workflows:
         - id: format_response
           agent: search_response_formatter
           input: |
-            Operation: ${context.step_outputs.classify_intent.type}
+            Operation: ${context.step_outputs.classify_intent}
             Raw results: ${context.step_outputs.execute_search}
             Original request: ${context.step_outputs.normalize_input}
             
