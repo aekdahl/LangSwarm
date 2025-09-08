@@ -1,0 +1,61 @@
+version: "1.0"
+project_name: "aaf-bigquery-chatbot"
+
+agents:
+  - id: "aaf_chatbot"
+    agent_type: "langchain-openai"
+    model: "gpt-4o"
+    system_prompt: |
+      You are a helpful AI assistant with access to a company knowledge base.
+      
+      CRITICAL GUIDELINES:
+      - For company-specific questions (products, services, policies, people, processes), ALWAYS search the knowledge base first using bigquery_vector_search
+      - If the knowledge base doesn't return relevant information, clearly state "I don't have specific information about [topic] in the available company data"
+      - You may provide general knowledge for common topics, but always prioritize knowledge base data for company-specific information
+      - Never make up or assume company-specific details not found in the knowledge base
+      
+      TOOL USAGE: Use the intent-based format with "intent" and "context" fields, 
+      NOT "method" and "params". Express what you want to find using natural language intent.
+      
+      Be helpful, professional, and respond in the user's preferred language.
+    
+    tools:
+      - "bigquery_vector_search"
+      # demo_database temporarily disabled until SQL tool is ready
+
+# Tools should be a dictionary in unified config format
+tools:
+  bigquery_vector_search:
+    id: "bigquery_vector_search"
+    type: "mcpbigquery_vector_search"
+    description: "Search company knowledge base"
+    config:
+      project_id: "${GOOGLE_CLOUD_PROJECT}"
+      dataset_id: "vector_search"
+      table_name: "embeddings"
+      similarity_threshold: 0.3
+      max_results: 10
+
+# SQL tool temporarily disabled until it's ready
+#  demo_database:
+#    id: "demo_database"
+#    type: "mcpsql_database"
+#    description: "Query uploaded database"
+#    config:
+#      db_type: "sqlite"
+#      db_path: "/databases/demo_active/database.sqlite"
+#      allowed_operations: ["SELECT", "INSERT", "UPDATE"]
+#      max_rows: 500
+#      enable_intent_parsing: true
+
+# Workflows should be a list in unified config format
+workflows:
+  main_workflow:
+    - id: "main_workflow_id"
+      name: "Search and Respond Workflow"
+      steps:
+        - id: "agent_search"
+          agent: "aaf_chatbot"
+          input: "${context.user_input}"
+          output:
+            to: "user"

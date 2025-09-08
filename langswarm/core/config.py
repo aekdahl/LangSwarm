@@ -88,9 +88,10 @@ except ImportError:
 try:
     from .detection import EnvironmentDetector, auto_discover_tools, detect_available_tools
     from .defaults import SmartDefaults
-    ZERO_CONFIG_AVAILABLE = True
+    # DISABLE ZERO-CONFIG: Force standard agent processing
+    ZERO_CONFIG_AVAILABLE = False
     import logging
-    logging.info("✅ Zero-config functionality available")
+    logging.info("🚫 Zero-config functionality disabled - using standard processing")
 except ImportError as e:
     ZERO_CONFIG_AVAILABLE = False
     import logging
