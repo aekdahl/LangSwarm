@@ -1,9 +1,13 @@
 """
 Currently only works for Hugging Face.
+Enhanced with rate limiting backoff for robust loading.
 """
 
 from transformers import AutoTokenizer, AutoModel
 from typing import Dict
+import logging
+
+logger = logging.getLogger(__name__)
 
 class PreLoadConfig:
     """
@@ -46,13 +50,17 @@ class PreLoadModels:
 class PreLoadTokenizers:
     def __init__(self):
         """
-        Preload Hugging Face tokenizers into cache.
+        Preload Hugging Face tokenizers into cache, skip gracefully on errors.
         """
         config = PreLoadConfig()
         for model_name in config.models_to_preload:
-            print(f"Preloading tokenizer: {model_name}")
-            AutoTokenizer.from_pretrained(model_name)
-        print("Tokenizers preloaded successfully.")
+            try:
+                logger.info(f"📥 Preloading tokenizer: {model_name}")
+                AutoTokenizer.from_pretrained(model_name)
+                logger.info(f"✅ Successfully preloaded tokenizer: {model_name}")
+            except Exception as e:
+                logger.info(f"⚠️ Skipping tokenizer {model_name}: {e}")
+        logger.info("✅ Tokenizer preloading completed.")
         
 """
 # main.py

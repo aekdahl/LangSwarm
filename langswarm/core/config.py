@@ -315,9 +315,21 @@ class WorkflowConfig:
         """Parse single agent workflow: just agent name"""
         agent_name = syntax.strip()
         
+        # Choose agent intelligently
+        if agent_name in available_agents:
+            chosen_agent = agent_name
+        elif available_agents:
+            # Use first available agent if specified agent not found
+            chosen_agent = available_agents[0]
+            print(f"⚠️ Agent '{agent_name}' not found, using '{chosen_agent}' instead")
+        else:
+            # Create a generic agent reference as last resort
+            chosen_agent = "default_agent"
+            print(f"⚠️ No agents available, workflow will reference 'default_agent'")
+        
         return [{
             "id": f"single_step_{agent_name.replace(' ', '_')}",
-            "agent": agent_name if agent_name in available_agents else "default_agent",
+            "agent": chosen_agent,
             "input": "${context.user_input}",
             "output": {"to": "user"}
         }]
@@ -439,6 +451,37 @@ class MemoryConfig:
             config["api_key"] and 
             config["api_secret"]
         )
+    
+    def get_adapter_settings(self, adapter_type: str) -> Dict[str, Any]:
+        """
+        Get filtered settings appropriate for specific adapter types.
+        Removes LangSwarm-specific configuration that adapters don't accept.
+        
+        Args:
+            adapter_type: Type of adapter ('sqlite', 'redis', 'bigquery', etc.)
+            
+        Returns:
+            Filtered settings dictionary
+        """
+        # Define allowed parameters for each adapter type
+        adapter_params = {
+            'sqlite': ['db_path', 'timeout', 'check_same_thread', 'isolation_level'],
+            'redis': ['redis_url', 'host', 'port', 'password', 'db', 'socket_timeout', 'connection_pool'],
+            'bigquery': ['project_id', 'dataset_id', 'table_id', 'location', 'credentials_path'],
+            'chromadb': ['persist_directory', 'collection_name', 'embedding_model', 'distance_metric'],
+            'elasticsearch': ['hosts', 'index_name', 'cloud_id', 'api_key', 'username', 'password'],
+            'memorypro': ['mode', 'api_url', 'api_key', 'api_secret', 'webhook_url', 'webhook_secret', 'db_path']
+        }
+        
+        allowed_params = adapter_params.get(adapter_type, [])
+        if not allowed_params:
+            # If adapter type not recognized, return all settings and let adapter handle filtering
+            return self.settings.copy()
+        
+        # Filter settings to only include parameters the adapter accepts
+        filtered_settings = {k: v for k, v in self.settings.items() if k in allowed_params}
+        
+        return filtered_settings
     
     @staticmethod
     def setup_memory(config_input: Union[bool, str, Dict[str, Any]]) -> 'MemoryConfig':
@@ -835,6 +878,16 @@ class LangSwarmConfigLoader:
         from langswarm.mcp.tools.codebase_indexer.main import CodebaseIndexerMCPTool
         from langswarm.mcp.tools.workflow_executor.main import WorkflowExecutorMCPTool
         
+        # Import SQL Database tool (always available - uses built-in sqlite)
+        try:
+            from langswarm.mcp.tools.sql_database.main import SQLDatabaseMCPTool
+            SQL_DATABASE_TOOL_AVAILABLE = True
+        except ImportError as e:
+            SQLDatabaseMCPTool = None
+            SQL_DATABASE_TOOL_AVAILABLE = False
+            import logging
+            logging.warning(f"SQL Database tool not available: {e}. Check tool implementation.")
+        
         # Import BigQuery Vector Search tool (with graceful fallback)
         try:
             from langswarm.mcp.tools.bigquery_vector_search.main import BigQueryVectorSearchMCPTool
@@ -883,6 +936,10 @@ class LangSwarmConfigLoader:
             "mcpgcp_environment": GCPEnvironmentMCPTool,
             # add more here (or via register_tool_class below)
         }
+        
+        # Add SQL Database tool if available
+        if SQL_DATABASE_TOOL_AVAILABLE:
+            self.tool_classes["mcpsql_database"] = SQLDatabaseMCPTool
         
         # Add BigQuery tool if available
         if BIGQUERY_TOOL_AVAILABLE:

@@ -1,6 +1,7 @@
 import hashlib
 import uuid
 import os
+import logging
 
 #%pip install --upgrade tiktoken
 import tiktoken
@@ -13,12 +14,25 @@ except ImportError:
 from .misc import StripTags
 from .subutilities.formatting import Formatting
 
+logger = logging.getLogger(__name__)
+
 class Utils(Formatting):
     def __init__(self):
-        if GPT2Tokenizer:
-            self.gpt2_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+        self.gpt2_tokenizer = None
+        
+        # Try to load GPT2 tokenizer, skip gracefully on any error
+        if GPT2Tokenizer and not os.getenv('LANGSWARM_DISABLE_HF_TOKENIZER', '').lower() == 'true':
+            try:
+                logger.info("Loading GPT2 tokenizer...")
+                self.gpt2_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+                logger.info("✅ GPT2 tokenizer loaded successfully")
+            except Exception as e:
+                logger.info(f"⚠️ Skipping GPT2 tokenizer due to: {e}")
+                logger.info("🔄 Will use tiktoken fallback for all tokenization")
+                self.gpt2_tokenizer = None
         else:
-            self.gpt2_tokenizer = None
+            logger.info("GPT2Tokenizer not available or disabled, using tiktoken fallback only")
+        
         self.bot_logs = []
 
     def _get_api_key(self, provider, api_key):
@@ -109,13 +123,14 @@ class Utils(Formatting):
         except Exception:
             if verbose:
                 print("tiktoken failed, falling back to GPT2Tokenizer.")
-            # Load the tokenizer
-            if GPT2Tokenizer:
-                tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-                # Tokenize the text
-                tokens = tokenizer.encode(text)
-                current_tokens = len(tokenizer.encode(current_conversation))
+            # Use pre-loaded tokenizer (with backoff) or fallback
+            if self.gpt2_tokenizer is not None:
+                # Tokenize the text using the pre-loaded tokenizer
+                tokens = self.gpt2_tokenizer.encode(text)
+                current_tokens = len(self.gpt2_tokenizer.encode(current_conversation))
             else:
+                if verbose:
+                    print("No tokenizer available, returning original text.")
                 return text
             
         # Check if any space is left?

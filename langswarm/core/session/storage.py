@@ -14,6 +14,14 @@ from datetime import datetime, timedelta
 
 from .models import LangSwarmSession, ConversationHistory, SessionMetadata, SessionStatus
 
+# Optional BigQuery support
+try:
+    from .bigquery_storage import BigQuerySessionStorage
+    BIGQUERY_AVAILABLE = True
+except ImportError:
+    BigQuerySessionStorage = None
+    BIGQUERY_AVAILABLE = False
+
 
 class SessionStorage(ABC):
     """Abstract base class for session storage backends"""
@@ -310,7 +318,7 @@ class SessionStorageFactory:
         Create a session storage instance
         
         Args:
-            storage_type: Type of storage ("memory", "sqlite")
+            storage_type: Type of storage ("memory", "sqlite", "bigquery")
             **kwargs: Storage-specific configuration
         """
         if storage_type == "memory":
@@ -318,6 +326,22 @@ class SessionStorageFactory:
         elif storage_type == "sqlite":
             db_path = kwargs.get("db_path", "langswarm_sessions.db")
             return SQLiteSessionStorage(db_path)
+        elif storage_type == "bigquery":
+            if not BIGQUERY_AVAILABLE:
+                raise ImportError("BigQuery storage requires google-cloud-bigquery package")
+            
+            project_id = kwargs.get("project_id")
+            if not project_id:
+                raise ValueError("BigQuery storage requires 'project_id' parameter")
+            
+            dataset_id = kwargs.get("dataset_id", "langswarm_sessions") 
+            table_id = kwargs.get("table_id", "session_events")
+            
+            return BigQuerySessionStorage(
+                project_id=project_id,
+                dataset_id=dataset_id,
+                table_id=table_id
+            )
         else:
             raise ValueError(f"Unknown storage type: {storage_type}")
     

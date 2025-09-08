@@ -101,21 +101,24 @@ class TaskStorage:
             
             if memory_config.backend == "bigquery":
                 from langswarm.memory.adapters._langswarm.bigquery.main import BigQueryAdapter
+                adapter_settings = memory_config.get_adapter_settings("bigquery")
                 return BigQueryAdapter(
                     identifier="tasklist_storage",
-                    **memory_config.settings
+                    **adapter_settings
                 )
             elif memory_config.backend == "redis":
                 from langswarm.memory.adapters._langswarm.redis.main import RedisAdapter
+                adapter_settings = memory_config.get_adapter_settings("redis")
                 return RedisAdapter(
                     identifier="tasklist_storage",
-                    **memory_config.settings
+                    **adapter_settings
                 )
             elif memory_config.backend == "sqlite":
                 from langswarm.memory.adapters._langswarm.sqlite.main import SQLiteAdapter
+                adapter_settings = memory_config.get_adapter_settings("sqlite")
                 return SQLiteAdapter(
                     identifier="tasklist_storage",
-                    db_path=memory_config.settings.get("db_path", "tasklist_memory.db")
+                    db_path=adapter_settings.get("db_path", "tasklist_memory.db")
                 )
             else:
                 print(f"⚠️  Unsupported memory backend: {memory_config.backend}, falling back to file storage")

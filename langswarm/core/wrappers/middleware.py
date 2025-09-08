@@ -137,7 +137,33 @@ class MiddlewareMixin:
         if self.tool_deployer:
             kwargs["tool_deployer"] = self.tool_deployer
             
-        output = executor.run_workflow(handler.main_workflow, **kwargs)
+        # Get the actual workflow ID from the main_workflow list
+        main_workflows = workflows.get("main_workflow", [])
+        if main_workflows and isinstance(main_workflows, list) and len(main_workflows) > 0:
+            workflow_id = main_workflows[0].get("id", "main_workflow")
+        else:
+            workflow_id = "main_workflow"
+            
+        # Try to execute with the extracted workflow ID, with fallback to "main_workflow"
+        try:
+            output = executor.run_workflow(workflow_id, **kwargs)
+        except Exception as e:
+            # If the workflow ID fails, try fallback to "main_workflow" (legacy compatibility)
+            if workflow_id != "main_workflow":
+                self._log_event(f"Primary workflow '{workflow_id}' failed: {e}. Falling back to 'main_workflow'", "warning")
+                try:
+                    output = executor.run_workflow("main_workflow", **kwargs)
+                except Exception as fallback_error:
+                    # If both fail, try the original handler approach (if it exists)
+                    if hasattr(handler, 'main_workflow'):
+                        self._log_event("Falling back to handler.main_workflow attribute", "warning")
+                        output = executor.run_workflow(handler.main_workflow, **kwargs)
+                    else:
+                        # All fallbacks failed, re-raise the original error
+                        raise e
+            else:
+                # Already tried "main_workflow", no more fallbacks
+                raise e
         
         print("MCP Intent-based output:", output)
         return output

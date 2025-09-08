@@ -245,6 +245,13 @@ class SmartDefaults:
                 "resource_usage": "low",
                 "requires_api": False
             },
+            "sql_database": {
+                "type": "mcpsql_database",
+                "capabilities": ["database", "sql", "analytics", "data_retrieval"],
+                "resource_usage": "low",
+                "always_available": True,
+                "description": "Secure SQL database access with natural language query building and validation"
+            },
             "daytona_environment": {
                 "type": "daytona_environment",
                 "capabilities": ["environments", "code_execution", "development"],

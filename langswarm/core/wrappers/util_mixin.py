@@ -193,10 +193,19 @@ class UtilMixin:
                 if not isinstance(mcp, dict):
                     return False, "'mcp' field must be an object or null"
                 
-                required_mcp_fields = ["tool", "method"]
-                for field in required_mcp_fields:
-                    if field not in mcp:
-                        return False, f"Missing required MCP field: {field}"
+                # Always require 'tool' field
+                if "tool" not in mcp:
+                    return False, "Missing required MCP field: tool"
+                
+                # Either 'method' OR 'intent' is required, not both
+                has_method = "method" in mcp
+                has_intent = "intent" in mcp
+                
+                if not (has_method or has_intent):
+                    return False, "MCP field must have either 'method' (for direct calls) or 'intent' (for intent-based calls)"
+                
+                if has_method and has_intent:
+                    return False, "MCP field cannot have both 'method' and 'intent' - use only one"
         
         return True, "Valid structured response"
     
