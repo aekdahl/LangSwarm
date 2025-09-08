@@ -4200,6 +4200,7 @@ def _add_workflow_methods_to_config_loader():
             'visited_steps': set(),
             'retry_counters': {},
             'pending_fanins': {},
+            'current_workflow_id': workflow_id,  # Add missing workflow ID to context
             **kwargs
         }
         
@@ -4237,6 +4238,7 @@ def _add_workflow_methods_to_config_loader():
             'visited_steps': set(),
             'retry_counters': {},
             'pending_fanins': {},
+            'current_workflow_id': workflow_id,  # Add missing workflow ID to context
             **kwargs
         }
         
@@ -4271,17 +4273,21 @@ class WorkflowExecutor:
     with existing code that expects a separate WorkflowExecutor class.
     """
     
-    def __init__(self, workflows: Dict[str, Any], agents: Dict[str, Any], **kwargs):
+    def __init__(self, workflows: Dict[str, Any], agents: Dict[str, Any], tools: Dict[str, Any] = None, tools_metadata: Dict[str, Any] = None, **kwargs):
         """
         Initialize WorkflowExecutor with loaded workflows and agents.
         
         Args:
             workflows: Dictionary of workflows from LangSwarmConfigLoader.load()
             agents: Dictionary of agents from LangSwarmConfigLoader.load()
+            tools: Dictionary of tools to make available to workflows (optional)
+            tools_metadata: Dictionary of tools metadata (optional)
             **kwargs: Additional configuration options
         """
         self.workflows = workflows
         self.agents = agents
+        self.tools = tools or {}
+        self.tools_metadata = tools_metadata or {}
         self.config_kwargs = kwargs
         
         # Create a minimal config loader instance for workflow execution
@@ -4313,8 +4319,9 @@ class WorkflowExecutor:
             self._config_loader.agents = self.agents
             
             # Set up minimal required attributes
-            self._config_loader.tools = {}
-            self._config_loader.tools_metadata = {}
+            # Use passed tools and metadata instead of empty dicts
+            self._config_loader.tools = self.tools
+            self._config_loader.tools_metadata = self.tools_metadata
             self._config_loader.brokers = {}
             self._config_loader.config_data = {
                 'workflows': self.workflows,

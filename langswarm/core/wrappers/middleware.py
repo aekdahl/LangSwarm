@@ -124,7 +124,33 @@ class MiddlewareMixin:
         loader = LangSwarmConfigLoader(config_path=config_path)
         workflows, agents, brokers, tools, tools_metadata = loader.load()
         
-        executor = WorkflowExecutor(workflows, agents)
+        # Pass user's tool registry to workflow executor instead of isolated tools
+        # This ensures MCP workflows have access to the user's configured tools
+        user_tools = {}
+        user_tools_metadata = {}
+        
+        if hasattr(self, 'tool_registry') and self.tool_registry:
+            if isinstance(self.tool_registry, dict):
+                user_tools = self.tool_registry
+            else:
+                # If it's a registry object, extract the tools
+                if hasattr(self.tool_registry, 'tools'):
+                    user_tools = self.tool_registry.tools
+                elif hasattr(self.tool_registry, 'get_all_tools'):
+                    user_tools = self.tool_registry.get_all_tools()
+        
+        # Also try to get tools_metadata from the agent if available
+        if hasattr(self, 'tools_metadata'):
+            user_tools_metadata = self.tools_metadata
+        elif hasattr(self, 'tool_registry') and hasattr(self.tool_registry, 'tools_metadata'):
+            user_tools_metadata = self.tool_registry.tools_metadata
+        
+        # Merge user tools with any tools from the workflow directory
+        # User tools take precedence over isolated workflow tools
+        merged_tools = {**tools, **user_tools}
+        merged_tools_metadata = {**tools_metadata, **user_tools_metadata}
+        
+        executor = WorkflowExecutor(workflows, agents, tools=merged_tools, tools_metadata=merged_tools_metadata)
         executor.context["request_id"] = str(uuid.uuid4())
         
         # Format input for intent-based processing
@@ -133,7 +159,11 @@ class MiddlewareMixin:
             user_input += f"\nContext: {context}"
         
         # Pass tool_deployer if available, otherwise let executor handle defaults
-        kwargs = {"user_input": user_input}
+        # Provide both user_input and user_query for maximum compatibility with workflows
+        kwargs = {
+            "user_input": user_input,
+            "user_query": user_input  # Alias for backwards compatibility
+        }
         if self.tool_deployer:
             kwargs["tool_deployer"] = self.tool_deployer
             

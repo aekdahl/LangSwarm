@@ -238,7 +238,7 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
         """Initialize session manager with optional hybrid capabilities"""
         if session_manager:
             # Use provided session manager
-            self.log_event(f"Using provided session manager: {type(session_manager).__name__}", "info")
+            self.log_event(f"Using provided session manager: {type(session_manager).__name__}", "debug")
             return session_manager
         
         elif enable_hybrid_sessions:
@@ -255,12 +255,12 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
                 return hybrid_manager
             except Exception as e:
                 self.log_event(f"Failed to create hybrid session manager: {e}", "warning")
-                self.log_event("Falling back to basic session manager", "info")
+                self.log_event("Falling back to basic session manager", "debug")
                 return LangSwarmSessionManager(default_session_control=SessionControl.HYBRID)
         
         else:
             # Use basic session manager
-            self.log_event("Using basic session manager", "info")
+            self.log_event("Using basic session manager", "debug")
             return LangSwarmSessionManager(default_session_control=SessionControl.HYBRID)
     
     def start_session(self, session_id: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None) -> str:
