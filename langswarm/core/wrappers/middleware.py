@@ -124,6 +124,20 @@ class MiddlewareMixin:
         loader = LangSwarmConfigLoader(config_path=config_path)
         workflows, agents, brokers, tools, tools_metadata = loader.load()
         
+        # Convert tools list back to dictionary if needed
+        if isinstance(tools, list):
+            # Convert list of tool instances to dict: {tool_id: tool_instance}
+            tools_dict = {}
+            for tool_instance in tools:
+                if hasattr(tool_instance, 'identifier'):
+                    tools_dict[tool_instance.identifier] = tool_instance
+                elif hasattr(tool_instance, 'name'):
+                    tools_dict[tool_instance.name] = tool_instance
+                else:
+                    # Fallback: use class name
+                    tools_dict[type(tool_instance).__name__] = tool_instance
+            tools = tools_dict
+        
         # Pass user's tool registry to workflow executor instead of isolated tools
         # This ensures MCP workflows have access to the user's configured tools
         user_tools = {}
