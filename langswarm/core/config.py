@@ -1106,50 +1106,68 @@ class LangSwarmConfigLoader:
         workflows = []
         agent_ids = [agent.id for agent in agents]  # Get available agent IDs for validation
         
-        for workflow_data in data.get("workflows", []):
-            if isinstance(workflow_data, str):
-                # Simple syntax: "assistant -> user"
-                workflow_id = f"simple_workflow_{len(workflows) + 1}"
-                workflow_config = WorkflowConfig.from_simple_syntax(
-                    workflow_id=workflow_id,
-                    simple_syntax=workflow_data,
-                    available_agents=agent_ids
-                )
-                workflows.append(workflow_config)
-                
-            elif isinstance(workflow_data, dict):
-                # Check if it's a simple workflow definition
-                if "simple" in workflow_data:
-                    # Simple syntax in dict format: {"id": "my_workflow", "simple": "assistant -> user"}
+        workflows_data = data.get("workflows", [])
+        
+        # Check if workflows is a dict (new format) or list (old format)
+        if isinstance(workflows_data, dict):
+            # New dict format: workflows: { main_workflow: [...], other_workflow: [...] }
+            for workflow_key, workflow_list in workflows_data.items():
+                if isinstance(workflow_list, list):
+                    for workflow_item in workflow_list:
+                        if isinstance(workflow_item, dict):
+                            # Complex workflow definition
+                            workflow_config = WorkflowConfig(
+                                id=workflow_item["id"],
+                                name=workflow_item.get("name"),
+                                steps=workflow_item.get("steps", [])
+                            )
+                            workflows.append(workflow_config)
+        else:
+            # Old list format: workflows: [...] or workflows: ["agent -> user", ...]
+            for workflow_data in workflows_data:
+                if isinstance(workflow_data, str):
+                    # Simple syntax: "assistant -> user"
+                    workflow_id = f"simple_workflow_{len(workflows) + 1}"
                     workflow_config = WorkflowConfig.from_simple_syntax(
-                        workflow_id=workflow_data["id"],
-                        simple_syntax=workflow_data["simple"],
+                        workflow_id=workflow_id,
+                        simple_syntax=workflow_data,
                         available_agents=agent_ids
                     )
-                    # Override name if provided
-                    if "name" in workflow_data:
-                        workflow_config.name = workflow_data["name"]
                     workflows.append(workflow_config)
                     
-                elif "workflow" in workflow_data:
-                    # Simple syntax in workflow field: {"id": "my_workflow", "workflow": "assistant -> user"}
-                    workflow_config = WorkflowConfig.from_simple_syntax(
-                        workflow_id=workflow_data["id"],
-                        simple_syntax=workflow_data["workflow"],
-                        available_agents=agent_ids
-                    )
-                    if "name" in workflow_data:
-                        workflow_config.name = workflow_data["name"]
-                    workflows.append(workflow_config)
-                    
-                else:
-                    # Complex workflow definition (existing format)
-                    workflow_config = WorkflowConfig(
-                        id=workflow_data["id"],
-                        name=workflow_data.get("name"),
-                        steps=workflow_data.get("steps", [])
-                    )
-                    workflows.append(workflow_config)
+                elif isinstance(workflow_data, dict):
+                    # Check if it's a simple workflow definition
+                    if "simple" in workflow_data:
+                        # Simple syntax in dict format: {"id": "my_workflow", "simple": "assistant -> user"}
+                        workflow_config = WorkflowConfig.from_simple_syntax(
+                            workflow_id=workflow_data["id"],
+                            simple_syntax=workflow_data["simple"],
+                            available_agents=agent_ids
+                        )
+                        # Override name if provided
+                        if "name" in workflow_data:
+                            workflow_config.name = workflow_data["name"]
+                        workflows.append(workflow_config)
+                        
+                    elif "workflow" in workflow_data:
+                        # Simple syntax in workflow field: {"id": "my_workflow", "workflow": "assistant -> user"}
+                        workflow_config = WorkflowConfig.from_simple_syntax(
+                            workflow_id=workflow_data["id"],
+                            simple_syntax=workflow_data["workflow"],
+                            available_agents=agent_ids
+                        )
+                        if "name" in workflow_data:
+                            workflow_config.name = workflow_data["name"]
+                        workflows.append(workflow_config)
+                        
+                    else:
+                        # Complex workflow definition (existing format)
+                        workflow_config = WorkflowConfig(
+                            id=workflow_data["id"],
+                            name=workflow_data.get("name"),
+                            steps=workflow_data.get("steps", [])
+                        )
+                        workflows.append(workflow_config)
         
         # Handle memory with Memory Made Simple
         memory_data = data.get("memory", False)
