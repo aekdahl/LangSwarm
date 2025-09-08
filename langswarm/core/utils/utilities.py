@@ -20,18 +20,36 @@ class Utils(Formatting):
     def __init__(self):
         self.gpt2_tokenizer = None
         
-        # Try to load GPT2 tokenizer, skip gracefully on any error
-        if GPT2Tokenizer and not os.getenv('LANGSWARM_DISABLE_HF_TOKENIZER', '').lower() == 'true':
+        # Check if HuggingFace tokenizer should be disabled
+        disable_hf = os.getenv('LANGSWARM_DISABLE_HF_TOKENIZER', '').lower() == 'true'
+        if disable_hf:
+            logger.info("🚫 HuggingFace tokenizer loading disabled via LANGSWARM_DISABLE_HF_TOKENIZER")
+        elif not GPT2Tokenizer:
+            logger.info("GPT2Tokenizer not available, using tiktoken fallback only")
+        else:
+            # Quick connectivity check to avoid rate limiting
             try:
-                logger.info("Loading GPT2 tokenizer...")
-                self.gpt2_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-                logger.info("✅ GPT2 tokenizer loaded successfully")
+                import requests
+                # Quick HEAD request to check HuggingFace accessibility
+                response = requests.head("https://huggingface.co", timeout=2)
+                if response.status_code == 429:
+                    logger.info("⚠️ HuggingFace rate limited, skipping tokenizer loading")
+                    self.gpt2_tokenizer = None
+                elif response.status_code >= 400:
+                    logger.info(f"⚠️ HuggingFace not accessible (HTTP {response.status_code}), skipping tokenizer loading")
+                    self.gpt2_tokenizer = None
+                else:
+                    # HuggingFace seems accessible, try loading tokenizer
+                    logger.info("Loading GPT2 tokenizer...")
+                    self.gpt2_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+                    logger.info("✅ GPT2 tokenizer loaded successfully")
+            except requests.RequestException:
+                logger.info("⚠️ Network connectivity issue, skipping HuggingFace tokenizer")
+                self.gpt2_tokenizer = None
             except Exception as e:
                 logger.info(f"⚠️ Skipping GPT2 tokenizer due to: {e}")
                 logger.info("🔄 Will use tiktoken fallback for all tokenization")
                 self.gpt2_tokenizer = None
-        else:
-            logger.info("GPT2Tokenizer not available or disabled, using tiktoken fallback only")
         
         self.bot_logs = []
 

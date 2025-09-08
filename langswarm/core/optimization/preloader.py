@@ -52,6 +52,20 @@ class PreLoadTokenizers:
         """
         Preload Hugging Face tokenizers into cache, skip gracefully on errors.
         """
+        # Check HuggingFace accessibility first
+        try:
+            import requests
+            response = requests.head("https://huggingface.co", timeout=2)
+            if response.status_code == 429:
+                logger.info("⚠️ HuggingFace rate limited, skipping tokenizer preloading")
+                return
+            elif response.status_code >= 400:
+                logger.info(f"⚠️ HuggingFace not accessible (HTTP {response.status_code}), skipping tokenizer preloading")
+                return
+        except requests.RequestException:
+            logger.info("⚠️ Network connectivity issue, skipping HuggingFace tokenizer preloading")
+            return
+        
         config = PreLoadConfig()
         for model_name in config.models_to_preload:
             try:
