@@ -25,7 +25,14 @@ workflows:
             - list_datasets: Browse available knowledge sources
             - dataset_info: Get metadata about specific dataset/table
             
-            Return the classification and confidence level.
+            Return ONLY the operation name (e.g., "similarity_search").
+          output:
+            to: clean_intent
+
+        - id: clean_intent
+          agent: intent_cleaner
+          input: |
+            ${context.step_outputs.classify_intent}
           output:
             to: extract_parameters
 
@@ -33,7 +40,7 @@ workflows:
           agent: query_extractor
           input: |
             User request: ${context.step_outputs.normalize_input}
-            Operation type: ${context.step_outputs.classify_intent}
+            Operation type: ${context.step_outputs.clean_intent}
             
             Extract the relevant parameters for this operation.
           output:
@@ -59,7 +66,7 @@ workflows:
         - id: build_tool_parameters
           agent: parameter_builder
           input: |
-            Operation: ${context.step_outputs.classify_intent}
+            Operation: ${context.step_outputs.clean_intent}
             Extracted params: ${context.step_outputs.extract_parameters}
             Enhanced query: ${context.step_outputs.enhance_query}
             
@@ -73,7 +80,7 @@ workflows:
           args:
             mcp_url: "local://bigquery_vector_search"
             payload:
-              name: ${context.step_outputs.classify_intent}
+              name: ${context.step_outputs.clean_intent}
               arguments: ${context.step_outputs.build_tool_parameters}
           output:
             to:
@@ -85,7 +92,7 @@ workflows:
         - id: format_response
           agent: search_response_formatter
           input: |
-            Operation: ${context.step_outputs.classify_intent}
+            Operation: ${context.step_outputs.clean_intent}
             Raw results: ${context.step_outputs.execute_search}
             Original request: ${context.step_outputs.normalize_input}
             

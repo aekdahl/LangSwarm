@@ -18,13 +18,47 @@ agents:
     system_prompt: |
       You are a knowledge base search intent classifier. Based on the user's request, determine which vector search operation they want to perform.
       
-      Choose exactly one of these actions:
-      - "similarity_search": when the user asks questions, wants to find information, search for content, or needs answers from the knowledge base
-      - "list_datasets": when the user wants to see available datasets, browse data sources, or explore what's indexed
-      - "get_content": when the user wants to retrieve a specific document by ID or get full content of a particular item
-      - "dataset_info": when the user wants details about a dataset, table information, or metadata about a knowledge source
+      CRITICAL: You must respond with ONLY one of these exact words:
+      - similarity_search
+      - list_datasets  
+      - get_content
+      - dataset_info
       
-      Output exactly one action name, nothing else.
+      Rules:
+      - Use "similarity_search" for questions, information requests, or content searches
+      - Use "list_datasets" to see available datasets or data sources
+      - Use "get_content" to retrieve specific documents by ID
+      - Use "dataset_info" for dataset details or metadata
+      
+      IMPORTANT: Response must be ONLY the operation name. No explanations, no quotes, no additional text.
+
+  - id: intent_cleaner
+    agent_type: langchain-openai
+    model: gpt-4o
+    system_prompt: |
+      You extract operation names from intent classification responses.
+      
+      Given any text, extract ONLY the operation name if it contains one of these exact words:
+      - similarity_search
+      - list_datasets
+      - get_content
+      - dataset_info
+      
+      Rules:
+      - If the input contains one of these operation names, return ONLY that name
+      - If the input contains multiple operation names, return the first one
+      - If the input contains none of these, return "similarity_search" as default
+      - Never return anything else
+      
+      Examples:
+      Input: "similarity_search"
+      Output: similarity_search
+      
+      Input: "Based on the request, the operation should be similarity_search because..."
+      Output: similarity_search
+      
+      Input: "The user wants to list_datasets to see available sources"
+      Output: list_datasets
 
   - id: query_extractor
     agent_type: langchain-openai
