@@ -164,8 +164,21 @@ def mcp_fetch_schema(
     # 🔧 Check for local:// URLs first
     if mcp_url.startswith("local://"):
         tool_name = mcp_url.split("://", 1)[1]
-        from langswarm.mcp.server_base import BaseMCPToolServer
-        local_server = BaseMCPToolServer.get_local_server(tool_name)
+        
+        # First check if we have tools in the workflow context
+        context = kwargs.get("context", {})
+        config_loader = context.get("config_loader")
+        local_server = None
+        
+        if config_loader and hasattr(config_loader, 'tools') and tool_name in config_loader.tools:
+            local_server = config_loader.tools[tool_name]
+            print(f"🔧 Found tool in workflow context for schema: {tool_name}")
+        else:
+            # Fallback to global server registry
+            from langswarm.mcp.server_base import BaseMCPToolServer
+            local_server = BaseMCPToolServer.get_local_server(tool_name)
+            if local_server:
+                print(f"🔧 Found tool in global registry for schema: {tool_name}")
         
         if local_server:
             print(f"🔧 Local schema fetch: {tool_name}")
@@ -226,8 +239,21 @@ def mcp_call(
     # 🔧 Check for local:// URLs first
     if mcp_url.startswith("local://"):
         tool_name = mcp_url.split("://", 1)[1]
-        from langswarm.mcp.server_base import BaseMCPToolServer
-        local_server = BaseMCPToolServer.get_local_server(tool_name)
+        
+        # First check if we have tools in the workflow context
+        context = kwargs.get("context", {})
+        config_loader = context.get("config_loader")
+        local_server = None
+        
+        if config_loader and hasattr(config_loader, 'tools') and tool_name in config_loader.tools:
+            local_server = config_loader.tools[tool_name]
+            print(f"🔧 Found tool in workflow context: {tool_name}")
+        else:
+            # Fallback to global server registry
+            from langswarm.mcp.server_base import BaseMCPToolServer
+            local_server = BaseMCPToolServer.get_local_server(tool_name)
+            if local_server:
+                print(f"🔧 Found tool in global registry: {tool_name}")
         
         if local_server:
             print(f"🔧 Local call: {tool_name}")
@@ -370,7 +396,7 @@ def find_tool_by_name(response: Dict[str, Any], tool_name: str) -> Optional[Dict
     return None
 
 
-def format_as_json(data) -> str:
+def format_as_json(data, **kwargs) -> str:
     """
     Simple wrapper around LangSwarm's to_json() utility.
     
