@@ -271,10 +271,58 @@ def mcp_call(
             else:
                 raise ValueError("Invalid payload format")
             
-            # Call the task directly
-            result = local_server.call_task(task_name, task_args)
-            print(f"✅ Local call result keys: {list(result.keys())}")
-            return result
+            # Handle different tool types
+            if hasattr(local_server, 'call_task'):
+                # BaseMCPToolServer - use call_task with task name
+                result = local_server.call_task(task_name, task_args)
+                print(f"✅ BaseMCPToolServer call result keys: {list(result.keys())}")
+                return result
+            elif hasattr(local_server, 'run_async'):
+                # LangChain tool - use run_async with input data
+                # For LangChain tools, we need to format the input properly
+                input_data = {
+                    "method": task_name,
+                    "params": task_args
+                }
+                # Handle async call properly
+                import asyncio
+                try:
+                    # Try to get current event loop
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        # We're in an async context, need to run in thread
+                        import concurrent.futures
+                        with concurrent.futures.ThreadPoolExecutor() as executor:
+                            future = executor.submit(asyncio.run, local_server.run_async(input_data))
+                            result = future.result()
+                    else:
+                        # No running loop, can use asyncio.run directly
+                        result = asyncio.run(local_server.run_async(input_data))
+                except RuntimeError:
+                    # No event loop, create new one
+                    result = asyncio.run(local_server.run_async(input_data))
+                
+                print(f"✅ LangChain tool async call result: {type(result)}")
+                # Ensure result is a dict
+                if isinstance(result, dict):
+                    return result
+                else:
+                    return {"result": result, "success": True}
+            elif hasattr(local_server, 'run'):
+                # LangChain tool - use synchronous run method
+                input_data = {
+                    "method": task_name,
+                    "params": task_args
+                }
+                result = local_server.run(input_data)
+                print(f"✅ LangChain tool sync call result: {type(result)}")
+                # Ensure result is a dict
+                if isinstance(result, dict):
+                    return result
+                else:
+                    return {"result": result, "success": True}
+            else:
+                raise ValueError(f"Tool '{tool_name}' doesn't have call_task, run, or run_async method")
         else:
             raise ValueError(f"Local server '{tool_name}' not found")
     
