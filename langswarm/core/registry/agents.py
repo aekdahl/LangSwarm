@@ -85,8 +85,84 @@ class AgentRegistry:
 
     @classmethod
     def get(cls, name):
-        """Retrieve an agent from either registry."""
-        return cls._registry.get(name) or cls._helper_registry.get(name)
+        """Retrieve an agent from either registry, auto-creating predefined helpers if needed."""
+        # Check if agent exists in registries
+        agent_dict = cls._registry.get(name) or cls._helper_registry.get(name)
+        
+        if agent_dict:
+            # Return the actual agent object, not the dict
+            return agent_dict.get("agent")
+        
+        # Auto-create predefined helper agents on first access
+        if name in cls.PREDEFINED_HELPER_AGENTS:
+            try:
+                # Auto-create the predefined helper agent
+                agent_instance = cls._create_predefined_helper_agent(name)
+                if agent_instance:
+                    cls.register_helper_agent(agent_instance, name=name)
+                    # Return the actual agent object, not the dict
+                    helper_dict = cls._helper_registry.get(name)
+                    return helper_dict.get("agent") if helper_dict else None
+            except Exception as e:
+                # If auto-creation fails, log and continue
+                print(f"Warning: Failed to auto-create predefined helper agent '{name}': {e}")
+        
+        return None
+    
+    @classmethod
+    def _create_predefined_helper_agent(cls, name):
+        """Create a predefined helper agent instance."""
+        if name == "ls_json_parser":
+            try:
+                from langswarm.core.factory.agents import AgentFactory
+                
+                # Check if we have an API key - if not, return None
+                import os
+                if not os.getenv('OPENAI_API_KEY'):
+                    print(f"Warning: OPENAI_API_KEY not set - cannot create ls_json_parser agent")
+                    return None
+                
+                # Create the agent using AgentFactory (without auto-registration)
+                agent = AgentFactory._create_base_agent(
+                    agent_type="langchain-openai",
+                    documents=None,
+                    model="gpt-4o",
+                    system_prompt="""You are a JSON parser and validator. Your job is to extract and return only valid JSON from any text input.
+
+Rules:
+- If the input is already valid JSON, return it exactly as-is
+- If the input contains JSON within text or markdown, extract just the JSON part
+- Remove any markdown code fences, explanations, or surrounding text
+- Fix minor JSON formatting issues if possible
+- If no valid JSON is found, return an empty object: {}
+- Never add explanations or additional text - only return the JSON
+
+Examples:
+Input: {"query": "test", "limit": 10}
+Output: {"query": "test", "limit": 10}
+
+Input: Here are the parameters: {"query": "search term"}
+Output: {"query": "search term"}
+
+Input: ```json\n{"query": "example"}\n```
+Output: {"query": "example"}"""
+                )
+                
+                # Wrap with AgentWrapper
+                from langswarm.core.wrappers.generic import AgentWrapper
+                wrapped_agent = AgentWrapper(
+                    name="ls_json_parser",
+                    agent=agent,
+                    model="gpt-4o",
+                    agent_type="langchain-openai"
+                )
+                
+                return wrapped_agent
+            except Exception as e:
+                print(f"Failed to create ls_json_parser agent: {e}")
+                return None
+        
+        return None
 
     @classmethod
     def list(cls):

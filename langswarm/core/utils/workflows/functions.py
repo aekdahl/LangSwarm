@@ -264,10 +264,31 @@ def mcp_call(
                 params = payload.get("params", {})
                 task_name = params.get("name")
                 task_args = params.get("arguments", {})
+                
+                # Handle case where arguments is a JSON string instead of dict
+                if isinstance(task_args, str):
+                    try:
+                        import json
+                        task_args = json.loads(task_args)
+                        print(f"🔧 Parsed JSON-RPC string arguments: {task_args}")
+                    except (json.JSONDecodeError, ValueError) as e:
+                        print(f"⚠️  Failed to parse JSON-RPC arguments as JSON: {e}")
+                        task_args = {}
             elif "name" in payload:
                 # Direct format
                 task_name = payload["name"]
                 task_args = payload.get("arguments", payload.get("args", {}))
+                
+                # Handle case where arguments is a JSON string instead of dict
+                if isinstance(task_args, str):
+                    try:
+                        import json
+                        task_args = json.loads(task_args)
+                        print(f"🔧 Parsed JSON string arguments: {task_args}")
+                    except (json.JSONDecodeError, ValueError) as e:
+                        print(f"⚠️  Failed to parse arguments as JSON: {e}")
+                        # If it's not valid JSON, treat as empty dict
+                        task_args = {}
             else:
                 raise ValueError("Invalid payload format")
             
@@ -446,7 +467,7 @@ def find_tool_by_name(response: Dict[str, Any], tool_name: str) -> Optional[Dict
 
 def format_as_json(data, **kwargs) -> str:
     """
-    Simple wrapper around LangSwarm's to_json() utility.
+    Simple wrapper around LangSwarm's to_json() utility with fallback regex extraction.
     
     Args:
         data: Input data - can be string, dict, list, or any JSON-serializable type
@@ -455,6 +476,7 @@ def format_as_json(data, **kwargs) -> str:
         Valid JSON string or empty object if conversion fails
     """
     import json
+    import re
     from langswarm.core.utils.subutilities.formatting import Formatting
     
     # If data is already a dict/list/etc, serialize it to JSON
@@ -465,7 +487,7 @@ def format_as_json(data, **kwargs) -> str:
             return "{}"
     
     # Convert to string if not already
-    data_str = str(data)
+    data_str = str(data).strip()
     
     formatter = Formatting()
     
@@ -480,4 +502,61 @@ def format_as_json(data, **kwargs) -> str:
         requirements="Output only valid JSON without explanations or markdown."
     )
     
-    return result if success else "{}"
+    if success:
+        return result
+    
+    # Fallback: Manual JSON extraction when ls_json_parser agent isn't available
+    # Remove markdown code fences
+    cleaned = re.sub(r'```(?:json)?\s*', '', data_str)
+    cleaned = re.sub(r'```\s*', '', cleaned)
+    
+    # Look for JSON object patterns
+    json_patterns = [
+        r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}',  # Basic JSON object
+        r'\{.*?\}',  # Simpler pattern
+    ]
+    
+    for pattern in json_patterns:
+        matches = re.findall(pattern, cleaned, re.DOTALL)
+        for match in matches:
+            try:
+                # Validate the extracted JSON
+                json.loads(match)
+                return match.strip()
+            except:
+                continue
+    
+    # If no JSON found, try to extract key-value patterns and construct JSON
+    # Look for common parameter patterns in agent responses
+    param_patterns = [
+        r'query["\']?\s*[:=]\s*["\']([^"\']+)["\']',  # query: "value" or query = "value"
+        r'limit["\']?\s*[:=]\s*(\d+)',  # limit: 10
+        r'similarity_threshold["\']?\s*[:=]\s*([\d.]+)',  # similarity_threshold: 0.7
+    ]
+    
+    extracted_params = {}
+    
+    # Extract query parameter
+    query_match = re.search(r'(?:search|query|find).*?["\']([^"\']+)["\']', data_str, re.IGNORECASE)
+    if query_match:
+        extracted_params["query"] = query_match.group(1)
+    
+    # Extract limit if mentioned
+    limit_match = re.search(r'limit["\']?\s*[:=]?\s*(\d+)', data_str, re.IGNORECASE)
+    if limit_match:
+        extracted_params["limit"] = int(limit_match.group(1))
+    else:
+        # Default limit
+        extracted_params["limit"] = 10
+    
+    # Extract similarity threshold if mentioned
+    threshold_match = re.search(r'threshold["\']?\s*[:=]?\s*([\d.]+)', data_str, re.IGNORECASE)
+    if threshold_match:
+        extracted_params["similarity_threshold"] = float(threshold_match.group(1))
+    
+    # Return constructed JSON if we found parameters
+    if extracted_params:
+        return json.dumps(extracted_params)
+    
+    # Final fallback - empty object
+    return "{}"
