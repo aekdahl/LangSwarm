@@ -368,3 +368,42 @@ def find_tool_by_name(response: Dict[str, Any], tool_name: str) -> Optional[Dict
         if tool.get("name") == tool_name:
             return tool
     return None
+
+
+def format_as_json(data) -> str:
+    """
+    Simple wrapper around LangSwarm's to_json() utility.
+    
+    Args:
+        data: Input data - can be string, dict, list, or any JSON-serializable type
+        
+    Returns:
+        Valid JSON string or empty object if conversion fails
+    """
+    import json
+    from langswarm.core.utils.subutilities.formatting import Formatting
+    
+    # If data is already a dict/list/etc, serialize it to JSON
+    if isinstance(data, (dict, list, int, float, bool)) or data is None:
+        try:
+            return json.dumps(data)
+        except (TypeError, ValueError):
+            return "{}"
+    
+    # Convert to string if not already
+    data_str = str(data)
+    
+    formatter = Formatting()
+    
+    # Try direct JSON validation first
+    if formatter.is_valid_json(data_str):
+        return data_str
+    
+    # Use the built-in to_json utility
+    success, result = formatter.to_json(
+        data=data_str,
+        instructions="Extract and return only the JSON object from the text.",
+        requirements="Output only valid JSON without explanations or markdown."
+    )
+    
+    return result if success else "{}"

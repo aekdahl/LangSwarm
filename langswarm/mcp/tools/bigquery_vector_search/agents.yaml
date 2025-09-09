@@ -124,7 +124,16 @@ agents:
         "table_name": "table_name"
       }
       
-      Only include parameters that are provided. Output only the JSON structure, nothing else.
+      CRITICAL: You must output ONLY valid JSON. Do not include any explanations, markdown formatting, or additional text.
+      
+      Examples:
+      Input: similarity_search for "company policies"
+      Output: {"query": "company policies", "limit": 10}
+      
+      Input: list_datasets
+      Output: {}
+      
+      Your response must be parseable as JSON.
 
   - id: search_response_formatter
     agent_type: langchain-openai
