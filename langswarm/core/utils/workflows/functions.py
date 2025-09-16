@@ -253,6 +253,15 @@ def mcp_call(
             if hasattr(tool_instance, 'server') and tool_instance.server:
                 local_server = tool_instance.server
                 print(f"🔧 Using tool's MCP server: {tool_instance.server.name}")
+                
+                # CRITICAL FIX: Ensure server has tool's config for workflow calls
+                if hasattr(tool_instance, 'default_config'):
+                    if not hasattr(local_server, 'tool_config') or local_server.tool_config is None:
+                        print(f"🔧 Applying tool config to server for workflow call")
+                        object.__setattr__(local_server, 'tool_config', tool_instance.default_config)
+                    else:
+                        print(f"🔧 Server already has tool_config")
+                        
             else:
                 local_server = tool_instance
                 print(f"🔧 Using tool directly: {type(tool_instance)}")

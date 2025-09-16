@@ -11,9 +11,15 @@ Provides vector similarity search capabilities over BigQuery datasets with embed
 
 ### Available Methods:
 - **similarity_search**: Perform semantic vector similarity search using embeddings
-- **list_datasets**: List available BigQuery datasets with vector data  
+  - Required: `query` (string) - The search text
+  - Optional: `limit` (integer) - Maximum results to return (uses your configured value)
+  - Optional: `similarity_threshold` (float) - Minimum similarity score (uses your configured value)
+- **list_datasets**: List available BigQuery datasets with vector data
+  - No parameters required
 - **get_content**: Retrieve full document content by ID
+  - Required: `document_id` (string) - The unique document identifier
 - **get_embedding**: Generate embeddings for text
+  - Required: `text` (string) - Text to generate embeddings for
 
 ### Response Format
 
@@ -54,7 +60,7 @@ OR for intent-based calls:
     "params": {
       "query": "refund policies",
       "limit": 10,
-      "similarity_threshold": 0.7
+      "similarity_threshold": 0.01
     }
   }
 }
@@ -116,7 +122,7 @@ OR for intent-based calls:
 ### similarity_search
 - **query** (required): The search text - use this exact field name
 - **limit** (optional): Number of results (default: 10)
-- **similarity_threshold** (optional): Minimum similarity score (default: 0.7)
+- **similarity_threshold** (optional): Minimum similarity score (default: 0.01)
 
 ### list_datasets  
 - **pattern** (optional): Filter pattern for dataset names
@@ -186,6 +192,35 @@ OR for intent-based calls:
 - **list_datasets**: Available datasets and their metadata
 - **get_content**: Full document content with metadata  
 - **get_embedding**: Vector embeddings for the provided text
+
+## Error Handling
+
+If you encounter errors, provide helpful guidance to the user:
+
+### Method Not Found
+If a method doesn't exist, suggest the correct method:
+- "search" → use "similarity_search"
+- "find" → use "similarity_search" 
+- "document" → use "get_content"
+- "datasets" → use "list_datasets"
+- "embed" → use "get_embedding"
+
+### Missing Parameters
+If parameters are missing, show the correct format:
+- For similarity_search: `{"query": "your search text"}` (limit and similarity_threshold will use your configured defaults)
+- For get_content: `{"document_id": "your_document_id"}`
+- For get_embedding: `{"text": "your text to embed"}`
+
+### Example Error Response
+When an error occurs, respond like this:
+{
+  "response": "I encountered an error with the BigQuery search. The method 'search' is not available. Did you mean 'similarity_search'? Here's the correct format: {\"query\": \"your search text\", \"limit\": 5}",
+  "mcp": {
+    "tool": "bigquery_vector_search",
+    "method": "similarity_search",
+    "params": {"query": "corrected search query", "limit": 5}
+  }
+}
 
 ## Brief
 

@@ -37,7 +37,7 @@ class BigQueryConfig:
     table_name: str = "embeddings"
     embedding_model: str = "text-embedding-3-small"
     max_results: int = 10
-    similarity_threshold: float = 0.7
+    similarity_threshold: float = 0.01
 
 
 @dataclass
@@ -159,8 +159,36 @@ class DebugConfigManager:
             'enable_console_logging': True
         }
     
+    def _resolve_env_variables(self, config_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Resolve ${VAR} style environment variables in config values"""
+        import re
+        
+        def resolve_value(value):
+            if isinstance(value, str):
+                # Find ${VAR} patterns and replace with environment variables
+                pattern = r'\$\{([^}]+)\}'
+                matches = re.findall(pattern, value)
+                for match in matches:
+                    env_value = os.getenv(match)
+                    if env_value is not None:
+                        value = value.replace(f'${{{match}}}', env_value)
+                    else:
+                        print(f"⚠️  Warning: Environment variable {match} not set")
+                return value
+            elif isinstance(value, dict):
+                return {k: resolve_value(v) for k, v in value.items()}
+            elif isinstance(value, list):
+                return [resolve_value(item) for item in value]
+            return value
+        
+        return resolve_value(config_data)
+
     def _apply_env_overrides(self, config_data: Dict[str, Any]) -> Dict[str, Any]:
         """Apply environment variable overrides"""
+        # First resolve ${VAR} style variables in the config
+        config_data = self._resolve_env_variables(config_data)
+        
+        # Then apply direct environment variable overrides
         # OpenAI overrides
         if os.getenv('OPENAI_API_KEY'):
             config_data['openai']['api_key'] = os.getenv('OPENAI_API_KEY')

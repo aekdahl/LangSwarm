@@ -46,8 +46,8 @@ DEFAULT_CONFIG = {
     "dataset_id": "vector_search",
     "table_name": "embeddings",
     "embedding_model": "text-embedding-3-small",
-    "default_similarity_threshold": 0.7,  # Conservative default
-    "max_results": 10                     # Reasonable default
+    "default_similarity_threshold": 0.01,  # Use more permissive default
+    "max_results": 5                       # Match working configuration
 }
 
 # === Schemas ===
@@ -282,6 +282,9 @@ server = BaseMCPToolServer(
     local_mode=True
 )
 
+# Note: Error handling and guidance is now provided through the template.md file
+# and handled by agents, not hardcoded in the tool itself
+
 # Add operations
 async def _similarity_search_handler(**kwargs):
     """Wrapper for similarity_search that handles keyword arguments from call_task"""
@@ -498,25 +501,36 @@ try:
                 raise
 
         def __init__(self, identifier: str, **kwargs):
-            # Extract template-based values with fallbacks (like filesystem tool pattern)
+            # STEP 1: Build config first 
+            config = DEFAULT_CONFIG.copy()
+            
+            # Handle settings dictionary  
+            if 'settings' in kwargs and isinstance(kwargs['settings'], dict):
+                config.update(kwargs['settings'])
+                
+            # Support nested config (deprecated but backward compatible)
+            if 'config' in kwargs:
+                config.update(kwargs['config'])
+                
+            # Support direct parameter passing
+            config_params = {
+                'project_id', 'dataset_id', 'table_name', 'embedding_model',
+                'default_similarity_threshold', 'max_results', 'similarity_threshold'
+            }
+            for param in config_params:
+                if param in kwargs:
+                    config[param] = kwargs[param]
+                    
+            # Handle similarity_threshold alias
+            if 'similarity_threshold' in kwargs:
+                config['default_similarity_threshold'] = kwargs['similarity_threshold']
+            
+            # NOTE: User config is properly applied to actual BigQuery calls
+            # Template examples show generic defaults, but tool uses user's values
+            
+            # Extract template-based values (will now have user config injected)
             description = kwargs.pop('description', "Search company knowledge base using BigQuery vector similarity")
-            instruction = kwargs.pop('instruction', """Use this tool to perform semantic searches on your knowledge base stored in BigQuery.
-
-IMPORTANT PARAMETERS:
-- Use 'query' (NOT 'keyword') for search text
-- Use 'limit' for number of results (default: 10) 
-- Use 'similarity_threshold' for relevance (default: 0.7)
-
-Example usage:
-{
-  "tool": "bigquery_vector_search",
-  "method": "similarity_search", 
-  "params": {
-    "query": "refund policy for enterprise customers",
-    "limit": 5,
-    "similarity_threshold": 0.8
-  }
-}""")
+            instruction = kwargs.pop('instruction', "Use this tool to perform semantic searches on your knowledge base stored in BigQuery.")
             brief = kwargs.pop('brief', "BigQuery vector search for semantic knowledge retrieval")
             
             super().__init__(
@@ -535,28 +549,6 @@ Example usage:
                 server._register_globally()
             
             object.__setattr__(self, 'server', server)
-            
-            # Start with default config
-            config = DEFAULT_CONFIG.copy()
-            
-            # Override with any provided configuration parameters
-            # Support both direct parameters and config dict
-            if 'config' in kwargs:
-                config.update(kwargs['config'])
-                
-            # Support direct parameter passing
-            config_params = {
-                'project_id', 'dataset_id', 'table_name', 'embedding_model',
-                'default_similarity_threshold', 'max_results', 'similarity_threshold'
-            }
-            for param in config_params:
-                if param in kwargs:
-                    config[param] = kwargs[param]
-                    
-            # Handle similarity_threshold alias
-            if 'similarity_threshold' in kwargs:
-                config['default_similarity_threshold'] = kwargs['similarity_threshold']
-            
             object.__setattr__(self, 'default_config', config)
             
             # CRITICAL FIX: Pass the tool's config to the server so it can use it

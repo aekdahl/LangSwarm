@@ -39,6 +39,8 @@ def parse_template_content(content: str) -> Dict[str, str]:
     Returns:
         Dictionary with parsed template values
     """
+    # Note: Template content is static, but tools apply user config to actual operations
+    
     values = {}
     
     # Extract description section (## Description)
@@ -86,6 +88,7 @@ def parse_template_content(content: str) -> Dict[str, str]:
         values['tool_type'] = tool_type_match.group(1).strip()
     
     return values
+
 
 def get_generic_fallback_values() -> Dict[str, str]:
     """

@@ -62,7 +62,13 @@ class BaseMCPToolServer:
     def call_task(self, task_name: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """Call a task directly (local mode)."""
         if task_name not in self._tasks:
-            raise ValueError(f"Task '{task_name}' not found in {self.name}")
+            # Return a simple error that agents can handle
+            return {
+                "success": False,
+                "error": f"Method '{task_name}' is not available",
+                "available_methods": list(self._tasks.keys()),
+                "tool_name": self.name
+            }
         
         meta = self._tasks[task_name]
         handler = meta["handler"]
@@ -89,7 +95,14 @@ class BaseMCPToolServer:
                     except ImportError:
                         pass  # Error monitor not available
                     
-                    raise validation_error  # Re-raise for normal error handling
+                    # Return simple parameter error that agents can handle
+                    return {
+                        "success": False,
+                        "error": f"Parameter validation failed for {task_name}",
+                        "validation_error": str(validation_error),
+                        "tool_name": self.name,
+                        "method": task_name
+                    }
                 
                 # Call handler (handle both sync and async)
                 import asyncio
