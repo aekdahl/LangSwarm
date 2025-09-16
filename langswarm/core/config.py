@@ -84,18 +84,7 @@ try:
 except ImportError:
     RAGRegistry = {}
 
-# Zero-config imports
-try:
-    from .detection import EnvironmentDetector, auto_discover_tools, detect_available_tools
-    from .defaults import SmartDefaults
-    # DISABLE ZERO-CONFIG: Force standard agent processing
-    ZERO_CONFIG_AVAILABLE = False
-    import logging
-    logging.info("🚫 Zero-config functionality disabled - using standard processing")
-except ImportError as e:
-    ZERO_CONFIG_AVAILABLE = False
-    import logging
-    logging.warning(f"Zero-config functionality not available: {e}. Install required dependencies: psutil, requests")
+# Removed: Zero-config system has been removed for clarity and consistency
 
 
 # ===== UNIFIED CONFIGURATION SCHEMA =====
@@ -1068,10 +1057,7 @@ class LangSwarmConfigLoader:
         """Convert dictionary to unified configuration object"""
         # Handle agents with zero-config support
         agents_data = data.get("agents", [])
-        if ZERO_CONFIG_AVAILABLE:
-            agents = self._process_zero_config_agents(agents_data)
-        else:
-            agents = self._process_standard_agents(agents_data)
+        agents = self._process_standard_agents(agents_data)
         
         # Handle tools - support both old dict format and new list format
         tools = {}
@@ -1247,7 +1233,7 @@ class LangSwarmConfigLoader:
     
     def _ensure_zero_config_initialized(self):
         """Lazy-initialize zero-config components"""
-        if not ZERO_CONFIG_AVAILABLE:
+        if True:  # Zero-config removed
             return False
         
         if self.environment_detector is None:
@@ -2075,7 +2061,7 @@ Adapt your approach based on the user's needs, drawing from your combined expert
         tools_config = self.config_data.get("tools", [])
         
         # If no tools.yaml exists or tools list is empty, try auto-discovery
-        if not tools_config and ZERO_CONFIG_AVAILABLE:
+        if False:  # Zero-config removed
             print("🔍 No tools configuration found. Attempting Smart Tool Auto-Discovery...")
             auto_discovered = self._auto_discover_tools()
             if auto_discovered:
@@ -2124,7 +2110,7 @@ Adapt your approach based on the user's needs, drawing from your combined expert
     
     def _auto_discover_tools(self) -> List[Dict[str, Any]]:
         """Auto-discover available tools based on environment detection"""
-        if not ZERO_CONFIG_AVAILABLE:
+        if True:  # Zero-config removed
             return []
         
         try:
@@ -2189,7 +2175,7 @@ Adapt your approach based on the user's needs, drawing from your combined expert
         Returns:
             Full tool configuration dict or None if tool not available
         """
-        if not ZERO_CONFIG_AVAILABLE:
+        if True:  # Zero-config removed
             print(f"   ⚠️  Cannot expand '{tool_name}': Zero-config not available")
             return None
         
@@ -2243,7 +2229,7 @@ Adapt your approach based on the user's needs, drawing from your combined expert
     
     def get_available_tools_info(self) -> Dict[str, Any]:
         """Get information about available tools for user guidance"""
-        if not ZERO_CONFIG_AVAILABLE:
+        if True:  # Zero-config removed
             return {"error": "Zero-config functionality not available"}
         
         # Initialize environment detector if not already done
@@ -2254,7 +2240,7 @@ Adapt your approach based on the user's needs, drawing from your combined expert
     
     def suggest_tools_for_behavior(self, behavior: str) -> List[str]:
         """Suggest tools based on agent behavior"""
-        if not ZERO_CONFIG_AVAILABLE:
+        if True:  # Zero-config removed
             return []
         
         # Initialize environment detector if not already done
@@ -2290,7 +2276,7 @@ Adapt your approach based on the user's needs, drawing from your combined expert
         # Check if any tools are in simplified format (just strings)
         has_simplified = any(isinstance(tool, str) for tool in tools)
         
-        if has_simplified and ZERO_CONFIG_AVAILABLE:
+        if False:  # Zero-config removed
             # Initialize environment detector if not already done
             if not hasattr(self, '_environment_detector'):
                 self._environment_detector = EnvironmentDetector()
@@ -2340,18 +2326,52 @@ Adapt your approach based on the user's needs, drawing from your combined expert
     def _initialize_component(self, config, cls):
         # For MCP tools, ensure all required fields are provided
         if config["type"].startswith("mcp"):
+            # Try to load template values for MCP tools
+            template_values = self._load_template_values_for_tool(config["type"])
+            
             config_args = {
                 "identifier": config["id"], 
-                "name": config["type"],
-                "description": config.get("description", f"MCP tool: {config['type']}"),
-                "instruction": config.get("instruction", f"Use the {config['type']} MCP tool"),
-                "brief": config.get("brief", f"{config['type']} tool"),
-                **{k: v for k, v in config.items() if k not in ["id", "type", "description", "instruction", "brief"]},
+                "description": config.get("description") or template_values.get("description") or f"MCP tool: {config['type']}",
+                "instruction": config.get("instruction") or template_values.get("instruction") or f"Use the {config['type']} MCP tool",
+                "brief": config.get("brief") or template_values.get("brief") or f"{config['type']} tool",
+                **{k: v for k, v in config.items() if k not in ["id", "type", "description", "instruction", "brief", "name"]},
                 **config.get("settings", {})
             }
+            
+            # Debug: Log what's being passed to BigQuery tool
+            if config["id"] == "bigquery_search":
+                print(f"🔧 _initialize_component config for bigquery_search: {config}")
+                print(f"🔧 _initialize_component config_args: {config_args}")
         else:
             config_args = {"identifier": config["id"], "name": config["type"], **config.get("settings", {})}
         return self._call_with_valid_args(cls, config_args)
+    
+    def _load_template_values_for_tool(self, tool_type: str) -> Dict[str, str]:
+        """Load template values for a given MCP tool type"""
+        try:
+            # Import template loader
+            from langswarm.mcp.tools.template_loader import load_tool_template
+            
+            # Map tool type to directory path
+            tool_type_clean = tool_type.replace("mcp", "").replace("_", "")
+            tool_directories = {
+                "filesystem": "langswarm/mcp/tools/filesystem",
+                "bigqueryvectorsearch": "langswarm/mcp/tools/bigquery_vector_search",
+                "githubtool": "langswarm/mcp/tools/mcpgithubtool",
+                "dynamicforms": "langswarm/mcp/tools/dynamic_forms",
+                "tasklist": "langswarm/mcp/tools/tasklist",
+                # Add more mappings as needed
+            }
+            
+            tool_dir = tool_directories.get(tool_type_clean.lower())
+            if tool_dir:
+                return load_tool_template(tool_dir)
+            
+        except Exception as e:
+            # Silently fall back to empty dict if template loading fails
+            pass
+            
+        return {}
 
     def _call_with_valid_args(self, func, config):
         sig = signature(func)
@@ -2377,7 +2397,11 @@ Adapt your approach based on the user's needs, drawing from your combined expert
                 # Lazy import to prevent circular imports
                 from langswarm.core.factory.agents import AgentFactory
                 creator = getattr(AgentFactory, f"create_{agent_type}", AgentFactory.create)
-                self.agents[agent["id"]] = self._call_with_valid_args(creator, {"name": agent["id"], **agent})
+                # Fix: Remove name=None from agent config to prevent override
+                agent_params = {k: v for k, v in agent.items() if not (k == "name" and v is None)}
+                agent_params["name"] = agent["id"]  # Ensure name is set correctly
+                
+                self.agents[agent["id"]] = self._call_with_valid_args(creator, agent_params)
                 
             except ValueError as e:
                 if "API key" in str(e):
@@ -3045,7 +3069,57 @@ If any required parameter is missing or ambiguous, instead return:
             output = self.run_workflow(wf_id, inp)
             
         elif 'agent' in step:
+            # Debug: Log step details
+            tracer = None
+            try:
+                from .debug.tracer import get_debug_tracer
+                tracer = get_debug_tracer()
+            except:
+                pass
+            
+            if tracer and tracer.enabled:
+                tracer.log_event(
+                    "INFO", "workflow", "agent_step_start",
+                    f"Starting agent step {step['id']} in workflow {getattr(self, 'workflow_id', 'unknown')}",
+                    data={
+                        "step_id": step['id'],
+                        "workflow_id": getattr(self, 'workflow_id', 'unknown'),
+                        "step_type": "agent",
+                        "mark_visited": mark_visited,
+                        "step_data": step
+                    }
+                )
+            
+            # Debug: Log agent retrieval details
+            agent_id = step['agent']
+            if tracer and tracer.enabled:
+                tracer.log_event(
+                    "INFO", "workflow", "agent_retrieval",
+                    f"Retrieving agent '{agent_id}' from registry",
+                    data={
+                        "agent_id": agent_id,
+                        "available_agents": list(self.agents.keys()),
+                        "registry_size": len(self.agents)
+                    }
+                )
+            
             agent = self.agents[step['agent']]
+            
+            # Debug: Log retrieved agent details
+            if tracer and tracer.enabled:
+                tracer.log_event(
+                    "INFO", "workflow", "agent_retrieved",
+                    f"Successfully retrieved agent {getattr(agent, 'name', 'NONE')}",
+                    data={
+                        "agent_name": getattr(agent, 'name', None),
+                        "agent_type": type(agent).__name__,
+                        "agent_id_attr": getattr(agent, 'agent_id', None),
+                        "agent_id_attr_alt": getattr(agent, 'id', None),
+                        "has_name_attr": hasattr(agent, 'name'),
+                        "name_value": getattr(agent, 'name', 'MISSING'),
+                        "agent_repr": repr(agent)[:200]
+                    }
+                )
             
             # Initialize navigation_choice for this agent step
             navigation_choice = None
@@ -3068,11 +3142,26 @@ If any required parameter is missing or ambiguous, instead return:
             
             # Execute agent
             raw_input = step.get("input")
+            resolved_input = None
+            
             if isinstance(raw_input, dict):
                 resolved = {k: self._resolve_input(v) for k, v in raw_input.items()}
-                output = agent.chat(f"{resolved}")
+                resolved_input = f"{resolved}"
             else:
-                output = agent.chat(self._resolve_input(raw_input))
+                resolved_input = self._resolve_input(raw_input)
+            
+            # Debug: Log before agent execution
+            if tracer and tracer.enabled:
+                tracer.log_event(
+                    "START", "agent", "chat",
+                    f"Agent {getattr(agent, 'name', 'None')} processing query",
+                    data={
+                        "agent_name": getattr(agent, 'name', None),
+                        "query": resolved_input
+                    }
+                )
+            
+            output = agent.chat(resolved_input)
             
             # NAVIGATION SUPPORT: Check if agent made a navigation choice
             if 'navigation' in step:
@@ -3406,7 +3495,11 @@ If any required parameter is missing or ambiguous, instead return:
                         if hasattr(agent, 'navigation_context'):
                             agent.navigation_context = nav_context
                     
-                    # Execute agent
+                    # Execute agent with workflow context
+                    # Pass workflow context to agent for tool access
+                    if hasattr(agent, 'set_workflow_context'):
+                        agent.set_workflow_context(self.context)
+                    
                     raw_input = step.get("input")
                     if isinstance(raw_input, dict):
                         resolved = {k: self._resolve_input(v) for k, v in raw_input.items()}
@@ -3484,12 +3577,12 @@ If any required parameter is missing or ambiguous, instead return:
                 to_targets = [to_targets]
         
             if any(isinstance(t, dict) and "condition" in t for t in to_targets):
-                self._handle_output(step_id, step["output"], output, step)
+                await self._handle_output_async(step_id, step["output"], output, step)
                 if mark_visited:
                     self.context["visited_steps"].add(visit_key)
                 return  # Important: return here explicitly after handling condition
             else:
-                self._handle_output(step_id, step["output"], output, step)
+                await self._handle_output_async(step_id, step["output"], output, step)
         
         if mark_visited:
             self.context["visited_steps"].add(visit_key)
@@ -3820,13 +3913,22 @@ If any required parameter is missing or ambiguous, instead return:
         return getattr(module, func_name)
 
     def _get_workflow(self, workflow_id: str) -> Dict:
-        workflow = next((wf for wf in self.workflows.get("main_workflow", []) if wf['id'] == workflow_id), None)
+        # Handle both new unified format (flat dict) and legacy format (main_workflow key)
+        if isinstance(self.workflows, dict):
+            # New unified format: workflows are stored as a flat dictionary
+            if workflow_id in self.workflows:
+                workflow = self.workflows[workflow_id]
+            else:
+                # Try legacy format fallback
+                workflow = next((wf for wf in self.workflows.get("main_workflow", []) if wf.get('id') == workflow_id), None)
+        else:
+            # Legacy format fallback
+            workflow = next((wf for wf in self.workflows.get("main_workflow", []) if wf.get('id') == workflow_id), None)
 
         if not workflow:
-            workflow = self.workflows.get("main_workflow", [{}])[0]
-
-        if not workflow:
-            raise ValueError(f"Workflow '{workflow_id}' not found. Ensure your workflows.yaml file starts with:\n\nworkflows:\n   main_workflow:...")
+            available_workflows = list(self.workflows.keys()) if isinstance(self.workflows, dict) else []
+            available_msg = f" Available workflows: {', '.join(available_workflows)}" if available_workflows else ""
+            raise ValueError(f"Workflow '{workflow_id}' not found.{available_msg}")
 
         # ⬇️ Grab intelligence settings if they exist in the workflow
         settings = workflow.get("settings", {}).get("intelligence", {})
@@ -4193,6 +4295,27 @@ def _add_workflow_methods_to_config_loader():
         Returns:
             Workflow execution result
         """
+        # Debug: Log workflow start
+        tracer = None
+        try:
+            from .debug.tracer import get_debug_tracer
+            tracer = get_debug_tracer()
+        except:
+            pass
+            
+        if tracer and tracer.enabled:
+            tracer.log_event(
+                "START", "workflow", "run_workflow",
+                f"Starting workflow execution for '{workflow_id}'",
+                data={
+                    "workflow_id": workflow_id,
+                    "user_input": user_input,
+                    "available_workflows": list(self.workflows.keys()) if hasattr(self, 'workflows') else [],
+                    "available_agents": list(self.agents.keys()) if hasattr(self, 'agents') else [],
+                    "kwargs": kwargs
+                }
+            )
+        
         # Initialize workflow context
         self.context = {
             'user_input': user_input,
@@ -4202,6 +4325,7 @@ def _add_workflow_methods_to_config_loader():
             'retry_counters': {},
             'pending_fanins': {},
             'current_workflow_id': workflow_id,  # Add missing workflow ID to context
+            'config_loader': self,  # Add config_loader reference for function calls
             **kwargs
         }
         
@@ -4240,6 +4364,7 @@ def _add_workflow_methods_to_config_loader():
             'retry_counters': {},
             'pending_fanins': {},
             'current_workflow_id': workflow_id,  # Add missing workflow ID to context
+            'config_loader': self,  # Add config_loader reference for function calls
             **kwargs
         }
         

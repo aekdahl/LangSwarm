@@ -99,14 +99,23 @@ class BaseTool(BaseClass):  # Conditional Inheritance
         if 'mcp_server' in kwargs:
             self.__dict__['mcp_server'] = kwargs['mcp_server']
         
-        # Handle workflow patterns for MCP tools
-        if kwargs.get("pattern") == "intent":
-            # For intent-based calls, set default workflow based on tool name
+        # Handle workflow patterns for MCP tools - IMPROVED: Support both patterns regardless of config
+        pattern = kwargs.get("pattern", "both")  # Default to supporting both patterns
+        
+        if pattern == "intent":
+            # Intent-only: Only set up workflow support
             default_workflow = f"{identifier}_workflow" if identifier else f"{name}_workflow"
             self.__dict__['main_workflow'] = kwargs.get("main_workflow", default_workflow)
-        elif "main_workflow" in kwargs:
-            # For direct pattern tools, main_workflow is optional
-            self.__dict__['main_workflow'] = kwargs.get("main_workflow")
+        elif pattern == "direct":
+            # Direct-only: No workflow setup (direct calls only)
+            if "main_workflow" in kwargs:
+                self.__dict__['main_workflow'] = kwargs.get("main_workflow")
+        else:
+            # Both or unspecified: Support both patterns (IMPROVED DEFAULT)
+            # Always set up workflow support so agent can choose either execution path
+            default_workflow = f"{identifier}_workflow" if identifier else f"{name}_workflow"
+            self.__dict__['main_workflow'] = kwargs.get("main_workflow", default_workflow)
+            # Tool will support both direct method calls AND intent-based workflow
     
     def invoke(self, input_data):
         """LangChain invoke method compatibility for MCP tools"""

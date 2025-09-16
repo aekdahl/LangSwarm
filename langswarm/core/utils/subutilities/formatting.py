@@ -242,11 +242,13 @@ Ensure your call follows the correct format.
         except json.JSONDecodeError as e:
             print(f"Initial JSON parsing failed: {e}. Attempting to sanitize...")
 
-            # First, try to extract JSON from code blocks
+            # First, try to extract JSON from code blocks (improved logic)
             extracted_json = self.clear_markdown(json_string)
             if extracted_json != json_string:
                 try:
-                    return json.loads(extracted_json)
+                    parsed = json.loads(extracted_json)
+                    print("Successfully parsed JSON after removing markdown!")
+                    return parsed
                 except json.JSONDecodeError:
                     pass  # Continue with sanitization
 
@@ -282,7 +284,15 @@ Ensure your call follows the correct format.
                     #print(f"Error Character: '{error_char}' at position {error_pos}")
                     #print(f"Context: ...{context}...")
         
-                    use_agent = True
+                    # Only use agent for JSON conversion if the text looks like it's INTENDED to be JSON
+                    # Don't convert plain text responses - they're valid as-is
+                    if ('{' in json_string and '}' in json_string) or ('[' in json_string and ']' in json_string):
+                        # This looks like malformed JSON that needs fixing
+                        use_agent = True
+                    else:
+                        # This is plain text, don't try to convert it to JSON
+                        print("Detected plain text response, not converting to JSON")
+                        return None
                     
         if use_agent:
             result, json_string = self.to_json(

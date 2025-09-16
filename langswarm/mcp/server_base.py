@@ -71,18 +71,99 @@ class BaseMCPToolServer:
         
         with self._lock:
             try:
-                # Validate input
-                validated_input = input_model(**params)
+                # Validate input with enhanced error reporting
+                try:
+                    validated_input = input_model(**params)
+                except Exception as validation_error:
+                    error_msg = f"🚨 PARAMETER VALIDATION FAILED in {self.name}.{task_name}: {str(validation_error)}"
+                    print(error_msg)  # IMMEDIATE CONSOLE ALERT
+                    # LOG AS ERROR (use module logger if instance logger not available)
+                    import logging
+                    logger = getattr(self, 'logger', logging.getLogger(__name__))
+                    logger.error(error_msg)
+                    
+                    # Report to central error monitoring
+                    try:
+                        from langswarm.core.debug.error_monitor import report_tool_validation_error
+                        report_tool_validation_error(self.name, task_name, str(validation_error), params)
+                    except ImportError:
+                        pass  # Error monitor not available
+                    
+                    raise validation_error  # Re-raise for normal error handling
                 
-                # Call handler
-                result = handler(**validated_input.dict())
+                # Call handler (handle both sync and async)
+                import asyncio
+                import inspect
+                
+                if inspect.iscoroutinefunction(handler):
+                    # Handler is async - run in a new thread with its own event loop
+                    import threading
+                    import concurrent.futures
+                    
+                    result_container = [None]
+                    exception_container = [None]
+                    
+                    def run_async_handler():
+                        try:
+                            # Create a new event loop for this thread
+                            new_loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(new_loop)
+                            try:
+                                result_container[0] = new_loop.run_until_complete(
+                                    handler(**validated_input.dict())
+                                )
+                            finally:
+                                new_loop.close()
+                        except Exception as e:
+                            exception_container[0] = e
+                    
+                    # Run in a separate thread with timeout
+                    thread = threading.Thread(target=run_async_handler)
+                    thread.start()
+                    thread.join(timeout=10)  # 10 second timeout
+                    
+                    if thread.is_alive():
+                        raise TimeoutError("Handler execution timed out after 10 seconds")
+                    
+                    if exception_container[0]:
+                        raise exception_container[0]
+                    
+                    result = result_container[0]
+                else:
+                    # Handler is sync
+                    result = handler(**validated_input.dict())
                 
                 # Validate output
-                validated_output = output_model(**result)
-                return validated_output.dict()
+                if isinstance(result, output_model):
+                    # Result is already the correct output model
+                    return result.dict()
+                elif isinstance(result, dict):
+                    # Result is a dict, validate it
+                    validated_output = output_model(**result)
+                    return validated_output.dict()
+                else:
+                    # Unexpected result type
+                    raise ValueError(f"Handler returned unexpected type: {type(result)}, expected {output_model} or dict")
                 
             except Exception as e:
-                return {"error": str(e)}
+                # Enhanced error reporting with immediate surfacing
+                error_type = type(e).__name__
+                error_msg = f"🚨 MCP TOOL EXECUTION FAILED: {self.name}.{task_name} - {error_type}: {str(e)}"
+                print(error_msg)  # IMMEDIATE CONSOLE ALERT
+                # LOG AS ERROR (use module logger if instance logger not available)
+                import logging
+                logger = getattr(self, 'logger', logging.getLogger(__name__))
+                logger.error(error_msg)
+                
+                # Return structured error response
+                return {
+                    "success": False,
+                    "error": str(e),
+                    "error_type": error_type,
+                    "tool": self.name,
+                    "task": task_name,
+                    "critical": True  # Flag this as a critical error
+                }
 
     def build_app(self) -> Optional[FastAPI]:
         """Build FastAPI app - skip for local mode."""

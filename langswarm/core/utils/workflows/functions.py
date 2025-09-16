@@ -246,8 +246,16 @@ def mcp_call(
         local_server = None
         
         if config_loader and hasattr(config_loader, 'tools') and tool_name in config_loader.tools:
-            local_server = config_loader.tools[tool_name]
+            tool_instance = config_loader.tools[tool_name]
             print(f"🔧 Found tool in workflow context: {tool_name}")
+            
+            # Check if tool has a server - use server if available, otherwise use tool directly
+            if hasattr(tool_instance, 'server') and tool_instance.server:
+                local_server = tool_instance.server
+                print(f"🔧 Using tool's MCP server: {tool_instance.server.name}")
+            else:
+                local_server = tool_instance
+                print(f"🔧 Using tool directly: {type(tool_instance)}")
         else:
             # Fallback to global server registry
             from langswarm.mcp.server_base import BaseMCPToolServer

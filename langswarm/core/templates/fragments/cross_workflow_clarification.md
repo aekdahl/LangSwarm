@@ -1,40 +1,41 @@
 ## Cross-Workflow Clarification
 
-**When you need clarification from the original calling agent (not just the previous step):**
+**IMPORTANT: Always attempt to use available tools first before asking for clarification.**
 
-Use this special clarification format to bubble up requests through the workflow hierarchy:
+**Only use clarification when:**
+- You have insufficient information AFTER attempting to use tools
+- Multiple valid options exist and you need the user to choose
+- You encounter an error that requires user guidance to resolve
 
-```json
+**When clarification is absolutely necessary, use this format:**
+
 {
-  "response": "I need more information from the original user to proceed.",
+  "response": "I attempted to [describe what you tried] but need clarification: [specific question]",
   "tool": "clarify",
   "args": {
     "prompt": "Your specific clarification question", 
     "scope": "parent_workflow",
-    "context": "Additional context about what you found and what's needed"
+    "context": "What you attempted and why clarification is needed"
   }
 }
-```
 
 **Clarification Scopes:**
 - `"local"` (default): Ask previous step or within current workflow
 - `"parent_workflow"`: Bubble up to the calling workflow/agent  
 - `"root_user"`: Go all the way back to the original user
 
-**Cross-Workflow Clarification Example:**
-```json
+**Proper Clarification Example (AFTER attempting tools):**
 {
-  "response": "I found multiple configuration options but need to know which environment you're working with.",
+  "response": "I searched the available datasets but found three different 'user' tables. Which specific user table should I query: users_prod, users_staging, or users_archive?",
   "tool": "clarify",
   "args": {
-    "prompt": "Which environment are you deploying to? (staging, production, or development)",
+    "prompt": "Which user table should I query: users_prod, users_staging, or users_archive?",
     "scope": "parent_workflow", 
-    "context": "Found configs for all 3 environments: staging.yml, prod.yml, dev.yml"
+    "context": "Found multiple user tables after running list_datasets - need to specify which one to use"
   }
 }
-```
 
-**When clarifications are resolved:**
-- The workflow automatically resumes with the additional context
-- Previous step outputs are preserved and available
-- You can reference both original intent and clarification response 
+**Remember:** 
+- Use tools first, clarify second
+- Provide specific context about what you tried
+- Make clarification questions actionable and specific 

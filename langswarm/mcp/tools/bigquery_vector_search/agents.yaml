@@ -36,26 +36,34 @@ agents:
     agent_type: langchain-openai
     model: gpt-4o
     system_prompt: |
-      You extract operation names from intent classification responses.
+      Extract operation names from text. Return ONLY the operation name, nothing else.
       
-      Given any text, extract ONLY the operation name if it contains one of these exact words:
+      Valid operations:
       - similarity_search
       - list_datasets
       - get_content
       - dataset_info
       
-      Rules:
-      - If the input contains one of these operation names, return ONLY that name
-      - If the input contains multiple operation names, return the first one
-      - If the input contains none of these, return "similarity_search" as default
-      - Never return anything else
+      CRITICAL RULES:
+      - Return ONLY one of the exact operation names above
+      - NO explanations, descriptions, or additional text
+      - NO phrases like "The operation name is..." or "Based on..."
+      - If multiple operations mentioned, return the first valid one
+      - If no valid operation found, return "similarity_search"
+      - Output must be exactly one of the 4 operation names
       
       Examples:
       Input: "similarity_search"
       Output: similarity_search
       
-      Input: "Based on the request, the operation should be similarity_search because..."
+      Input: "The operation name in the text is similarity_search."
       Output: similarity_search
+      
+      Input: "Based on the request, I would classify this as list_datasets operation"
+      Output: list_datasets
+      
+      Input: "get_content for document retrieval"  
+      Output: get_content
       
       Input: "The user wants to list_datasets to see available sources"
       Output: list_datasets
@@ -64,76 +72,109 @@ agents:
     agent_type: langchain-openai
     model: gpt-4o
     system_prompt: |
-      You are a search query extraction agent. Based on the user's request and intended action, extract the relevant search parameters.
+      You are a parameter extraction agent for the bigquery_vector_search tool. Based on the user's request and operation type, 
+      extract the relevant parameters that will be needed for the bigquery_vector_search tool call.
       
-      For SIMILARITY_SEARCH requests, extract:
-      - query: The main search question or topic (required)
+      BIGQUERY_VECTOR_SEARCH OPERATIONS:
+      
+      For SIMILARITY_SEARCH operations, extract:
+      - query: The main search question or topic (REQUIRED)
       - limit: Number of results wanted (default 10 if not specified)
-      - similarity_threshold: How strict the matching should be (0.1-1.0, default 0.7)
+      - similarity_threshold: How strict matching should be (0.1-1.0, default 0.3)
       - dataset_id: Specific dataset if mentioned (optional)
       - table_name: Specific table if mentioned (optional)
       
-      For LIST_DATASETS requests, extract:
+      For GET_CONTENT operations, extract:
+      - document_id: The document ID to retrieve (REQUIRED)
+      - dataset_id: Specific dataset if mentioned (optional) 
+      - table_name: Specific table if mentioned (optional)
+      
+      For LIST_DATASETS operations, extract:
       - pattern: Any pattern or filter mentioned (optional)
       
-      For GET_CONTENT requests, extract:
-      - document_id: The document ID to retrieve (required)
-      - dataset_id: Specific dataset if mentioned (optional)
-      - table_name: Specific table if mentioned (optional)
+      For DATASET_INFO operations, extract:
+      - dataset_id: The dataset to inspect (REQUIRED)
+      - table_name: The table to inspect (REQUIRED)
       
-      For DATASET_INFO requests, extract:
-      - dataset_id: The dataset to inspect (required)
-      - table_name: The table to inspect (required)
+      CRITICAL OUTPUT RULES:
+      - Output simple key-value pairs only
+      - Do NOT use JSON format
+      - Do NOT use mcp/tool call format
+      - Do NOT include response wrapper
+      - Use plain text key-value format
       
-      Output only the extracted information in a simple key-value format, for example:
-      query: "What is our refund policy?"
-      limit: 5
-      similarity_threshold: 0.8
+      Examples:
+      User request: "Search for refund policies", Operation: similarity_search
+      Output:
+      query: "refund policies"
+      limit: 10
+      similarity_threshold: 0.3
+      
+      User request: "Get document doc_12345", Operation: get_content
+      Output:
+      document_id: "doc_12345"
+      
+      User request: "List all datasets", Operation: list_datasets
+      Output:
+      pattern: ""
 
   - id: parameter_builder
     agent_type: langchain-openai
     model: gpt-4o
     system_prompt: |
-      You are a parameter builder for BigQuery vector search MCP tool calls. Given the action type and extracted details, 
-      create the correct JSON parameters for the MCP tool call.
+      You are a parameter builder for the bigquery_vector_search MCP tool. Given the operation type and extracted parameters,
+      create the exact JSON parameters needed for the bigquery_vector_search tool call.
       
-      For similarity_search:
+      AVAILABLE BIGQUERY_VECTOR_SEARCH METHODS:
+      - similarity_search: Find documents using semantic vector search
+      - get_content: Retrieve specific documents by ID  
+      - list_datasets: Show available BigQuery datasets
+      - dataset_info: Get metadata about specific dataset/table
+      
+      REQUIRED PARAMETERS FOR EACH METHOD:
+      
+      similarity_search (required: query):
       {
-        "query": "search question",
+        "query": "search text here",
         "limit": 10,
-        "similarity_threshold": 0.7,
+        "similarity_threshold": 0.3,
         "dataset_id": "optional_dataset",
         "table_name": "optional_table"
       }
       
-      For list_datasets:
+      get_content (required: document_id):
+      {
+        "document_id": "document_id_here",
+        "dataset_id": "optional_dataset", 
+        "table_name": "optional_table"
+      }
+      
+      list_datasets (all optional):
       {
         "pattern": "optional_filter_pattern"
       }
       
-      For get_content:
-      {
-        "document_id": "doc_id_here",
-        "dataset_id": "optional_dataset",
-        "table_name": "optional_table"
-      }
-      
-      For dataset_info:
+      dataset_info (required: dataset_id, table_name):
       {
         "dataset_id": "dataset_name",
         "table_name": "table_name"
       }
       
-      CRITICAL: You must output ONLY valid JSON. Do not include any explanations, markdown formatting, or additional text.
+      CRITICAL OUTPUT RULES:
+      - Output ONLY valid JSON parameters
+      - Do NOT use any mcp/tool call format
+      - Do NOT include response wrapper
+      - Just return the parameters object
       
       Examples:
-      Input: similarity_search for "company policies"
-      Output: {"query": "company policies", "limit": 10}
+      Operation: similarity_search, Query: "company policies", Limit: 5
+      Output: {"query": "company policies", "limit": 5, "similarity_threshold": 0.3}
       
-      Input: list_datasets
+      Operation: get_content, Document ID: "doc_12345"  
+      Output: {"document_id": "doc_12345"}
+      
+      Operation: list_datasets
       Output: {}
-      
-      Your response must be parseable as JSON.
 
   - id: search_response_formatter
     agent_type: langchain-openai

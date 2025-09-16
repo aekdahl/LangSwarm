@@ -54,7 +54,14 @@ class MiddlewareMixin:
             # Fallback for test environments or incomplete registries
             self.tool_deployer = None
         
+        # Initialize workflow context
+        self.workflow_context = None
+        
         self.ask_to_continue_regex = r"\[AGENT_REQUEST:PROCEED_WITH_INTERNAL_STEP\]"
+    
+    def set_workflow_context(self, context):
+        """Set the workflow context for use in tool calls"""
+        self.workflow_context = context
     
     def _find_workflow_path(self, handler, filename="workflows.yaml") -> str:
         """
@@ -119,7 +126,19 @@ class MiddlewareMixin:
         config_path, workflow_path = self._find_workflow_path(handler)
         
         if not os.path.exists(workflow_path):
-            raise FileNotFoundError(f"No workflow found for tool: {tool_id} at {workflow_path}")
+            # IMPROVED: Check if tool provides its own intent handling
+            self._log_event(f"No workflow found for tool {tool_id}, checking tool-level intent support", "warning")
+            
+            # Check if the tool itself can handle intent-based calls directly
+            if hasattr(handler, 'handle_intent'):
+                try:
+                    self._log_event(f"Using tool-level intent handler: {tool_id}.handle_intent", "info")
+                    return handler.handle_intent(intent, context)
+                except Exception as tool_error:
+                    self._log_event(f"Tool-level intent handler failed: {tool_error}", "error")
+            
+            # If no workflow and no tool-level intent handler, raise error
+            raise FileNotFoundError(f"No workflow found for tool: {tool_id} at {workflow_path} and tool does not support direct intent handling")
 
         loader = LangSwarmConfigLoader(config_path=config_path)
         workflows, agents, brokers, tools, tools_metadata = loader.load()
@@ -242,10 +261,14 @@ class MiddlewareMixin:
             "arguments": params
         }
         
-        # Build context with tool_deployer if available
+        # Build context with tool_deployer and workflow context if available
         context = {}
         if self.tool_deployer:
             context["tool_deployer"] = self.tool_deployer
+        
+        # Include workflow context if available (contains config_loader for tool instances)
+        if self.workflow_context:
+            context.update(self.workflow_context)
             
         result = mcp_call(
             mcp_url=mcp_url,
@@ -344,6 +367,13 @@ class MiddlewareMixin:
                         method=mcp_data['method'],
                         params=mcp_data.get('params', {})
                     )
+                    
+                    # Check for critical MCP tool failures and surface them immediately
+                    if isinstance(result, dict) and result.get('critical'):
+                        error_msg = f"🚨 CRITICAL MCP TOOL FAILURE: {tool_id}.{mcp_data['method']} - {result.get('error', 'Unknown error')}"
+                        print(error_msg)
+                        self._log_event(error_msg, "error")
+                    
                     return 201, json.dumps(result, indent=2)
                     
                 else:

@@ -214,6 +214,36 @@ class UtilMixin:
         model_info = self.model_details or {}
         return model_info.get("supports_function_calling", False)
     
+    def _extract_tool_call_metadata(self, completion):
+        """Extract tool call metadata for debug tracing before cleanup"""
+        if not completion or not hasattr(completion, 'choices'):
+            return None
+            
+        try:
+            choice = completion.choices[0]
+            if hasattr(choice, 'message') and hasattr(choice.message, 'tool_calls') and choice.message.tool_calls:
+                tool_calls = choice.message.tool_calls
+                metadata = {
+                    "tool_calls_detected": True,
+                    "tool_call_count": len(tool_calls),
+                    "tool_calls": []
+                }
+                
+                for tc in tool_calls:
+                    tool_info = {
+                        "function_name": tc.function.name,
+                        "arguments_preview": tc.function.arguments[:100] + "..." if len(tc.function.arguments) > 100 else tc.function.arguments,
+                        "call_id": getattr(tc, 'id', 'unknown')
+                    }
+                    metadata["tool_calls"].append(tool_info)
+                
+                return metadata
+        except Exception as e:
+            if hasattr(self, 'log_event'):
+                self.log_event(f"Error extracting tool call metadata: {e}", "warning")
+        
+        return {"tool_calls_detected": False, "tool_call_count": 0}
+    
     def get_native_tool_format_schema(self, tools):
         """Convert MCP tools to native tool format for the current model"""
         if not tools or not self.supports_native_tool_calling():
@@ -345,17 +375,70 @@ class UtilMixin:
                 # Extract the first tool call
                 tool_call = choice.message.tool_calls[0]
                 
+                # Parse arguments to detect method for multi-method tools
+                params = self.utils.safe_json_loads(tool_call.function.arguments) if tool_call.function.arguments else {}
+                method, unwrapped_params = self._detect_method_and_unwrap_params(tool_call.function.name, params)
+                
                 # Create MCP format
                 mcp_response = {
                     "response": choice.message.content or "",
                     "mcp": {
                         "tool": tool_call.function.name,
-                        "method": "call",  # Standard MCP method
-                        "params": self.utils.safe_json_loads(tool_call.function.arguments) if tool_call.function.arguments else {}
+                        "method": method,
+                        "params": unwrapped_params
                     }
                 }
                 return mcp_response
         return response_data
+    
+    def _detect_method_and_unwrap_params(self, tool_name, params, explicit_method=None):
+        """Generic method detection and parameter unwrapping for MCP tools"""
+        
+        # First, try tool-specific preprocessing if available
+        try:
+            if hasattr(self, 'tool_registry') and hasattr(self.tool_registry, 'tools'):
+                tools_dict = self.tool_registry.tools
+                if tool_name in tools_dict:
+                    tool_instance = tools_dict[tool_name]
+                    if hasattr(tool_instance, 'preprocess_parameters'):
+                        # Check if the tool's preprocess_parameters accepts explicit_method parameter
+                        import inspect
+                        sig = inspect.signature(tool_instance.preprocess_parameters)
+                        if 'explicit_method' in sig.parameters:
+                            return tool_instance.preprocess_parameters(params, explicit_method=explicit_method)
+                        else:
+                            return tool_instance.preprocess_parameters(params)
+        except Exception as e:
+            # Debug: log why tool preprocessing failed
+            import logging
+            logging.getLogger(__name__).debug(f"Tool preprocessing failed for {tool_name}: {e}")
+            pass  # Tool doesn't have custom preprocessing
+        
+        # Generic parameter unwrapping patterns that work for any tool
+        unwrapped_params = params
+        detected_method = "call"  # Default fallback
+        
+        # Pattern 1: Check if wrapped in "input" parameter (common pattern)
+        if "input" in params and isinstance(params["input"], (dict, str)):
+            if isinstance(params["input"], str):
+                try:
+                    unwrapped_params = json.loads(params["input"])
+                except:
+                    unwrapped_params = params
+            else:
+                unwrapped_params = params["input"]
+        
+        # Pattern 2: Generic detection of nested method parameters
+        # Look for any single key that contains a dict (likely a method call)
+        else:
+            for key, value in params.items():
+                if isinstance(value, dict) and len(params) == 1:
+                    # Single key with dict value suggests method-based nesting
+                    detected_method = key
+                    unwrapped_params = value
+                    break
+        
+        return detected_method, unwrapped_params
     
     def _translate_anthropic_to_mcp(self, response_data):
         """Translate Anthropic Claude function calls to MCP format"""
@@ -460,13 +543,13 @@ class UtilMixin:
         # Check for streaming mode configuration
         streaming_config = config.get("streaming", {}) if config else {}
         
-        # Default to enabled if model supports it and not explicitly disabled
-        return streaming_config.get("enabled", True)
+        # Default to disabled unless explicitly enabled
+        return streaming_config.get("enabled", False)
     
     def get_streaming_config(self, config=None):
         """Get streaming configuration with defaults"""
         default_config = {
-            "enabled": True,
+            "enabled": False,
             "mode": "real_time",  # real_time, immediate, integrated
             "chunk_size": "word",  # word, sentence, paragraph, character
             "buffer_timeout": 50,  # ms before flushing buffer
@@ -592,6 +675,21 @@ class UtilMixin:
                 # Check for function calls in delta
                 if hasattr(choice, 'delta') and hasattr(choice.delta, 'tool_calls'):
                     chunk_data["metadata"]["has_tool_calls"] = True
+                    # Capture the actual tool call data
+                    if choice.delta.tool_calls:
+                        chunk_data["tool_calls"] = []
+                        for tool_call in choice.delta.tool_calls:
+                            tool_call_data = {
+                                "id": getattr(tool_call, 'id', None),
+                                "type": getattr(tool_call, 'type', None),
+                                "function": {}
+                            }
+                            if hasattr(tool_call, 'function'):
+                                tool_call_data["function"] = {
+                                    "name": getattr(tool_call.function, 'name', None),
+                                    "arguments": getattr(tool_call.function, 'arguments', None)
+                                }
+                            chunk_data["tool_calls"].append(tool_call_data)
         except Exception as e:
             chunk_data["metadata"]["parse_error"] = str(e)
         
@@ -686,6 +784,7 @@ class UtilMixin:
         """Aggregate multiple stream chunks into final response"""
         full_content = ""
         metadata = {"chunks_processed": 0, "providers": set()}
+        aggregated_tool_calls = []
         
         for chunk in chunks:
             if isinstance(chunk, dict):
@@ -693,6 +792,40 @@ class UtilMixin:
                 chunk_metadata = chunk.get("metadata", {})
                 if "provider" in chunk_metadata:
                     metadata["providers"].add(chunk_metadata["provider"])
+                
+                # Aggregate tool calls from chunks
+                if "tool_calls" in chunk:
+                    for tool_call in chunk["tool_calls"]:
+                        # Find existing tool call by ID (use first non-None ID as reference)
+                        existing_call = None
+                        tool_call_id = tool_call.get("id")
+                        
+                        # If this chunk has an ID, find by ID
+                        if tool_call_id:
+                            for existing in aggregated_tool_calls:
+                                if existing.get("id") == tool_call_id:
+                                    existing_call = existing
+                                    break
+                        # If no ID in this chunk, assume it belongs to the last tool call
+                        elif aggregated_tool_calls:
+                            existing_call = aggregated_tool_calls[-1]
+                        
+                        if existing_call:
+                            # Merge arguments (streaming tool calls can be split across chunks)
+                            if tool_call.get("function", {}).get("arguments"):
+                                if "arguments" not in existing_call["function"]:
+                                    existing_call["function"]["arguments"] = ""
+                                existing_call["function"]["arguments"] += tool_call["function"]["arguments"]
+                            # Update other fields if they're missing in existing but present in new chunk
+                            if not existing_call.get("type") and tool_call.get("type"):
+                                existing_call["type"] = tool_call["type"]
+                            if not existing_call["function"].get("name") and tool_call.get("function", {}).get("name"):
+                                existing_call["function"]["name"] = tool_call["function"]["name"]
+                        else:
+                            # Add new tool call (only if it has meaningful data)
+                            if tool_call.get("id") or tool_call.get("function", {}).get("name"):
+                                aggregated_tool_calls.append(tool_call)
+                
                 metadata["chunks_processed"] += 1
             else:
                 full_content += str(chunk)
@@ -701,10 +834,16 @@ class UtilMixin:
         # Convert set to list for JSON serialization
         metadata["providers"] = list(metadata["providers"])
         
-        return {
+        result = {
             "content": full_content,
             "metadata": metadata
         }
+        
+        # Include tool calls if any were found
+        if aggregated_tool_calls:
+            result["tool_calls"] = aggregated_tool_calls
+            
+        return result
 
 # ========== PRIORITY 4: RESPONSE API SUPPORT ==========
     
@@ -745,7 +884,10 @@ class UtilMixin:
                     "properties": {
                         "tool": {"type": "string"},
                         "method": {"type": "string"}, 
-                        "params": {"type": "object"}
+                        "params": {
+                            "type": "object",
+                            "additionalProperties": False
+                        }
                     },
                     "required": ["tool", "method"],
                     "additionalProperties": False
@@ -756,12 +898,25 @@ class UtilMixin:
         }
         
         if strict and self.supports_strict_mode():
+            # For strict mode, OpenAI requires ALL properties to be in the required array
+            # So we'll create a simplified schema with only required fields
+            strict_schema = {
+                "type": "object",
+                "properties": {
+                    "response": {
+                        "type": "string",
+                        "description": "The main response text intended for the user"
+                    }
+                },
+                "required": ["response"],
+                "additionalProperties": False
+            }
             return {
                 "type": "json_schema",
                 "json_schema": {
                     "name": schema_name,
-                    "schema": base_schema,
-                    "strict": True
+                    "strict": True,
+                    "schema": strict_schema
                 }
             }
         else:
@@ -942,5 +1097,5 @@ class UtilMixin:
         if config and "api_preference" in config:
             return config["api_preference"] == "response_api"
         
-        # Default: use Response API for supporting models
-        return True
+        # Default: use Chat Completions API until Response API is stable
+        return False

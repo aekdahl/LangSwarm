@@ -73,13 +73,6 @@ workflows:
             Build the exact parameters needed for the BigQuery vector search tool call.
             Use the enhanced query if available, otherwise use extracted parameters directly.
           output:
-            to: clean_json
-
-        - id: clean_json
-          function: langswarm.core.utils.workflows.functions.format_as_json
-          args:
-            data: ${context.step_outputs.build_tool_parameters}
-          output:
             to: execute_search
 
         - id: execute_search
@@ -88,7 +81,7 @@ workflows:
             mcp_url: "local://bigquery_vector_search"
             payload:
               name: ${context.step_outputs.clean_intent}
-              arguments: ${context.step_outputs.clean_json}
+              arguments: ${context.step_outputs.build_tool_parameters}
           output:
             to:
               - condition:

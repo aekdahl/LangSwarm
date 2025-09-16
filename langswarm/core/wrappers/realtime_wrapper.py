@@ -192,15 +192,15 @@ def create_realtime_agent(name: str,
     Returns:
         RealtimeAgentWrapper: Configured realtime agent
     """
-    from langswarm.core.agents.simple import create_chat_agent
+    from langswarm.core.factory.agents import AgentFactory
     
     # Create underlying agent with memory if requested
     agent_config = kwargs.copy()
     if memory_enabled:
         agent_config["memory"] = True
     
-    # Create base agent
-    base_agent = create_chat_agent(name, **agent_config)
+    # Create base agent using standard factory
+    base_agent = AgentFactory.create(name, "openai", **agent_config)
     
     # Create realtime configuration
     realtime_config = {

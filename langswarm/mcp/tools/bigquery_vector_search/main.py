@@ -46,16 +46,16 @@ DEFAULT_CONFIG = {
     "dataset_id": "vector_search",
     "table_name": "embeddings",
     "embedding_model": "text-embedding-3-small",
-    "default_similarity_threshold": 0.7,
-    "max_results": 50
+    "default_similarity_threshold": 0.7,  # Conservative default
+    "max_results": 10                     # Reasonable default
 }
 
 # === Schemas ===
 class SimilaritySearchInput(BaseModel):
     query: str
     query_embedding: Optional[List[float]] = None
-    limit: Optional[int] = 10
-    similarity_threshold: Optional[float] = 0.7
+    limit: Optional[int] = None  # Will be set from config if not provided
+    similarity_threshold: Optional[float] = None  # Will be set from config if not provided
     dataset_id: Optional[str] = None
     table_name: Optional[str] = None
 
@@ -106,6 +106,7 @@ class DatasetInfoOutput(BaseModel):
 
 async def get_embedding(text: str, model: str = "text-embedding-3-small") -> List[float]:
     """Get embedding for text using OpenAI with Python 3.11+ compatibility"""
+    
     if not OPENAI_AVAILABLE:
         raise ImportError("OpenAI support requires: pip install openai")
     
@@ -141,13 +142,25 @@ async def get_embedding(text: str, model: str = "text-embedding-3-small") -> Lis
 
 # === Unified Async Handlers ===
 
-async def similarity_search(input_data: SimilaritySearchInput) -> SimilaritySearchOutput:
+async def similarity_search(input_data: SimilaritySearchInput, config: dict = None) -> SimilaritySearchOutput:
     """Perform vector similarity search in BigQuery using shared utilities"""
     try:
+        # Use provided config or fall back to default
+        effective_config = config or DEFAULT_CONFIG
+        
         # Get configuration
         project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
-        dataset_id = input_data.dataset_id or DEFAULT_CONFIG["dataset_id"]
-        table_name = input_data.table_name or DEFAULT_CONFIG["table_name"]
+        dataset_id = input_data.dataset_id or effective_config["dataset_id"]
+        table_name = input_data.table_name or effective_config["table_name"]
+        
+        # Apply config defaults for optional parameters
+        limit = input_data.limit if input_data.limit is not None else effective_config["max_results"]
+        similarity_threshold = input_data.similarity_threshold if input_data.similarity_threshold is not None else effective_config["default_similarity_threshold"]
+        
+        print(f"🔧 Config source: {'tool_instance' if config else 'global_default'}")
+        print(f"🔧 Config applied: limit={limit}, similarity_threshold={similarity_threshold}")
+        if config:
+            print(f"🔧 Full tool config: {effective_config}")
         
         # Generate embedding if not provided
         if input_data.query_embedding is None:
@@ -167,8 +180,8 @@ async def similarity_search(input_data: SimilaritySearchInput) -> SimilaritySear
             dataset_id=dataset_id,
             table_name=table_name,
             query_embedding=query_embedding,
-            similarity_threshold=input_data.similarity_threshold,
-            limit=input_data.limit
+            similarity_threshold=similarity_threshold,
+            limit=limit
         )
         
         return SimilaritySearchOutput(
@@ -193,9 +206,8 @@ async def similarity_search(input_data: SimilaritySearchInput) -> SimilaritySear
 async def list_datasets(input_data: ListDatasetsInput) -> ListDatasetsOutput:
     """List available vector search datasets using shared utilities"""
     try:
-        project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
+        project_id = os.getenv('GOOGLE_CLOUD_PROJECT') or "production-pingday"
         bq_manager = BigQueryManager(project_id)
-        
         datasets = bq_manager.list_embedding_datasets(input_data.pattern)
         
         return ListDatasetsOutput(
@@ -216,10 +228,10 @@ async def list_datasets(input_data: ListDatasetsInput) -> ListDatasetsOutput:
 async def get_content(input_data: GetContentInput) -> GetContentOutput:
     """Retrieve full content by document ID using shared utilities"""
     try:
-        project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
         dataset_id = input_data.dataset_id or DEFAULT_CONFIG["dataset_id"]
         table_name = input_data.table_name or DEFAULT_CONFIG["table_name"]
         
+        project_id = os.getenv('GOOGLE_CLOUD_PROJECT') or "production-pingday"
         bq_manager = BigQueryManager(project_id)
         result = bq_manager.get_document_by_id(dataset_id, table_name, input_data.document_id)
         
@@ -265,26 +277,49 @@ async def dataset_info(input_data: DatasetInfoInput) -> DatasetInfoOutput:
 
 # === MCP Server ===
 server = BaseMCPToolServer(
-    name="bigquery_vector_search",
+    name="bigquery_vector_search",  # Default name, will be overridden by tool identifier
     description="BigQuery vector similarity search for knowledge base queries.",
     local_mode=True
 )
 
 # Add operations
+async def _similarity_search_handler(**kwargs):
+    """Wrapper for similarity_search that handles keyword arguments from call_task"""
+    # Convert keyword arguments to SimilaritySearchInput object
+    input_data = SimilaritySearchInput(**kwargs)
+    # CRITICAL FIX: Use server's tool_config if available
+    config_to_use = getattr(server, 'tool_config', None)
+    return await similarity_search(input_data, config=config_to_use)
+
 server.add_task(
     name="similarity_search",
     description="Perform vector similarity search to find relevant content.",
     input_model=SimilaritySearchInput,
     output_model=SimilaritySearchOutput,
-    handler=lambda input_data: similarity_search(input_data)
+    handler=_similarity_search_handler
 )
+
+async def _get_content_handler(**kwargs):
+    """Wrapper for get_content that handles keyword arguments from call_task"""
+    input_data = GetContentInput(**kwargs)
+    return await get_content(input_data)
+
+async def _list_datasets_handler(**kwargs):
+    """Wrapper for list_datasets that handles keyword arguments from call_task"""
+    input_data = ListDatasetsInput(**kwargs)
+    return await list_datasets(input_data)
+
+async def _dataset_info_handler(**kwargs):
+    """Wrapper for dataset_info that handles keyword arguments from call_task"""
+    input_data = DatasetInfoInput(**kwargs)
+    return await dataset_info(input_data)
 
 server.add_task(
     name="get_content",
     description="Retrieve full document content by document ID.",
     input_model=GetContentInput,
     output_model=GetContentOutput,
-    handler=lambda input_data: get_content(input_data)
+    handler=_get_content_handler
 )
 
 server.add_task(
@@ -292,7 +327,7 @@ server.add_task(
     description="List available vector search datasets and tables.",
     input_model=ListDatasetsInput,
     output_model=ListDatasetsOutput,
-    handler=lambda input_data: list_datasets(input_data)
+    handler=_list_datasets_handler
 )
 
 server.add_task(
@@ -300,7 +335,7 @@ server.add_task(
     description="Get detailed information about a specific dataset/table.",
     input_model=DatasetInfoInput,
     output_model=DatasetInfoOutput,
-    handler=lambda input_data: dataset_info(input_data)
+    handler=_dataset_info_handler
 )
 
 # Create FastAPI app
@@ -322,11 +357,150 @@ try:
         """
         _bypass_pydantic = True
         
-        def __init__(self, identifier: str):
-            super().__init__(
-                name="BigQuery Vector Search",
-                description="Search company knowledge base using BigQuery vector similarity",
-                instruction="""Use this tool to perform semantic searches on your knowledge base stored in BigQuery.
+        def preprocess_parameters(self, params, explicit_method=None):
+            """BigQuery-specific parameter preprocessing and method detection"""
+            # Handle None params gracefully
+            if params is None:
+                params = {}
+            input_data = params
+            
+            # CRITICAL FIX: If explicit method is provided, use it instead of detecting
+            if explicit_method and explicit_method in ["similarity_search", "list_datasets", "get_content", "dataset_info"]:
+                # For explicit methods, just clean the parameters without changing the method
+                if "input" in params:
+                    input_data = params["input"]
+                    if isinstance(input_data, str):
+                        try:
+                            import json
+                            input_data = json.loads(input_data)
+                        except:
+                            input_data = {}
+                    elif not isinstance(input_data, dict):
+                        input_data = {}
+                # Check if parameters are nested under method names
+                elif explicit_method in params:
+                    input_data = params[explicit_method]
+                
+                # VALIDATION: Ensure similarity_search has query parameter
+                # BUT don't change the method - let BigQuery validation handle the error
+                if explicit_method == "similarity_search":
+                    if not input_data or "query" not in input_data or not input_data.get("query"):
+                        # Agent called similarity_search without proper query - return error in params
+                        # Don't change method to list_datasets - that's misleading!
+                        return explicit_method, {"error": "similarity_search requires 'query' parameter"}
+                
+                return explicit_method, input_data if input_data else {}
+            
+            # Original logic for when no explicit method is provided
+            # Check if it's wrapped in an "input" parameter
+            if "input" in params:
+                # Parse the nested input JSON
+                input_data = params["input"]
+                if isinstance(input_data, str):
+                    try:
+                        import json
+                        input_data = json.loads(input_data)
+                    except:
+                        input_data = {}
+                elif not isinstance(input_data, dict):
+                    input_data = {}
+            
+            # Check for nested MCP structure (CRITICAL FIX for agent nesting)
+            elif "mcp" in params and isinstance(params["mcp"], dict):
+                # Agent generated nested MCP call - extract the inner method and params
+                nested_mcp = params["mcp"]
+                if "method" in nested_mcp and nested_mcp["method"] in ["similarity_search", "list_datasets", "get_content", "dataset_info"]:
+                    return nested_mcp["method"], nested_mcp.get("params", {})
+            
+            # Check if parameters are nested under method names (CRITICAL FIX)
+            elif "similarity_search" in params:
+                input_data = params["similarity_search"]
+            elif "get_content" in params:
+                input_data = params["get_content"] 
+            elif "list_datasets" in params:
+                input_data = params["list_datasets"]
+            elif "dataset_info" in params:
+                input_data = params["dataset_info"]
+            
+            # Detect method based on parameter patterns
+            if "query" in input_data:
+                return "similarity_search", input_data
+            elif "document_id" in input_data:
+                return "get_content", input_data
+            elif "pattern" in input_data or ("pattern" in params and params != input_data):
+                return "list_datasets", input_data
+            elif "dataset_id" in input_data and "table_name" in input_data:
+                return "dataset_info", input_data
+            else:
+                # IMPROVED FALLBACK: For empty params, default to list_datasets (safer than similarity_search)
+                return "list_datasets", input_data if input_data else {}
+        
+        def handle_intent(self, intent: str, context: Optional[str] = None) -> Any:
+            """
+            Handle intent-based calls directly without requiring a workflow.
+            This provides a fallback when no workflow is available.
+            
+            Args:
+                intent: Natural language intent
+                context: Optional context information
+                
+            Returns:
+                Result of the intent execution
+            """
+            try:
+                # Use built-in logging instead of self.logger
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info(f"Handling intent directly: '{intent}' with context: '{context}'")
+                
+                # Simple intent-to-method mapping for BigQuery
+                intent_lower = intent.lower()
+                if "search" in intent_lower or "find" in intent_lower:
+                    method = "similarity_search"
+                    params = {"query": intent}
+                elif "list" in intent_lower or "show" in intent_lower:
+                    method = "list_datasets" 
+                    params = {}
+                elif "get" in intent_lower or "retrieve" in intent_lower:
+                    method = "get_content"
+                    params = {"document_id": context if context else "unknown"}
+                else:
+                    method = "similarity_search"  # Default fallback
+                    params = {"query": intent}
+                
+                logger.info(f"Intent mapped to: {method} with params {params}")
+                
+                # Execute the method directly using async functions
+                import asyncio
+                
+                if method == "similarity_search":
+                    # Convert params to proper input model
+                    search_input = SimilaritySearchInput(**params)
+                    return asyncio.run(similarity_search(search_input))
+                elif method == "list_datasets":
+                    # Convert params to proper input model
+                    list_input = ListDatasetsInput(**params)
+                    return asyncio.run(list_datasets(list_input))
+                elif method == "get_content":
+                    # Convert params to proper input model
+                    content_input = GetContentInput(**params)
+                    return asyncio.run(get_content(content_input))
+                elif method == "get_embedding":
+                    # Direct call to get_embedding
+                    text = params.get("text", "")
+                    model = params.get("model", "text-embedding-3-small")
+                    return asyncio.run(get_embedding(text, model))
+                else:
+                    raise ValueError(f"Unknown method: {method}")
+                
+            except Exception as e:
+                logger.error(f"Intent handling failed: {e}")
+                raise
+
+        def __init__(self, identifier: str, **kwargs):
+            # Extract template-based values with fallbacks (like filesystem tool pattern)
+            description = kwargs.pop('description', "Search company knowledge base using BigQuery vector similarity")
+            instruction = kwargs.pop('instruction', """Use this tool to perform semantic searches on your knowledge base stored in BigQuery.
 
 IMPORTANT PARAMETERS:
 - Use 'query' (NOT 'keyword') for search text
@@ -342,12 +516,56 @@ Example usage:
     "limit": 5,
     "similarity_threshold": 0.8
   }
-}""",
+}""")
+            brief = kwargs.pop('brief', "BigQuery vector search for semantic knowledge retrieval")
+            
+            super().__init__(
+                name="BigQuery Vector Search",
+                description=description,
+                instruction=instruction,
                 identifier=identifier,
-                brief="BigQuery vector search for semantic knowledge retrieval"
+                brief=brief,
+                **kwargs
             )
+            
+            # Update server name to match tool identifier for proper registration
+            server.name = identifier
+            # Re-register with the correct name
+            if server.local_mode:
+                server._register_globally()
+            
             object.__setattr__(self, 'server', server)
-            object.__setattr__(self, 'default_config', DEFAULT_CONFIG.copy())
+            
+            # Start with default config
+            config = DEFAULT_CONFIG.copy()
+            
+            # Override with any provided configuration parameters
+            # Support both direct parameters and config dict
+            if 'config' in kwargs:
+                config.update(kwargs['config'])
+                
+            # Support direct parameter passing
+            config_params = {
+                'project_id', 'dataset_id', 'table_name', 'embedding_model',
+                'default_similarity_threshold', 'max_results', 'similarity_threshold'
+            }
+            for param in config_params:
+                if param in kwargs:
+                    config[param] = kwargs[param]
+                    
+            # Handle similarity_threshold alias
+            if 'similarity_threshold' in kwargs:
+                config['default_similarity_threshold'] = kwargs['similarity_threshold']
+            
+            object.__setattr__(self, 'default_config', config)
+            
+            # CRITICAL FIX: Pass the tool's config to the server so it can use it
+            # The server is what actually handles the MCP calls, so it needs the config
+            object.__setattr__(server, 'tool_config', config)
+            
+            # Debug: Log the final configuration
+            print(f"🔧 BigQuery Tool Constructor kwargs: {kwargs}")
+            print(f"🔧 BigQuery Tool Final Config: {config}")
         
         async def run_async(self, input_data=None):
             """Unified async execution method"""
@@ -401,7 +619,10 @@ Example usage:
                 # Route to appropriate handler
                 if method == "similarity_search":
                     input_obj = SimilaritySearchInput(**params)
-                    result = await similarity_search(input_obj)
+                    # Use server's tool_config if available, fallback to self.default_config
+                    server_config = getattr(self.server, 'tool_config', None) if hasattr(self, 'server') else None
+                    config_to_use = server_config or self.default_config
+                    result = await similarity_search(input_obj, config=config_to_use)
                 elif method == "get_content":
                     input_obj = GetContentInput(**params)
                     result = await get_content(input_obj)

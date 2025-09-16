@@ -1,0 +1,97 @@
+# BigQuery Vector Search Debug Scenarios
+# Configure test scenarios for Case 3 BigQuery tool debugging
+
+scenarios:
+  similarity_search:
+    name: "similarity_search"
+    description: "Real vector similarity search test"
+    query: "Execute a similarity search using bigquery_search tool. Search query: 'pingday monitoring'. Parameters: limit=5, similarity_threshold=0.1"
+    expected_behavior: "Should generate embeddings and perform vector similarity search in BigQuery"
+    trace_file_suffix: "similarity_search"
+    enabled: true
+    
+  list_datasets:
+    name: "list_datasets" 
+    description: "Dataset discovery and metadata query test"
+    query: "Execute list_datasets using the bigquery_search tool to show all available BigQuery datasets"
+    expected_behavior: "Should query BigQuery metadata to list available datasets"
+    trace_file_suffix: "list_datasets"
+    enabled: true
+    
+  error_handling:
+    name: "error_handling"
+    description: "Error handling and graceful failure test"
+    query: "Execute get_content using bigquery_search tool. Document ID: nonexistent_doc_12345"
+    expected_behavior: "Should handle non-existent document gracefully with user-friendly error"
+    trace_file_suffix: "error_handling"
+    enabled: true
+    
+  intent_based:
+    name: "intent_based"
+    description: "Intent-based tool calling with natural language"
+    query: "I need to find information about Pingday's IoT services and smart city solutions"
+    expected_behavior: "Should understand intent and perform appropriate similarity search without explicit method calls"
+    trace_file_suffix: "intent_based"
+    enabled: true
+    
+  # Additional scenarios (can be enabled/disabled as needed)
+  
+  performance_test:
+    name: "performance_test"
+    description: "Large dataset performance and timeout handling"
+    query: "Search for all documents related to customer service and support policies"
+    expected_behavior: "Should handle large result sets efficiently and respect timeout limits"
+    trace_file_suffix: "performance_test"
+    enabled: false  # Disabled by default
+    
+  embedding_accuracy:
+    name: "embedding_accuracy"
+    description: "Embedding quality and similarity threshold testing"
+    query: "Find documents similar to: customer complaints about billing issues"
+    expected_behavior: "Should return semantically relevant results based on embedding similarity"
+    trace_file_suffix: "embedding_accuracy"
+    enabled: false  # Disabled by default
+    
+  multi_language:
+    name: "multi_language"
+    description: "Multi-language content search capabilities"
+    query: "Buscar información sobre políticas de devolución"  # Spanish
+    expected_behavior: "Should handle non-English queries appropriately"
+    trace_file_suffix: "multi_language"
+    enabled: false  # Disabled by default
+
+# Global scenario configuration
+config:
+  # Maximum time to wait for each scenario (seconds)
+  scenario_timeout: 30
+  
+  # Whether to continue running other scenarios if one fails
+  continue_on_failure: true
+  
+  # Output settings
+  separate_trace_files: true
+  
+  # Evaluation criteria
+  success_criteria:
+    similarity_search:
+      min_response_length: 10
+      # Success = agent makes tool call OR returns actual search results (not clarification)
+      forbidden_keywords: ["need more information", "could you please", "clarification"]
+      required_keywords: ["vector", "similarity", "search", "found", "documents", "results"]
+      
+    list_datasets:
+      min_response_length: 10
+      # Success = agent shows dataset information OR makes tool call
+      forbidden_keywords: ["need more information", "could you please", "clarification"]
+      required_keywords: ["dataset", "available", "table", "schema"]
+      
+    error_handling:
+      min_response_length: 10
+      # Success = agent handles the error properly (not found/doesn't exist)
+      required_keywords: ["not exist", "not found", "nonexistent", "error", "invalid"]
+      
+    intent_based:
+      min_response_length: 20
+      # Success = agent understands natural language intent and provides relevant information
+      forbidden_keywords: ["need more information", "could you please", "clarification", "what tool", "which method"]
+      required_keywords: ["IoT", "smart city", "Pingday", "information", "found"]

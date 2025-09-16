@@ -48,7 +48,7 @@ print('✅ Your multi-agent AI system is ready!')
 "
 ```
 
-### **Option 2: Pure Python (Even Simpler)**
+### **Option 2: Pure Python (Even Simpler)** AE: NOT CORRECT USE/IMPLEMENTATION
 ```python
 from langswarm.core.agents.simple import create_chat_agent
 
@@ -63,7 +63,7 @@ print(response)
 agent.cleanup()
 ```
 
-### **Option 3: Voice Agent (NEW!)**
+### **Option 3: Voice Agent (NEW!)** AE: NOT CORRECT USE/IMPLEMENTATION
 ```python
 from langswarm.core.wrappers.realtime_wrapper import create_realtime_agent
 
@@ -107,7 +107,7 @@ memory:
 
 ---
 
-## 🔄 **Workflow Simplification** 
+## 🔄 **Workflow Simplification** AE: NOT WORKING, ROLL BACK TO ORIGINAL WORKFLOWS
 
 **90% Complexity Reduction - From 15+ lines to 1 line:**
 
@@ -145,7 +145,7 @@ workflows:
 
 ---
 
-## 🤖 **Simplified Agent Architecture**
+## 🤖 **Simplified Agent Architecture** AE: NOT WORKING, ROLL BACK TO ORIGINAL 
 
 **95% Parameter Reduction - From 22+ parameters to 1 config object:**
 

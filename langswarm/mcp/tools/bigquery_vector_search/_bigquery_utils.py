@@ -83,12 +83,68 @@ class BigQueryManager:
     ) -> List[Dict[str, Any]]:
         """Execute similarity search and return formatted results"""
         
+        # 🔍 DEBUG: Log BigQuery execution details
+        print(f"🔍 BigQuery DEBUG: Starting similarity search")
+        print(f"  Project: {self.project_id}")
+        print(f"  Dataset: {dataset_id}")
+        print(f"  Table: {table_name}")
+        print(f"  Embedding dimensions: {len(query_embedding)}")
+        print(f"  Similarity threshold: {similarity_threshold}")
+        print(f"  Limit: {limit}")
+        
         query = self.build_similarity_query(
             dataset_id, table_name, query_embedding, similarity_threshold, limit
         )
         
+        # 🔍 DEBUG: Log the exact SQL query
+        print(f"🔍 BigQuery SQL Query (first 300 chars):")
+        print(f"  {query[:300]}...")
+        
+        print(f"🔍 BigQuery: Executing query...")
         query_job = self.client.query(query)
+        
+        # 🔍 DEBUG: Log query job details
+        print(f"🔍 BigQuery Job: {query_job.job_id}")
+        print(f"🔍 BigQuery State: {query_job.state}")
+        
         results = list(query_job.result())
+        
+        # 🔍 DEBUG: Log raw BigQuery response
+        print(f"🔍 BigQuery RAW RESPONSE:")
+        print(f"  Total rows returned: {len(results)}")
+        print(f"  Job bytes processed: {query_job.total_bytes_processed}")
+        print(f"  Job cache hit: {query_job.cache_hit}")
+        
+        if results:
+            print(f"  First row data:")
+            first_row = results[0]
+            print(f"    document_id: {first_row.document_id}")
+            print(f"    similarity: {first_row.similarity}")
+            print(f"    content preview: {first_row.content[:50]}...")
+        else:
+            print(f"  ❌ NO ROWS RETURNED FROM BIGQUERY!")
+            
+            # 🔍 DEBUG: Additional diagnostic info
+            print(f"🔍 BigQuery DIAGNOSTICS:")
+            print(f"  Query job errors: {query_job.errors}")
+            print(f"  Query job state: {query_job.state}")
+            print(f"  Query job ended: {query_job.ended}")
+            
+            # Check if the table exists and has data
+            try:
+                table_ref = self.client.dataset(dataset_id).table(table_name)
+                table = self.client.get_table(table_ref)
+                print(f"  Table exists: ✅ with {table.num_rows} total rows")
+                
+                # Try a simple count query
+                count_query = f"SELECT COUNT(*) as total FROM `{self.project_id}.{dataset_id}.{table_name}`"
+                count_job = self.client.query(count_query)
+                count_result = list(count_job.result())
+                total_count = count_result[0].total if count_result else 0
+                print(f"  Table accessible: ✅ {total_count} rows via COUNT query")
+                
+            except Exception as table_error:
+                print(f"  Table access error: {table_error}")
         
         formatted_results = []
         for row in results:
@@ -110,6 +166,7 @@ class BigQueryManager:
             
             formatted_results.append(result)
         
+        print(f"🔍 BigQuery FINAL: Returning {len(formatted_results)} formatted results")
         return formatted_results
     
     def get_document_by_id(
@@ -195,7 +252,7 @@ class BigQueryManager:
                 datasets.append({
                     "dataset_id": dataset_id,
                     "tables": tables,
-                    "location": dataset.location
+                    "location": getattr(dataset, 'location', 'unknown')
                 })
         
         return datasets

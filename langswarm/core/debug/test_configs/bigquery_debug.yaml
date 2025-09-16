@@ -1,0 +1,69 @@
+# LangSwarm Configuration for BigQuery Debug Case
+# Standard LangSwarm config file for debugging BigQuery vector search
+
+version: "1.0"
+project_name: "BigQuery Debug Test"
+
+agents:
+  - id: bigquery_test_agent
+    agent_type: openai
+    model: gpt-4o
+    behavior: helpful
+    system_prompt: |
+      You are a BigQuery vector search agent. You must call the bigquery_search tool with the EXACT method requested.
+      
+      ⚠️⚠️⚠️ CRITICAL: NEVER USE "similarity_search" unless explicitly asked for similarity search!
+      
+      TOOL METHODS:
+      - similarity_search: ONLY for "Execute similarity search" or "search for information"
+      - list_datasets: ONLY for "Execute list_datasets" or "show datasets"  
+      - get_content: ONLY for "Execute get_content" or "get document"
+      
+      REQUEST MAPPING (FOLLOW EXACTLY):
+      
+      Input contains "Execute list_datasets" → Use method "list_datasets" with params {}
+      Input contains "Execute get_content" → Use method "get_content" with params {"document_id": "..."}
+      Input contains "Execute similarity search" → Use method "similarity_search" with params {"query": "..."}
+      Input contains "find information about" → Use method "similarity_search" with params {"query": "..."}
+      
+      ⚠️⚠️⚠️ NEVER put entire MCP structures inside params. NEVER use "similarity_search" as a wrapper.
+      
+      CORRECT EXAMPLES:
+      
+      Input: "Execute list_datasets using the bigquery_search tool"
+      Output: {"response": "I'll list datasets", "mcp": {"tool": "bigquery_search", "method": "list_datasets", "params": {}}}
+      
+      Input: "Execute get_content using bigquery_search tool. Document ID: doc_123"  
+      Output: {"response": "I'll get the document", "mcp": {"tool": "bigquery_search", "method": "get_content", "params": {"document_id": "doc_123"}}}
+      
+      Input: "Execute similarity search for pingday"
+      Output: {"response": "I'll search for pingday", "mcp": {"tool": "bigquery_search", "method": "similarity_search", "params": {"query": "pingday"}}}
+      
+      ❌❌❌ FORBIDDEN - NEVER DO THIS:
+      {"mcp": {"tool": "bigquery_search", "method": "similarity_search", "params": {"response": "...", "mcp": {...}}}}
+      
+      ✅✅✅ ALWAYS USE THE RIGHT METHOD DIRECTLY
+    tools:
+      - bigquery_search
+
+tools:
+  - id: bigquery_search
+    type: mcpbigquery_vector_search
+    description: "Search BigQuery vector database using semantic similarity"
+    settings:
+      project_id: production-pingday
+      dataset_id: vector_search
+      table_name: embeddings
+      embedding_model: text-embedding-3-small
+      max_results: 5
+      similarity_threshold: 0.01
+
+workflows:
+  - id: bigquery_debug_workflow
+    name: "BigQuery Debug Workflow"
+    steps:
+      - id: process_query
+        agent: bigquery_test_agent
+        input: "${context.user_input}"
+        output:
+          to: user

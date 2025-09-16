@@ -63,199 +63,12 @@ class AgentFactory:
         
         return wrapped_agent
     
-    # ========== ZERO-CONFIG AGENT CREATION ==========
+    # Removed: Zero-config agent creation methods have been removed for clarity
     
-    @staticmethod
-    def create_simple(
-        name: str,
-        behavior: str = "helpful",
-        model: str = "gpt-4o",
-        tools: Optional[list] = None,
-        memory: Optional[Any] = None,
-        **kwargs
-    ) -> AgentWrapper:
-        """
-        Create a simple agent using behavior-driven configuration.
-        
-        Args:
-            name: Agent name and identifier
-            behavior: Behavior preset (helpful, coding, research, creative, analytical, support, conversational, educational)
-            model: LLM model to use
-            tools: List of tool names to enable
-            memory: Memory configuration
-            **kwargs: Additional agent options
-            
-        Returns:
-            AgentWrapper: Ready-to-use agent
-            
-        Example:
-            # Create a coding assistant in one line
-            agent = AgentFactory.create_simple(
-                name="code_helper",
-                behavior="coding",
-                tools=["filesystem", "github"]
-            )
-        """
-        # Create config loader to generate agent configuration
-        config_loader = LangSwarmConfigLoader()
-        
-        # Generate agent config using zero-config system
-        agent_config = config_loader.create_simple_agent(
-            agent_id=name,
-            behavior=behavior,
-            model=model,
-            tools=tools or [],
-            memory=memory is not None,
-            **kwargs
-        )
-        
-        # Create base agent
-        agent = AgentFactory._create_base_agent("openai", documents=None, model=model, **kwargs)
-        
-        # Create wrapper with generated system prompt
-        wrapped_agent = AgentWrapper(
-            name=name,
-            agent=agent,
-            model=model,
-            system_prompt=agent_config.system_prompt,
-            memory=memory,
-            agent_type="generic",
-            **kwargs
-        )
-        
-        # Register the agent
-        AgentFactory._register_agent(wrapped_agent, register_as="agent")
-        
-        return wrapped_agent
+    # create_simple method removed - use standard AgentFactory.create() instead
     
-    @staticmethod
-    def create_coding_assistant(
-        name: str = "coding_assistant",
-        model: str = "gpt-4o",
-        tools: Optional[list] = None,
-        memory: Optional[Any] = None,
-        **kwargs
-    ) -> AgentWrapper:
-        """
-        Create a specialized coding assistant with pre-configured tools and behavior.
-        
-        Args:
-            name: Agent identifier
-            model: LLM model (optimized for coding)
-            tools: Additional tools beyond filesystem and github
-            memory: Memory configuration
-            **kwargs: Additional options
-            
-        Returns:
-            AgentWrapper: Coding assistant ready for development tasks
-        """
-        default_tools = ["filesystem", "github"]
-        all_tools = list(dict.fromkeys(default_tools + (tools or [])))
-        
-        return AgentFactory.create_simple(
-            name=name,
-            behavior="coding",
-            model=model,
-            tools=all_tools,
-            memory=memory,
-            **kwargs
-        )
-    
-    @staticmethod
-    def create_research_assistant(
-        name: str = "research_assistant",
-        model: str = "gpt-4o",
-        tools: Optional[list] = None,
-        memory: Optional[Any] = None,
-        **kwargs
-    ) -> AgentWrapper:
-        """
-        Create a research assistant with analysis and search capabilities.
-        
-        Args:
-            name: Agent identifier
-            model: LLM model (optimized for analysis)
-            tools: Additional tools beyond web_search and filesystem
-            memory: Memory configuration
-            **kwargs: Additional options
-            
-        Returns:
-            AgentWrapper: Research assistant ready for information gathering
-        """
-        default_tools = ["web_search", "filesystem"]
-        all_tools = list(dict.fromkeys(default_tools + (tools or [])))
-        
-        return AgentFactory.create_simple(
-            name=name,
-            behavior="research",
-            model=model,
-            tools=all_tools,
-            memory=memory,
-            **kwargs
-        )
-    
-    @staticmethod
-    def create_support_agent(
-        name: str = "support_agent",
-        model: str = "gpt-4o-mini",
-        tools: Optional[list] = None,
-        memory: Optional[Any] = None,
-        **kwargs
-    ) -> AgentWrapper:
-        """
-        Create a customer support agent with helpful interactive tools.
-        
-        Args:
-            name: Agent identifier
-            model: LLM model (cost-optimized for support)
-            tools: Additional tools beyond dynamic-forms and filesystem
-            memory: Memory configuration
-            **kwargs: Additional options
-            
-        Returns:
-            AgentWrapper: Support agent ready for customer assistance
-        """
-        default_tools = ["dynamic-forms", "filesystem"]
-        all_tools = list(dict.fromkeys(default_tools + (tools or [])))
-        
-        return AgentFactory.create_simple(
-            name=name,
-            behavior="support",
-            model=model,
-            tools=all_tools,
-            memory=memory,
-            **kwargs
-        )
-    
-    @staticmethod
-    def create_conversational_agent(
-        name: str = "chat_agent",
-        model: str = "gpt-4o-mini",
-        tools: Optional[list] = None,
-        memory: Optional[Any] = None,
-        **kwargs
-    ) -> AgentWrapper:
-        """
-        Create a conversational agent optimized for natural dialogue.
-        
-        Args:
-            name: Agent identifier
-            model: LLM model (optimized for responsiveness)
-            tools: Tools to enable (minimal by default)
-            memory: Memory configuration
-            **kwargs: Additional options
-            
-        Returns:
-            AgentWrapper: Conversational agent ready for chat
-        """
-        return AgentFactory.create_simple(
-            name=name,
-            behavior="conversational",
-            model=model,
-            tools=tools or [],
-            memory=memory,
-            **kwargs
-        )
+    # Removed: Convenience methods that depended on zero-config system
+    # Use AgentFactory.create() with explicit agent_type instead
     
     # ========== ORIGINAL FACTORY METHODS ==========
     
@@ -528,6 +341,43 @@ class AgentFactory:
             openai.api_key = utils._get_api_key('deepseek', kwargs.get("deepseek_api_key"))
             agent = openai
         else:
-            raise ValueError(f"Unsupported agent type: {agent_type}")
+            # Provide helpful error message for common configuration issues
+            if agent_type == "generic":
+                raise ValueError(
+                    "Missing required 'agent_type' field in agent configuration.\n"
+                    "\n"
+                    "💡 Solution: Add 'agent_type' to your agent configuration:\n"
+                    "\n"
+                    "  agents:\n"
+                    "    - id: my_agent\n"
+                    "      agent_type: openai          # ← ADD THIS LINE\n"
+                    "      model: gpt-4o\n"
+                    "      system_prompt: \"...\"\n"
+                    "\n"
+                    "📚 Supported agent types:\n"
+                    "  • openai - OpenAI models (GPT-4, GPT-3.5, etc.)\n"
+                    "  • langchain-openai - LangChain OpenAI integration\n"
+                    "  • azure-openai - Azure OpenAI service\n"
+                    "  • anthropic - Anthropic models (Claude)\n"
+                    "  • huggingface - Hugging Face models\n"
+                    "  • llamaindex - LlamaIndex integration\n"
+                    "  • deepseek - DeepSeek models\n"
+                    "\n"
+                    "🎯 For most use cases, use: agent_type: openai"
+                )
+            else:
+                # List available agent types for unknown types
+                available_types = [
+                    "openai", "langchain-openai", "azure-openai", "anthropic", 
+                    "huggingface", "llamaindex", "deepseek"
+                ]
+                
+                raise ValueError(
+                    f"Unsupported agent type: '{agent_type}'\n"
+                    "\n"
+                    "📚 Supported agent types:\n" + 
+                    "\n".join(f"  • {atype}" for atype in available_types) +
+                    "\n\n💡 Most common: agent_type: openai"
+                )
             
         return agent

@@ -96,6 +96,24 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
     ):
         kwargs.pop("provider", None)  # Remove `provider` if it exists
         
+        # Debug tracing for agent initialization (if enabled)
+        try:
+            from .debug.tracer import get_debug_tracer
+            tracer = get_debug_tracer()
+            if tracer and tracer.enabled:
+                tracer.log_event(
+                    "DEBUG", "agent", "init_start",
+                    f"AgentWrapper.__init__ starting with name='{name}'",
+                    data={
+                        "input_name": name,
+                        "agent_type": agent_type,
+                        "model": model,
+                        "kwargs_keys": list(kwargs.keys())
+                    }
+                )
+        except:
+            pass
+        
         # Handle allow_middleware parameter
         if allow_middleware is not None:
             self.__allow_middleware = allow_middleware
@@ -120,6 +138,21 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
             system_prompt=system_prompt,
             **kwargs
         )
+        
+        # Debug tracing after super init (if enabled)
+        try:
+            if tracer and tracer.enabled:
+                tracer.log_event(
+                    "DEBUG", "agent", "post_super_init",
+                    f"After super().__init__, self.name='{getattr(self, 'name', 'MISSING')}'",
+                    data={
+                        "self_name": getattr(self, 'name', None),
+                        "input_name": name,
+                        "has_name_attr": hasattr(self, 'name')
+                    }
+                )
+        except:
+            pass
         
         UtilMixin.__init__(self)  # Initialize UtilMixin
         MiddlewareMixin.__init__(
@@ -159,6 +192,22 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
             enhanced_config=enhanced_config or {}
         )
         self.current_session_id = None
+        
+        # Debug tracing for completion (if enabled)
+        try:
+            if tracer and tracer.enabled:
+                tracer.log_event(
+                    "DEBUG", "agent", "init_complete",
+                    f"AgentWrapper.__init__ complete, final self.name='{getattr(self, 'name', 'MISSING')}'",
+                    data={
+                        "final_name": getattr(self, 'name', None),
+                        "input_name": name,
+                        "agent_type": agent_type,
+                        "name_equals_input": getattr(self, 'name', None) == name
+                    }
+                )
+        except:
+            pass
 
     def handle_push_message(self, payload):
         """Handles incoming messages for the agent if a broker is active."""
@@ -473,13 +522,55 @@ Do not include any text outside the JSON structure."""
                 else:
                     # No memory, include context manually
                     if callable(self.agent):
-                        # Direct calls are deprecated, so we use .invoke() instead.
+                        # For LangChain ChatModels, create proper message list with system prompt
+                        messages = []
+                        
+                        # Add system prompt if available
+                        if self.system_prompt:
+                            try:
+                                from langchain.schema import SystemMessage
+                                messages.append(SystemMessage(content=self.system_prompt))
+                            except ImportError:
+                                try:
+                                    from langchain_core.messages import SystemMessage
+                                    messages.append(SystemMessage(content=self.system_prompt))
+                                except ImportError:
+                                    pass  # Fallback to text-based approach
+                        
+                        # Add conversation history
                         if self.in_memory:
-                            self._report_estimated_usage(self.in_memory)
-                            response = self.agent.invoke(self.in_memory)
+                            try:
+                                from langchain.schema import HumanMessage, AIMessage
+                            except ImportError:
+                                from langchain_core.messages import HumanMessage, AIMessage
+                            
+                            for msg in self.in_memory:
+                                role = msg.get("role", "user")
+                                content = msg.get("content", "")
+                                if role == "user":
+                                    messages.append(HumanMessage(content=content))
+                                elif role == "assistant":
+                                    messages.append(AIMessage(content=content))
                         else:
+                            # Add current query
+                            try:
+                                from langchain.schema import HumanMessage
+                            except ImportError:
+                                from langchain_core.messages import HumanMessage
+                            messages.append(HumanMessage(content=q))
+                        
+                        # For now, don't bind tools to LangChain - let the MCP system handle tool calling
+                        # The existing MCP middleware handles tool calls properly
+                        agent_to_invoke = self.agent
+                        
+                        # Call agent with message list
+                        if messages:
+                            self._report_estimated_usage(messages)
+                            response = agent_to_invoke.invoke(messages)
+                        else:
+                            # Fallback to text-based call
                             self._report_estimated_usage(q)
-                            response = self.agent.invoke(q)
+                            response = agent_to_invoke.invoke(q)
                     else:
                         context = " ".join([message["content"] for message in self.in_memory]) if self.in_memory else q
                         self._report_estimated_usage(context)
@@ -678,6 +769,8 @@ Do not include any text outside the JSON structure."""
     
     def _call_chat_completions_api(self, messages, config=None):
         """Enhanced Chat Completions API call with Priority 1-3 features"""
+        # DEBUG: Log that we entered the streaming method
+        self.log_event(f"ENTERED _call_chat_completions_api method for {self.name}", "info")
         try:
             # Prepare API parameters
             api_params = {
@@ -730,6 +823,64 @@ Do not include any text outside the JSON structure."""
             
             self._current_completion = completion
             
+            # DEBUG: Log raw LLM response before any processing
+            print(f"🔍 Raw LLM Response for {self.name}: {type(completion)}")
+            try:
+                from langswarm.core.debug.tracer import get_debug_tracer
+                tracer = get_debug_tracer()
+                if tracer and tracer.enabled:
+                    # Log the complete raw response object
+                    import json
+                    try:
+                        # Convert completion to dict for logging (handle different response types)
+                        if hasattr(completion, 'model_dump'):
+                            raw_data = completion.model_dump()
+                        elif hasattr(completion, 'to_dict'):
+                            raw_data = completion.to_dict()
+                        else:
+                            # Fallback - try to extract key attributes
+                            raw_data = {
+                                "id": getattr(completion, 'id', None),
+                                "object": getattr(completion, 'object', None),
+                                "model": getattr(completion, 'model', None),
+                                "choices": []
+                            }
+                            if hasattr(completion, 'choices'):
+                                for choice in completion.choices:
+                                    choice_data = {
+                                        "index": getattr(choice, 'index', None),
+                                        "finish_reason": getattr(choice, 'finish_reason', None),
+                                        "message": {}
+                                    }
+                                    if hasattr(choice, 'message'):
+                                        choice_data["message"] = {
+                                            "role": getattr(choice.message, 'role', None),
+                                            "content": getattr(choice.message, 'content', None),
+                                            "tool_calls": getattr(choice.message, 'tool_calls', None)
+                                        }
+                                    raw_data["choices"].append(choice_data)
+                        
+                        tracer.log_event(
+                            "DEBUG", "llm", "raw_response",
+                            f"Raw LLM response received from {self.model}",
+                            data={
+                                "model": self.model,
+                                "agent_name": self.name,
+                                "raw_response": raw_data,
+                                "response_type": str(type(completion)),
+                                "has_choices": hasattr(completion, 'choices'),
+                                "choices_count": len(completion.choices) if hasattr(completion, 'choices') else 0
+                            }
+                        )
+                    except Exception as e:
+                        tracer.log_event(
+                            "DEBUG", "llm", "raw_response_error", 
+                            f"Failed to log raw response: {e}",
+                            data={"error": str(e), "completion_type": str(type(completion))}
+                        )
+            except:
+                pass
+            
             # PRIORITY 3: Handle streaming vs non-streaming responses
             if streaming_params and streaming_params.get("stream"):
                 # Check if this is a Mock object (for testing)
@@ -742,27 +893,124 @@ Do not include any text outside the JSON structure."""
                 else:
                     # Streaming response - aggregate chunks
                     chunks = []
-                    for chunk in completion:
+                    
+                    # DEBUG: Log streaming start  
+                    try:
+                        from langswarm.core.debug.tracer import get_debug_tracer
+                        tracer = get_debug_tracer()
+                        if tracer and tracer.enabled:
+                            tracer.log_event(
+                                "START", "llm", "streaming_response",
+                                f"Starting streaming response processing for {self.name}",
+                                data={"agent_name": self.name, "model": self.model}
+                            )
+                    except Exception as e:
+                        self.log_event(f"Debug tracer not available: {e}", "debug")
+                    
+                    for i, chunk in enumerate(completion):
                         parsed_chunk = self.parse_stream_chunk(chunk)
                         chunks.append(parsed_chunk)
+                        
+                        # DEBUG: Log streaming chunk data using agent's log_event
+                        if i < 5:  # Log first 5 chunks
+                            chunk_summary = f"Chunk {i}: "
+                            if hasattr(chunk, 'choices') and chunk.choices:
+                                choice = chunk.choices[0]
+                                if hasattr(choice, 'delta'):
+                                    content = getattr(choice.delta, 'content', None)
+                                    tool_calls = getattr(choice.delta, 'tool_calls', None)
+                                    chunk_summary += f"content='{content}', tool_calls={tool_calls is not None}"
+                                    if tool_calls:
+                                        try:
+                                            tc_summary = f"[{len(tool_calls)} calls: "
+                                            for tc in tool_calls:
+                                                tc_summary += f"{getattr(tc, 'function', {}).name if hasattr(tc, 'function') else 'unknown'},"
+                                            tc_summary = tc_summary.rstrip(',') + "]"
+                                            chunk_summary += f", details={tc_summary}"
+                                        except:
+                                            chunk_summary += ", details=parsing_failed"
+                            
+                            self.log_event(f"STREAMING: {chunk_summary}", "info")
+                            
+                            # Also log parsed chunk
+                            self.log_event(f"PARSED: Chunk {i} parsed to: {parsed_chunk}", "info")
+                        
                         if parsed_chunk.get("is_complete"):
                             break
                 
                     # Aggregate streaming chunks into final response
                     aggregated = self.aggregate_stream_chunks(chunks)
                     content = aggregated["content"]
-                
+                    
                     # Create a mock completion object for tool call translation
-                    self._current_completion = type('MockCompletion', (), {
-                        'choices': [type('MockChoice', (), {
-                            'message': type('MockMessage', (), {
-                                'content': content,
-                                'tool_calls': getattr(completion.choices[0].message, 'tool_calls', None) if hasattr(completion, 'choices') else None,
-                                'refusal': None
-                            })()
-                        })()],
-                        '_streaming_metadata': aggregated["metadata"]
-                    })()
+                    # Use aggregated tool calls from streaming chunks
+                    tool_calls = aggregated.get("tool_calls", [])
+                    print(f"🔍 FINAL Tool calls for execution: {tool_calls}")
+                    
+                    # DEBUG: Log final aggregated response using agent's log_event
+                    self.log_event(f"STREAMING COMPLETE: Processed {len(chunks)} chunks, content_length={len(content)}, tool_calls_count={len(tool_calls)}", "info")
+                    if tool_calls:
+                        self.log_event(f"FINAL TOOL CALLS: {tool_calls}", "info")
+                    
+                    # Store detailed streaming information for debug tracing
+                    streaming_details = {
+                        "chunks_processed": len(chunks),
+                        "final_content": content,
+                        "final_content_length": len(content),
+                        "tool_calls": tool_calls,
+                        "chunk_summaries": []
+                    }
+                    
+                    # Add summaries of first few chunks for debugging
+                    for i, chunk in enumerate(chunks[:5]):
+                        chunk_summary = {
+                            "index": i,
+                            "content": chunk.get("content", ""),
+                            "has_tool_calls": "tool_calls" in chunk,
+                            "tool_calls_count": len(chunk.get("tool_calls", [])),
+                            "metadata": chunk.get("metadata", {})
+                        }
+                        if "tool_calls" in chunk:
+                            chunk_summary["tool_calls"] = chunk["tool_calls"]
+                        streaming_details["chunk_summaries"].append(chunk_summary)
+                    
+                    # Add to aggregated metadata for trace capture
+                    if "metadata" not in aggregated:
+                        aggregated["metadata"] = {}
+                    aggregated["metadata"]["detailed_streaming"] = streaming_details
+                    
+                    # Create proper completion object from aggregated streaming data
+                    class StreamingCompletion:
+                        def __init__(self, content, tool_calls, metadata):
+                            self.choices = [StreamingChoice(content, tool_calls)]
+                            self._streaming_metadata = metadata
+                            self.id = metadata.get("chunk_id", "streaming_completion")
+                            self.object = "chat.completion"
+                            self.model = self.model if hasattr(self, 'model') else 'unknown'
+                    
+                    class StreamingChoice:
+                        def __init__(self, content, tool_calls):
+                            self.message = StreamingMessage(content, tool_calls)
+                            self.index = 0
+                            self.finish_reason = "tool_calls" if tool_calls else "stop"
+                    
+                    class StreamingMessage:
+                        def __init__(self, content, tool_calls):
+                            self.content = content
+                            self.tool_calls = tool_calls
+                            self.role = "assistant"
+                            self.refusal = None
+                    
+                    self._current_completion = StreamingCompletion(content, tool_calls, aggregated["metadata"])
+                    
+                    # Preserve streaming metadata for debug access
+                    self._last_completion = self._current_completion
+                    self._streaming_debug_data = {
+                        "chunks_processed": len(chunks),
+                        "tool_calls_captured": tool_calls,
+                        "streaming_metadata": aggregated.get("metadata", {}),
+                        "final_content": content
+                    }
                     self.log_event(f"Streaming completed: {aggregated['metadata']['chunks_processed']} chunks processed", "debug")
             else:
                 # Non-streaming response
@@ -800,17 +1048,12 @@ Do not include any text outside the JSON structure."""
                 tool_calls = None
             if tool_calls and self.supports_native_tool_calling():
                 # Translate native tool calls to MCP format
-                mcp_calls = []
-                for tool_call in tool_calls:
-                    mcp_call = self.translate_native_tool_call_to_mcp(tool_call)
-                    if mcp_call:
-                        mcp_calls.append(mcp_call)
-                
-                if mcp_calls:
+                mcp_call = self.translate_native_tool_call_to_mcp(completion)
+                if mcp_call and "mcp" in mcp_call:
                     # Return with translated tool calls
                     return {
-                        "response": content or "Tool call initiated",
-                        "mcp": mcp_calls[0] if len(mcp_calls) == 1 else mcp_calls,
+                        "response": content or mcp_call.get("response", "Tool call initiated"),
+                        "mcp": mcp_call["mcp"],
                         "metadata": {
                             "api_type": "chat_completions",
                             "model": self.model,
@@ -842,7 +1085,17 @@ Do not include any text outside the JSON structure."""
                     self.log_event(f"Failed to parse structured response: {str(e)}", "warning")
             
             # Fallback: manual JSON parsing (legacy behavior)
-            return self._parse_agent_response(content)
+            try:
+                # Try to parse as JSON first
+                parsed = self.utils.safe_json_loads(content)
+                if parsed and isinstance(parsed, dict):
+                    return parsed
+                else:
+                    # Return as simple response format
+                    return {"response": content, "mcp": None}
+            except Exception:
+                # Final fallback: wrap plain text in response format
+                return {"response": content, "mcp": None}
             
         except Exception as e:
             self.log_event(f"Chat Completions API call failed: {str(e)}", "error")
@@ -880,6 +1133,28 @@ Do not include any text outside the JSON structure."""
         Returns:
         - str: The agent's response.
         """
+        # Check if called externally (not from internal LangSwarm components)
+        import inspect
+        frame = inspect.currentframe()
+        try:
+            caller_file = frame.f_back.f_code.co_filename if frame.f_back else ""
+            # If not called from within LangSwarm core, issue warning
+            if caller_file and "langswarm/core/" not in caller_file:
+                import warnings
+                warnings.warn(
+                    "⚠️  Direct .chat() calls bypass LangSwarm's workflow orchestration.\n"
+                    "   For full functionality (tools, middleware, proper routing), consider using:\n"
+                    "   \n"
+                    "   from langswarm.core.config import LangSwarmConfigLoader, WorkflowExecutor\n"
+                    "   loader = LangSwarmConfigLoader('your_config.yaml')\n"
+                    "   workflows, agents, brokers, tools, metadata = loader.load()\n"
+                    "   executor = WorkflowExecutor(workflows, agents)\n"
+                    "   result = executor.run_workflow('your_workflow_id', your_input)\n",
+                    UserWarning,
+                    stacklevel=2
+                )
+        finally:
+            del frame
         # PRIORITY 5: Session management integration
         if start_new_session:
             session_id = self.start_session(session_id)
@@ -907,10 +1182,17 @@ Do not include any text outside the JSON structure."""
             # PRIORITY 2: Universal Tool Calling - Translate native tool calls to MCP format
             if self.supports_native_tool_calling() and hasattr(self, '_last_completion'):
                 try:
+                    # Store tool call metadata for debug tracing BEFORE cleanup
+                    tool_call_metadata = self._extract_tool_call_metadata(self._last_completion)
+                    
                     translated_response = self.translate_native_tool_call_to_mcp(self._last_completion)
                     if translated_response != self._last_completion:
                         # Native tool call was detected and translated to MCP format
                         self.log_event(f"Translated native tool call to MCP format for model {self.model}", "info")
+                        
+                        # Store tool call information for debug access
+                        if tool_call_metadata:
+                            self._tool_call_debug_info = tool_call_metadata
                         
                         # Override the response with the translated MCP format
                         # Convert the translated response to JSON string for consistent processing

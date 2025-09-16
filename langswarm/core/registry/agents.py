@@ -122,39 +122,57 @@ class AgentRegistry:
                     print(f"Warning: OPENAI_API_KEY not set - cannot create ls_json_parser agent")
                     return None
                 
+                # Define the system prompt
+                ls_json_parser_prompt = """You are a specialized JSON parser and validator assistant.
+
+CRITICAL TASK:
+Extract and return ONLY valid JSON from any text input you receive.
+
+PROCESSING GUIDELINES:
+- If input is already valid JSON → return it exactly as-is
+- If input contains JSON within text/markdown → extract just the JSON part
+- Remove markdown code fences, explanations, or surrounding text
+- Fix minor JSON formatting issues when possible
+- If no valid JSON found → return empty object: {}
+
+RESPONSE FORMAT:
+- Return ONLY the JSON object/array
+- NO explanations, markdown, or additional text
+- NO code fences or formatting
+- NO wrapper structures
+
+**Examples:**
+
+Input: {"query": "test", "limit": 10}
+Output: {"query": "test", "limit": 10}
+
+Input: Here are the search parameters: {"query": "company policies", "limit": 5}
+Output: {"query": "company policies", "limit": 5}
+
+Input: ```json\n{"method": "search", "params": {"q": "example"}}\n```
+Output: {"method": "search", "params": {"q": "example"}}
+
+Input: I want to search for information about "Pingday stadsnät" with a limit of 10 results
+Output: {"query": "Pingday stadsnät", "limit": 10}
+
+Be precise, efficient, and always return valid JSON without any wrapper or explanation."""
+
                 # Create the agent using AgentFactory (without auto-registration)
                 agent = AgentFactory._create_base_agent(
                     agent_type="langchain-openai",
                     documents=None,
                     model="gpt-4o",
-                    system_prompt="""You are a JSON parser and validator. Your job is to extract and return only valid JSON from any text input.
-
-Rules:
-- If the input is already valid JSON, return it exactly as-is
-- If the input contains JSON within text or markdown, extract just the JSON part
-- Remove any markdown code fences, explanations, or surrounding text
-- Fix minor JSON formatting issues if possible
-- If no valid JSON is found, return an empty object: {}
-- Never add explanations or additional text - only return the JSON
-
-Examples:
-Input: {"query": "test", "limit": 10}
-Output: {"query": "test", "limit": 10}
-
-Input: Here are the parameters: {"query": "search term"}
-Output: {"query": "search term"}
-
-Input: ```json\n{"query": "example"}\n```
-Output: {"query": "example"}"""
+                    system_prompt=ls_json_parser_prompt
                 )
                 
-                # Wrap with AgentWrapper
+                # Wrap with AgentWrapper - pass system_prompt explicitly
                 from langswarm.core.wrappers.generic import AgentWrapper
                 wrapped_agent = AgentWrapper(
                     name="ls_json_parser",
                     agent=agent,
                     model="gpt-4o",
-                    agent_type="langchain-openai"
+                    agent_type="langchain-openai",
+                    system_prompt=ls_json_parser_prompt
                 )
                 
                 return wrapped_agent

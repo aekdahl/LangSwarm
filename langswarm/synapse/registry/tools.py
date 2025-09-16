@@ -52,6 +52,45 @@ class ToolRegistry:
         """
         return [f"{k} - {v.brief}" for k, v in self.tools.items()]
 
+    def get_tools(self):
+        """
+        Get all registered tools in a format suitable for function calling.
+        
+        :return: A list of tool schemas for function calling.
+        """
+        tools_list = []
+        for tool_name, tool in self.tools.items():
+            # Try to get the tool schema for function calling
+            if hasattr(tool, 'get_schema'):
+                try:
+                    schema = tool.get_schema()
+                    tools_list.append(schema)
+                except Exception:
+                    # Fallback to basic schema
+                    tools_list.append(self._create_basic_tool_schema(tool_name, tool))
+            elif hasattr(tool, 'description'):
+                # Create schema from tool attributes
+                tools_list.append(self._create_basic_tool_schema(tool_name, tool))
+        
+        return tools_list
+    
+    def _create_basic_tool_schema(self, tool_name, tool):
+        """Create a basic tool schema for function calling"""
+        return {
+            "tool": tool_name,
+            "description": getattr(tool, 'description', f"Tool: {tool_name}"),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "input": {
+                        "type": "string", 
+                        "description": "Input for the tool"
+                    }
+                },
+                "required": ["input"]
+            }
+        }
+
     def remove_tool(self, tool_name: str):
         """
         Remove a tool by its name.
