@@ -115,6 +115,7 @@ class AgentConfig:
     frequency_penalty: Optional[float] = None
     top_p: Optional[float] = None
     response_format: Optional[str] = None
+    use_native_tool_calling: bool = False  # Control whether to use native vs custom tool calling - defaults to LangSwarm custom
     
 @dataclass
 class ToolConfig:
@@ -765,6 +766,7 @@ class LangSwarmConfig:
                     "max_tokens": agent.max_tokens,
                     "temperature": agent.temperature,
                     "response_format": agent.response_format,
+                    "use_native_tool_calling": agent.use_native_tool_calling,
                 } for agent in self.agents
             ],
             "tools": [
@@ -809,6 +811,7 @@ LS_SCHEMAS = {
         "agent_type": {"type": "string", "required": True},
         "model": {"type": "string", "required": True},
         "system_prompt": {"type": "string"},
+        "use_native_tool_calling": {"type": "boolean"},
     },
     "tools": {
         "id": {"type": "string", "required": True},
@@ -1315,7 +1318,8 @@ class LangSwarmConfigLoader:
                     presence_penalty=agent_data.get("presence_penalty"),
                     frequency_penalty=agent_data.get("frequency_penalty"),
                     top_p=agent_data.get("top_p"),
-                    response_format=agent_data.get("response_format")
+                    response_format=agent_data.get("response_format"),
+                    use_native_tool_calling=agent_data.get("use_native_tool_calling")
                 )
                 agents.append(agent_config)
         
@@ -2379,6 +2383,14 @@ Adapt your approach based on the user's needs, drawing from your combined expert
         accepts_kwargs = any(p.kind == Parameter.VAR_KEYWORD for p in valid_params.values())
         filtered_args = {k: v for k, v in config.items() if k in valid_params}
         extra_kwargs = {k: v for k, v in config.items() if k not in valid_params}
+        
+        # Debug: Log what's happening with use_native_tool_calling
+        if "use_native_tool_calling" in config:
+            print(f"🔧 _call_with_valid_args: use_native_tool_calling = {config['use_native_tool_calling']}")
+            print(f"🔧 _call_with_valid_args: accepts_kwargs = {accepts_kwargs}")
+            print(f"🔧 _call_with_valid_args: in filtered_args = {'use_native_tool_calling' in filtered_args}")
+            print(f"🔧 _call_with_valid_args: in extra_kwargs = {'use_native_tool_calling' in extra_kwargs}")
+        
         return func(**filtered_args, **extra_kwargs) if accepts_kwargs else func(**filtered_args)
 
     def _initialize_agents(self):

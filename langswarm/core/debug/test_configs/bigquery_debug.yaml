@@ -9,6 +9,7 @@ agents:
     agent_type: openai
     model: gpt-4o
     behavior: helpful
+    # use_native_tool_calling defaults to false (LangSwarm custom tool calling)
     system_prompt: |
       You are a BigQuery vector search agent. You must call the bigquery_search tool with the EXACT method requested.
       

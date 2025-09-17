@@ -1,0 +1,124 @@
+# Production Readiness Test Workflow
+# Tests all major LangSwarm components before deployment
+
+version: "1.0"
+project_name: "LangSwarm Production Test"
+
+agents:
+  # Test agent with custom tool calling (default)
+  - id: test_agent_custom
+    agent_type: openai
+    model: gpt-4o
+    behavior: helpful
+    max_tokens: 1000  # CRITICAL: Prevent infinite responses
+    system_prompt: |
+      You are a production test agent using LangSwarm's custom tool calling.
+      When asked to search, use the bigquery_search tool with similarity_search method.
+      When asked to list, use the bigquery_search tool with list_datasets method.
+      
+      Always return responses in this format:
+      {"response": "Your helpful message", "mcp": {"tool": "bigquery_search", "method": "...", "params": {...}}}
+      
+      Keep responses concise and professional.
+    tools:
+      - bigquery_search
+
+  # Test agent with native tool calling  
+  - id: test_agent_native
+    agent_type: openai
+    model: gpt-4o
+    behavior: helpful
+    max_tokens: 1000  # CRITICAL: Prevent infinite responses
+    use_native_tool_calling: true
+    system_prompt: |
+      You are a production test agent using OpenAI's native tool calling.
+      Test native function calling capabilities. Keep responses concise.
+    tools:
+      - bigquery_search
+
+  # Test agent with no tools
+  - id: test_agent_plain
+    agent_type: openai
+    model: gpt-4o
+    behavior: helpful
+    max_tokens: 500  # CRITICAL: Prevent infinite responses
+    system_prompt: |
+      You are a plain agent with no tools. Respond helpfully in natural language.
+      
+      IMPORTANT: Keep responses concise and under 200 words. Do not repeat input text.
+      If given long input, summarize it briefly rather than copying it.
+
+tools:
+  - id: bigquery_search
+    type: mcpbigquery_vector_search
+    description: "BigQuery vector search for production testing"
+    settings:
+      project_id: production-pingday
+      dataset_id: vector_search
+      table_name: embeddings
+      embedding_model: text-embedding-3-small
+      max_results: 3
+      similarity_threshold: 0.01
+
+workflows:
+  # Test 1: Custom Tool Calling Workflow
+  - id: test_custom_tool_calling
+    name: "Test Custom Tool Calling"
+    steps:
+      - id: test_list_datasets
+        agent: test_agent_custom
+        input: "List the available datasets"
+        output:
+          to: test_similarity_search
+      
+      - id: test_similarity_search
+        agent: test_agent_custom
+        input: "Search for information about fiber networks"
+        output:
+          to: user
+
+  # Test 2: Native Tool Calling Workflow
+  - id: test_native_tool_calling
+    name: "Test Native Tool Calling" 
+    steps:
+      - id: test_native_call
+        agent: test_agent_native
+        input: "List datasets using native tool calling"
+        output:
+          to: user
+
+  # Test 3: Plain Agent Workflow (no tools)
+  - id: test_plain_agent
+    name: "Test Plain Agent"
+    steps:
+      - id: test_plain_response
+        agent: test_agent_plain
+        input: "Explain what LangSwarm is"
+        output:
+          to: user
+
+  # Test 4: Multi-step workflow with different agents
+  - id: test_multi_agent_workflow
+    name: "Test Multi-Agent Coordination"
+    steps:
+      - id: gather_data
+        agent: test_agent_custom
+        input: "Search for information about Pingday"
+        output:
+          to: process_data
+      
+      - id: process_data
+        agent: test_agent_plain
+        input: "Summarize this information: ${context.step_outputs.gather_data}"
+        output:
+          to: user
+
+  # Test 5: Configuration validation workflow
+  - id: test_config_validation
+    name: "Test Configuration Handling"
+    steps:
+      - id: validate_config
+        agent: test_agent_custom
+        input: "List datasets to validate configuration"
+        output:
+          to: user

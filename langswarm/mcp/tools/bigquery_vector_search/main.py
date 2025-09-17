@@ -288,11 +288,23 @@ server = BaseMCPToolServer(
 # Add operations
 async def _similarity_search_handler(**kwargs):
     """Wrapper for similarity_search that handles keyword arguments from call_task"""
+    print(f"🔍 BigQuery similarity_search_handler called with kwargs: {list(kwargs.keys())}")
+    
     # Convert keyword arguments to SimilaritySearchInput object
-    input_data = SimilaritySearchInput(**kwargs)
+    try:
+        input_data = SimilaritySearchInput(**kwargs)
+        print(f"🔍 BigQuery input validation passed: query='{input_data.query[:50]}...', limit={input_data.limit}")
+    except Exception as e:
+        print(f"❌ BigQuery input validation failed: {e}")
+        raise
+    
     # CRITICAL FIX: Use server's tool_config if available
     config_to_use = getattr(server, 'tool_config', None)
-    return await similarity_search(input_data, config=config_to_use)
+    print(f"🔍 BigQuery config_to_use: {config_to_use is not None}")
+    
+    result = await similarity_search(input_data, config=config_to_use)
+    print(f"🔍 BigQuery similarity_search completed: {len(result.results) if hasattr(result, 'results') else 'no results'} items")
+    return result
 
 server.add_task(
     name="similarity_search",

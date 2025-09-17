@@ -211,6 +211,10 @@ class UtilMixin:
     
     def supports_native_tool_calling(self):
         """Check if the current model supports native tool/function calling"""
+        # Check if user has explicitly disabled native tool calling
+        if hasattr(self, 'use_native_tool_calling') and not self.use_native_tool_calling:
+            return False
+            
         model_info = self.model_details or {}
         return model_info.get("supports_function_calling", False)
     

@@ -96,6 +96,10 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
     ):
         kwargs.pop("provider", None)  # Remove `provider` if it exists
         
+        # CRITICAL: Add response length safeguards to prevent infinite loops
+        self.max_response_length = kwargs.get('max_response_length', 50000)  # 50k character limit
+        self.max_tokens = kwargs.get('max_tokens', 16000)  # Token limit for LLM
+        
         # Debug tracing for agent initialization (if enabled)
         try:
             from .debug.tracer import get_debug_tracer
@@ -179,6 +183,14 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
             self.broker.subscribe(f"{self.agent.identifier}_incoming", self.handle_push_message)
 
         self.response_mode = response_mode
+        
+        # Store custom configuration options
+        self.use_native_tool_calling = kwargs.get('use_native_tool_calling', False)  # Default to False - prefer LangSwarm custom tool calling
+        
+        # Debug: Log what we received for bigquery_test_agent
+        if name == "bigquery_test_agent":
+            print(f"🔧 AgentWrapper.__init__ for {name}: use_native_tool_calling in kwargs = {kwargs.get('use_native_tool_calling', 'NOT IN KWARGS')}")
+            print(f"🔧 AgentWrapper.__init__ for {name}: self.use_native_tool_calling = {self.use_native_tool_calling}")
         
         # PRIORITY 3: Initialize streaming configuration  
         self.streaming_config = self.get_streaming_config(streaming_config)
@@ -776,7 +788,8 @@ Do not include any text outside the JSON structure."""
             api_params = {
                 "model": self.model,
                 "messages": messages,
-                "temperature": 0.0
+                "temperature": 0.0,
+                "max_tokens": self.max_tokens  # CRITICAL: Prevent infinite generation
             }
             
             # PRIORITY 3: Add streaming parameters if enabled
@@ -824,7 +837,22 @@ Do not include any text outside the JSON structure."""
             self._current_completion = completion
             
             # DEBUG: Log raw LLM response before any processing
-            print(f"🔍 Raw LLM Response for {self.name}: {type(completion)}")
+            # Log useful LLM response info instead of just class type
+            if hasattr(completion, 'choices') and completion.choices:
+                choice = completion.choices[0]
+                if hasattr(choice, 'message') and hasattr(choice.message, 'content'):
+                    content_preview = choice.message.content[:100] if choice.message.content else "No content"
+                    print(f"🔍 Raw LLM Response for {self.name}: {content_preview}..." + (f" (with {len(choice.message.tool_calls)} tool calls)" if hasattr(choice.message, 'tool_calls') and choice.message.tool_calls else ""))
+                    
+                    # CRITICAL: Check if response was truncated due to token limit
+                    if hasattr(choice, 'finish_reason') and choice.finish_reason == 'length':
+                        warning_msg = f"TOKEN LIMIT REACHED: Agent '{self.name}' hit max_tokens limit ({self.max_tokens}), response may be incomplete"
+                        print(f"⚠️ {warning_msg}")
+                        self.log_event(warning_msg, "warning")
+                else:
+                    print(f"🔍 Raw LLM Response for {self.name}: {type(completion)} - {len(completion.choices)} choices")
+            else:
+                print(f"🔍 Raw LLM Response for {self.name}: {type(completion)} - No choices")
             try:
                 from langswarm.core.debug.tracer import get_debug_tracer
                 tracer = get_debug_tracer()
@@ -1368,7 +1396,8 @@ Do not include any text outside the JSON structure."""
                     "model": self.model,
                     "messages": self.in_memory,
                     "temperature": 0.0,
-                    "stream": True  # Force streaming for this method
+                    "stream": True,  # Force streaming for this method
+                    "max_tokens": self.max_tokens  # CRITICAL: Prevent infinite generation
                 }
                 
                 # Add native tool calling if supported
@@ -1394,8 +1423,15 @@ Do not include any text outside the JSON structure."""
 
                 # Stream chunks in real-time
                 full_response = ""
+                finish_reason = None
                 for chunk in completion:
                     parsed_chunk = self.parse_stream_chunk(chunk)
+                    
+                    # Check for finish_reason in streaming chunks
+                    if hasattr(chunk, 'choices') and chunk.choices:
+                        choice = chunk.choices[0]
+                        if hasattr(choice, 'finish_reason') and choice.finish_reason:
+                            finish_reason = choice.finish_reason
                     
                     # Accumulate content for final processing
                     if parsed_chunk.get("content"):
@@ -1406,6 +1442,12 @@ Do not include any text outside the JSON structure."""
                     
                     if parsed_chunk.get("is_complete"):
                         break
+                
+                # CRITICAL: Check if streaming response hit token limit
+                if finish_reason == 'length':
+                    warning_msg = f"TOKEN LIMIT REACHED (STREAMING): Agent '{self.name}' hit max_tokens limit ({self.max_tokens}), response may be incomplete"
+                    print(f"⚠️ {warning_msg}")
+                    self.log_event(warning_msg, "warning")
                 
                 # Post-processing: add to memory, handle tools, etc.
                 if full_response:
@@ -1513,7 +1555,7 @@ Do not include any text outside the JSON structure."""
 
     def _parse_response(self, response: Any) -> str:
         """
-        Parse the response from the wrapped agent.
+        Parse the response from the wrapped agent with safety limits.
 
         Parameters:
         - response: The agent's raw response.
@@ -1522,10 +1564,20 @@ Do not include any text outside the JSON structure."""
         - str: The parsed response.
         """
         if hasattr(response, "content"):
-            return response.content
+            result = response.content
         elif isinstance(response, dict):
-            return response.get("generated_text", "")
-        return str(response)
+            result = response.get("generated_text", "")
+        else:
+            result = str(response)
+        
+        # CRITICAL FIX: Prevent infinite loops from enormous responses
+        if len(result) > self.max_response_length:
+            warning_msg = f"RESPONSE TRUNCATED: Agent '{self.name}' generated {len(result)} characters, truncating to {self.max_response_length}"
+            print(f"⚠️ {warning_msg}")
+            self.log_event(warning_msg, "warning")
+            result = result[:self.max_response_length] + "\n\n[RESPONSE TRUNCATED - EXCEEDED MAXIMUM LENGTH]"
+        
+        return result
 
     def has_tools(self) -> bool:
         """

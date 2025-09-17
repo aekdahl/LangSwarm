@@ -226,6 +226,7 @@ class MiddlewareMixin:
         Direct MCP tool invocation.
         Bypasses orchestration workflow for simple method calls.
         """
+        print(f"🔍 Middleware Direct MCP call: {tool_id}.{method} with params: {list(params.keys()) if params else 'None'}")
         from langswarm.core.utils.workflows.functions import mcp_call
         
         # Get tool handler to determine MCP URL/mode

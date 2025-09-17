@@ -61,7 +61,10 @@ class BaseMCPToolServer:
 
     def call_task(self, task_name: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """Call a task directly (local mode)."""
+        print(f"🔍 MCP Server '{self.name}' call_task: {task_name} with params: {list(params.keys()) if params else 'None'}")
+        
         if task_name not in self._tasks:
+            print(f"❌ Task '{task_name}' not found in {self.name}. Available: {list(self._tasks.keys())}")
             # Return a simple error that agents can handle
             return {
                 "success": False,
