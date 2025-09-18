@@ -867,7 +867,20 @@ class LangSwarmConfigLoader:
         from langswarm.mcp.tools.tasklist.main import TasklistMCPTool
         from langswarm.mcp.tools.message_queue_publisher.main import MessageQueuePublisherMCPTool
         from langswarm.mcp.tools.message_queue_consumer.main import MessageQueueConsumerMCPTool
-        from langswarm.mcp.tools.gcp_environment.main import GCPEnvironmentMCPTool
+        # Import GCP Environment tool (with error handling for SDK conflicts)
+        try:
+            from langswarm.mcp.tools.gcp_environment.main import GCPEnvironmentMCPTool
+            GCP_ENVIRONMENT_TOOL_AVAILABLE = True
+        except ImportError as e:
+            GCPEnvironmentMCPTool = None
+            GCP_ENVIRONMENT_TOOL_AVAILABLE = False
+            import logging
+            logging.warning(f"GCP Environment tool not available: {e}. This may be due to Google Cloud SDK import conflicts.")
+        except RecursionError as e:
+            GCPEnvironmentMCPTool = None
+            GCP_ENVIRONMENT_TOOL_AVAILABLE = False
+            import logging
+            logging.warning(f"GCP Environment tool import caused recursion error: {e}. This indicates a Google Cloud SDK import conflict.")
         from langswarm.mcp.tools.codebase_indexer.main import CodebaseIndexerMCPTool
         from langswarm.mcp.tools.workflow_executor.main import WorkflowExecutorMCPTool
         
@@ -926,13 +939,16 @@ class LangSwarmConfigLoader:
             "mcpmessage_queue_consumer": MessageQueueConsumerMCPTool,
             "mcpcodebase_indexer": CodebaseIndexerMCPTool,
             "mcpworkflow_executor": WorkflowExecutorMCPTool,
-            "mcpgcp_environment": GCPEnvironmentMCPTool,
             # add more here (or via register_tool_class below)
         }
         
         # Add SQL Database tool if available
         if SQL_DATABASE_TOOL_AVAILABLE:
             self.tool_classes["mcpsql_database"] = SQLDatabaseMCPTool
+            
+        # Add GCP Environment tool if available (avoid import conflicts)
+        if GCP_ENVIRONMENT_TOOL_AVAILABLE and GCPEnvironmentMCPTool is not None:
+            self.tool_classes["mcpgcp_environment"] = GCPEnvironmentMCPTool
         
         # Add BigQuery tool if available
         if BIGQUERY_TOOL_AVAILABLE:

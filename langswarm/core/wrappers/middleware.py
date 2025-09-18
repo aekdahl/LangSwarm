@@ -231,13 +231,42 @@ class MiddlewareMixin:
         
         # Get tool handler to determine MCP URL/mode
         handler = None
-        if isinstance(self.tool_registry, dict):
-            handler = self.tool_registry.get(tool_id)
-        else:
-            handler = self.tool_registry.get_tool(tool_id)
+        
+        # First try workflow context if available (prioritizes workflow-loaded tools)
+        if self.workflow_context and 'config_loader' in self.workflow_context:
+            config_loader = self.workflow_context['config_loader']
+            if hasattr(config_loader, 'tools') and isinstance(config_loader.tools, dict):
+                handler = config_loader.tools.get(tool_id)
+                if handler:
+                    print(f"🔍 Found tool '{tool_id}' in workflow context")
+        
+        # Fallback to regular tool registry
+        if not handler:
+            if isinstance(self.tool_registry, dict):
+                handler = self.tool_registry.get(tool_id)
+            else:
+                handler = self.tool_registry.get_tool(tool_id)
+            
+            if handler:
+                print(f"🔍 Found tool '{tool_id}' in agent tool registry")
             
         if not handler:
-            raise ValueError(f"Tool '{tool_id}' not found in registry")
+            available_tools = []
+            # Try to get available tools from both sources for better error message
+            if self.workflow_context and 'config_loader' in self.workflow_context:
+                config_loader = self.workflow_context['config_loader']
+                if hasattr(config_loader, 'tools') and isinstance(config_loader.tools, dict):
+                    available_tools.extend(config_loader.tools.keys())
+            
+            if isinstance(self.tool_registry, dict):
+                available_tools.extend(self.tool_registry.keys())
+            elif hasattr(self.tool_registry, 'tools'):
+                available_tools.extend(getattr(self.tool_registry, 'tools', {}).keys())
+                
+            available_tools = list(set(available_tools))  # Remove duplicates
+            error_msg = f"Tool '{tool_id}' not found in registry. Available tools: {available_tools}"
+            print(f"❌ {error_msg}")
+            raise ValueError(error_msg)
         
         # Build MCP URL based on tool configuration
         # First check if it's a local mode MCP tool

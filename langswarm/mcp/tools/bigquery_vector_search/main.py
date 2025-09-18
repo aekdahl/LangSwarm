@@ -160,7 +160,9 @@ async def similarity_search(input_data: SimilaritySearchInput, config: dict = No
         print(f"🔧 Config source: {'tool_instance' if config else 'global_default'}")
         print(f"🔧 Config applied: limit={limit}, similarity_threshold={similarity_threshold}")
         if config:
-            print(f"🔧 Full tool config: {effective_config}")
+            # Safe config printing to avoid circular reference issues
+            config_keys = list(effective_config.keys()) if isinstance(effective_config, dict) else "non-dict"
+            print(f"🔧 Tool config keys: {config_keys}")
         
         # Generate embedding if not provided
         if input_data.query_embedding is None:
@@ -569,11 +571,15 @@ try:
             
             # CRITICAL FIX: Pass the tool's config to the server so it can use it
             # The server is what actually handles the MCP calls, so it needs the config
-            object.__setattr__(server, 'tool_config', config)
+            # Create a safe copy to avoid circular references
+            config_copy = config.copy() if isinstance(config, dict) else dict(config) if hasattr(config, 'items') else config
+            object.__setattr__(server, 'tool_config', config_copy)
             
-            # Debug: Log the final configuration
-            print(f"🔧 BigQuery Tool Constructor kwargs: {kwargs}")
-            print(f"🔧 BigQuery Tool Final Config: {config}")
+            # Debug: Log the final configuration (safe printing to avoid circular refs)
+            kwargs_keys = list(kwargs.keys()) if isinstance(kwargs, dict) else "non-dict"
+            config_keys = list(config.keys()) if isinstance(config, dict) else "non-dict"
+            print(f"🔧 BigQuery Tool Constructor kwargs keys: {kwargs_keys}")
+            print(f"🔧 BigQuery Tool Final Config keys: {config_keys}")
         
         async def run_async(self, input_data=None):
             """Unified async execution method"""

@@ -157,9 +157,11 @@ def mcp_fetch_schema(
     """
     Fetch the schema from a MCP tool.  Supports both HTTP and stdio modes.
     • HTTP:   GET {mcp_url.rstrip('/')}/schema
-    • stdio:  spin up container, run “<stdio_cmd> schema” over stdio, tear down.
+    • stdio:  spin up container, run "<stdio_cmd> schema" over stdio, tear down.
     """
-    print("kwargs", kwargs)
+    # Safe logging to avoid circular reference issues in Pydantic objects
+    kwargs_keys = list(kwargs.keys()) if isinstance(kwargs, dict) else "non-dict"
+    print("mcp_fetch_schema kwargs keys:", kwargs_keys)
     
     # 🔧 Check for local:// URLs first
     if mcp_url.startswith("local://"):
@@ -234,7 +236,9 @@ def mcp_call(
     • HTTP:   POST mcp_url  (json=payload)
     • stdio:  spin up container, send JSON-RPC over stdio, tear down.
     """
-    print("kwargs", kwargs)
+    # Safe logging to avoid circular reference issues in Pydantic objects
+    kwargs_keys = list(kwargs.keys()) if isinstance(kwargs, dict) else "non-dict"
+    print("mcp_call kwargs keys:", kwargs_keys)
     
     # 🔧 Check for local:// URLs first
     if mcp_url.startswith("local://"):
@@ -258,7 +262,16 @@ def mcp_call(
                 if hasattr(tool_instance, 'default_config'):
                     if not hasattr(local_server, 'tool_config') or local_server.tool_config is None:
                         print(f"🔧 Applying tool config to server for workflow call")
-                        object.__setattr__(local_server, 'tool_config', tool_instance.default_config)
+                        # Create a safe copy to avoid circular references
+                        if isinstance(tool_instance.default_config, dict):
+                            config_copy = tool_instance.default_config.copy()
+                        else:
+                            # For non-dict configs, convert to dict to break any circular refs
+                            try:
+                                config_copy = dict(tool_instance.default_config)
+                            except:
+                                config_copy = tool_instance.default_config
+                        object.__setattr__(local_server, 'tool_config', config_copy)
                     else:
                         print(f"🔧 Server already has tool_config")
                         
