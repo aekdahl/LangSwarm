@@ -288,8 +288,50 @@ server = BaseMCPToolServer(
     local_mode=True
 )
 
-# Note: Error handling and guidance is now provided through the template.md file
-# and handled by agents, not hardcoded in the tool itself
+# Add tool-specific guidance for parameter validation errors
+def _get_tool_specific_guidance(task_name, error_details):
+    """Provide BigQuery-specific guidance for parameter validation errors"""
+    field_name = error_details['field']
+    error_type = error_details['type']
+    
+    if task_name == 'similarity_search':
+        if field_name == 'query' and error_type == 'missing':
+            return "Required parameter 'query' is missing. Please provide the text you want to search for. Example: {\"query\": \"Pingday monitoring\", \"limit\": 5}"
+        elif field_name == 'query' and 'type_error' in error_type:
+            return "Parameter 'query' must be a string. Please provide your search text as a string. Example: {\"query\": \"your search text\"}"
+        elif field_name == 'limit' and ('type_error' in error_type or 'int_parsing' in error_type):
+            return "Parameter 'limit' must be an integer. Please specify how many results you want (e.g., 5, 10). Example: {\"query\": \"search text\", \"limit\": 5}"
+        elif field_name == 'similarity_threshold' and 'value_error' in error_type:
+            return "Parameter 'similarity_threshold' must be a number between 0 and 1. Example: {\"query\": \"search text\", \"similarity_threshold\": 0.7}"
+    
+    elif task_name == 'get_content':
+        if field_name == 'document_id' and error_type == 'missing':
+            return "Required parameter 'document_id' is missing. Please provide the ID of the document you want to retrieve. Example: {\"document_id\": \"abc123_0\"}"
+        elif field_name == 'document_id' and 'type_error' in error_type:
+            return "Parameter 'document_id' must be a string. Example: {\"document_id\": \"your_document_id\"}"
+    
+    elif task_name == 'get_embedding':
+        if field_name == 'text' and error_type == 'missing':
+            return "Required parameter 'text' is missing. Please provide the text you want to embed. Example: {\"text\": \"your text to embed\"}"
+        elif field_name == 'text' and 'type_error' in error_type:
+            return "Parameter 'text' must be a string. Example: {\"text\": \"your text here\"}"
+    
+    elif task_name == 'list_datasets':
+        # list_datasets has no required parameters, so provide general guidance
+        return "This method lists available datasets and doesn't require any parameters. You can call it with an empty parameters object: {}"
+    
+    elif task_name == 'dataset_info':
+        if field_name == 'dataset_id' and error_type == 'missing':
+            return "Parameter 'dataset_id' is recommended for getting specific dataset information. Example: {\"dataset_id\": \"vector_search\"}"
+    
+    # Fallback for unknown patterns
+    return f"Please check the parameter format for {task_name}. Refer to the tool documentation for correct parameter usage."
+
+# Attach the guidance method to the server
+server._get_tool_specific_guidance = _get_tool_specific_guidance
+
+# Note: Enhanced error handling and guidance now provides actionable feedback
+# that helps agents correct their parameter usage and retry successfully
 
 # Add operations
 async def _similarity_search_handler(**kwargs):

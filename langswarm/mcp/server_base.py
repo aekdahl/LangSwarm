@@ -98,14 +98,11 @@ class BaseMCPToolServer:
                     except ImportError:
                         pass  # Error monitor not available
                     
-                    # Return simple parameter error that agents can handle
-                    return {
-                        "success": False,
-                        "error": f"Parameter validation failed for {task_name}",
-                        "validation_error": str(validation_error),
-                        "tool_name": self.name,
-                        "method": task_name
-                    }
+                    # Enhanced parameter error response with actionable feedback
+                    error_response = self._generate_parameter_error_response(
+                        task_name, validation_error, params, input_model
+                    )
+                    return error_response
                 
                 # Call handler (handle both sync and async)
                 import asyncio
@@ -238,3 +235,109 @@ class BaseMCPToolServer:
             app.post(f"/{task_name}", response_model=output_model)(make_handler())
 
         return app
+    
+    def _generate_parameter_error_response(self, task_name, validation_error, params, input_model):
+        """
+        Generate an enhanced error response with actionable feedback for parameter validation failures.
+        This helps agents understand what went wrong and how to fix it.
+        """
+        import logging
+        logger = getattr(self, 'logger', logging.getLogger(__name__))
+        
+        # Extract field information from the validation error
+        error_details = self._parse_validation_error(validation_error)
+        
+        # Generate helpful suggestions based on the tool's template
+        suggestions = self._generate_parameter_suggestions(task_name, error_details, input_model)
+        
+        # Log the validation error with actionable information
+        logger.warning(f"Parameter validation failed for {self.name}.{task_name}: {error_details['summary']}")
+        logger.info(f"Providing actionable feedback to agent: {suggestions['guidance']}")
+        
+        # Return comprehensive error response that agents can act upon
+        return {
+            "success": False,
+            "error": error_details['summary'],
+            "error_type": "parameter_validation_error",
+            "tool_name": self.name,
+            "method": task_name,
+            "validation_details": error_details,
+            "actionable_feedback": suggestions,
+            "retry_enabled": True,  # Indicate that the agent should retry with corrections
+            "guidance": suggestions['guidance']
+        }
+    
+    def _parse_validation_error(self, validation_error):
+        """Parse Pydantic validation error into structured information"""
+        try:
+            if hasattr(validation_error, 'errors'):
+                # Pydantic v2 style
+                errors = validation_error.errors()
+            else:
+                # Pydantic v1 or other validation errors
+                errors = [{"loc": ["unknown"], "msg": str(validation_error), "type": "validation_error"}]
+            
+            # Extract the most relevant error information
+            primary_error = errors[0] if errors else {}
+            field_name = primary_error.get('loc', ['unknown'])[0] if primary_error.get('loc') else 'unknown'
+            error_message = primary_error.get('msg', str(validation_error))
+            error_type = primary_error.get('type', 'validation_error')
+            
+            return {
+                "summary": f"Invalid parameter '{field_name}': {error_message}",
+                "field": field_name,
+                "message": error_message,
+                "type": error_type,
+                "all_errors": errors
+            }
+        except Exception:
+            # Fallback for unexpected error formats
+            return {
+                "summary": f"Parameter validation failed: {str(validation_error)}",
+                "field": "unknown",
+                "message": str(validation_error),
+                "type": "validation_error",
+                "all_errors": []
+            }
+    
+    def _generate_parameter_suggestions(self, task_name, error_details, input_model):
+        """Generate helpful suggestions for fixing parameter errors"""
+        field_name = error_details['field']
+        error_type = error_details['type']
+        
+        # Get field information from the Pydantic model
+        model_fields = getattr(input_model, 'model_fields', {}) or getattr(input_model, '__fields__', {})
+        
+        # Generate specific suggestions based on error type and field
+        suggestions = {
+            "guidance": f"Parameter validation failed for '{field_name}'. Please check the parameter format and try again.",
+            "example": {},
+            "required_fields": [],
+            "optional_fields": []
+        }
+        
+        # Extract field requirements from the model
+        for field, field_info in model_fields.items():
+            if hasattr(field_info, 'is_required') and field_info.is_required():
+                suggestions["required_fields"].append(field)
+            else:
+                suggestions["optional_fields"].append(field)
+        
+        # Provide specific guidance based on common error patterns
+        if error_type == 'missing':
+            suggestions["guidance"] = f"Required parameter '{field_name}' is missing. Please include this parameter in your request."
+            if task_name == 'similarity_search' and field_name == 'query':
+                suggestions["example"] = {"query": "your search text here", "limit": 5}
+                suggestions["guidance"] += f" Example: {suggestions['example']}"
+        elif error_type == 'type_error':
+            suggestions["guidance"] = f"Parameter '{field_name}' has the wrong type. {error_details['message']}"
+        elif 'value_error' in error_type:
+            suggestions["guidance"] = f"Parameter '{field_name}' has an invalid value. {error_details['message']}"
+        
+        # Add tool-specific guidance
+        if hasattr(self, '_get_tool_specific_guidance'):
+            tool_guidance = self._get_tool_specific_guidance(task_name, error_details)
+            if tool_guidance:
+                suggestions["guidance"] = tool_guidance
+        
+        return suggestions

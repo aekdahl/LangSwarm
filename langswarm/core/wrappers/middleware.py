@@ -398,11 +398,15 @@ class MiddlewareMixin:
                         params=mcp_data.get('params', {})
                     )
                     
-                    # Check for critical MCP tool failures and surface them immediately
-                    if isinstance(result, dict) and result.get('critical'):
-                        error_msg = f"🚨 CRITICAL MCP TOOL FAILURE: {tool_id}.{mcp_data['method']} - {result.get('error', 'Unknown error')}"
-                        print(error_msg)
-                        self._log_event(error_msg, "error")
+                    # Enhanced error handling for parameter validation and retry guidance
+                    if isinstance(result, dict):
+                        if result.get('critical'):
+                            error_msg = f"🚨 CRITICAL MCP TOOL FAILURE: {tool_id}.{mcp_data['method']} - {result.get('error', 'Unknown error')}"
+                            print(error_msg)
+                            self._log_event(error_msg, "error")
+                        elif result.get('error_type') == 'parameter_validation_error':
+                            # Handle parameter validation errors with actionable feedback
+                            self._handle_parameter_validation_error(tool_id, mcp_data['method'], result)
                     
                     return 201, json.dumps(result, indent=2)
                     
@@ -545,6 +549,38 @@ class MiddlewareMixin:
             elif self.timer and self.timer.is_alive():
                 self.timer.cancel()
 
+    def _handle_parameter_validation_error(self, tool_id, method, error_result):
+        """
+        Handle parameter validation errors with enhanced logging and retry guidance.
+        This provides actionable feedback to help agents correct their usage.
+        """
+        guidance = error_result.get('guidance', 'Parameter validation failed')
+        retry_enabled = error_result.get('retry_enabled', True)
+        
+        # Log the validation error with actionable information
+        self._log_event(
+            f"Parameter validation failed for {tool_id}.{method}: {guidance}", 
+            "warning"
+        )
+        
+        # Log retry information
+        if retry_enabled:
+            self._log_event(
+                f"Retry enabled for {tool_id}.{method} - agent should correct parameters and try again", 
+                "info"
+            )
+            print(f"🔄 RETRY GUIDANCE: {guidance}")
+        else:
+            self._log_event(
+                f"Retry disabled for {tool_id}.{method} - agent will receive error without retry suggestion", 
+                "warning"
+            )
+            print(f"❌ NO RETRY: {guidance}")
+        
+        # Optional: Add retry tracking (could be used for analytics)
+        if hasattr(self, '_retry_tracker'):
+            self._retry_tracker.record_validation_error(tool_id, method, guidance)
+    
     def _log_event(self, message, level, **metadata):
         """
         Log an event to GlobalLogger.
