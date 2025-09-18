@@ -1,1 +1,0 @@
-{"trace_id": "cc33fae7-767a-41c0-958e-de8de201a9b6", "span_id": "b6b5bf66-3b3b-4048-8c53-3b46db8c8e42", "parent_span_id": null, "timestamp": "2025-09-11T10:00:34.168955", "event_type": "INFO", "component": "debug", "operation": "initialization", "level": "INFO", "message": "Debug tracing system initialized", "data": {}, "duration_ms": null}

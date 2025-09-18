@@ -7,8 +7,142 @@ mixins to add tracing capabilities.
 """
 
 import functools
+import json
 from typing import Any, Dict, Optional
 from .tracer import get_debug_tracer, trace_event
+
+
+def serialize_agent_config(agent, max_depth=3, _current_depth=0):
+    """
+    Safely serialize an agent's configuration and settings for debug tracing.
+    
+    Args:
+        agent: The agent object to serialize
+        max_depth: Maximum recursion depth to prevent infinite loops
+        _current_depth: Current recursion depth (internal use)
+    
+    Returns:
+        Dict: Serialized agent configuration
+    """
+    if _current_depth >= max_depth:
+        return {"_serialization_limit_reached": True, "type": str(type(agent))}
+    
+    try:
+        config = {
+            "agent_name": getattr(agent, 'name', None),
+            "agent_type": type(agent).__name__,
+            "agent_class": f"{agent.__class__.__module__}.{agent.__class__.__name__}",
+            "model": getattr(agent, 'model', None),
+            "agent_repr": repr(agent)[:200],
+        }
+        
+        # Core configuration
+        if hasattr(agent, 'model_details'):
+            config["model_details"] = _safe_serialize(agent.model_details, max_depth, _current_depth + 1)
+        
+        # Memory configuration
+        config["memory_info"] = {
+            "has_memory": hasattr(agent, 'memory') and agent.memory is not None,
+            "is_conversational": getattr(agent, 'is_conversational', False),
+            "memory_adapter": str(type(getattr(agent, 'memory_adapter', None))),
+            "memory_size": len(getattr(agent, 'in_memory', [])) if hasattr(agent, 'in_memory') and agent.in_memory else 0
+        }
+        
+        # Tool configuration
+        tool_info = {
+            "has_tool_registry": hasattr(agent, 'tool_registry') and agent.tool_registry is not None,
+            "tools_count": 0,
+            "tool_names": []
+        }
+        
+        if hasattr(agent, 'tool_registry') and agent.tool_registry:
+            try:
+                # Try different ways to get tool information
+                if hasattr(agent.tool_registry, 'list_tools'):
+                    tools = agent.tool_registry.list_tools()
+                    tool_info["tools_count"] = len(tools)
+                    tool_info["tool_names"] = [str(tool) for tool in tools[:10]]  # Limit to first 10
+                elif hasattr(agent.tool_registry, 'tools'):
+                    tools_dict = getattr(agent.tool_registry, 'tools', {})
+                    tool_info["tools_count"] = len(tools_dict)
+                    tool_info["tool_names"] = list(tools_dict.keys())[:10]  # Limit to first 10
+                elif isinstance(agent.tool_registry, dict):
+                    tool_info["tools_count"] = len(agent.tool_registry)
+                    tool_info["tool_names"] = list(agent.tool_registry.keys())[:10]  # Limit to first 10
+            except Exception as e:
+                tool_info["tool_error"] = str(e)
+        
+        config["tool_info"] = tool_info
+        
+        # Session and streaming configuration
+        config["session_info"] = {
+            "session_manager": str(type(getattr(agent, 'session_manager', None))),
+            "current_session_id": getattr(agent, 'current_session_id', None),
+            "response_mode": getattr(agent, 'response_mode', None),
+            "streaming_enabled": getattr(agent, 'streaming_enabled', False)
+        }
+        
+        # Agent-specific settings
+        config["agent_settings"] = {
+            "timeout": getattr(agent, 'timeout', None),
+            "max_response_length": getattr(agent, 'max_response_length', None),
+            "max_tokens": getattr(agent, 'max_tokens', None),
+            "use_native_tool_calling": getattr(agent, 'use_native_tool_calling', None),
+            "context_limit": getattr(agent, 'model_details', {}).get('limit') if hasattr(agent, 'model_details') else None
+        }
+        
+        # Plugin and RAG configuration
+        config["extension_info"] = {
+            "has_plugin_registry": hasattr(agent, 'plugin_registry') and agent.plugin_registry is not None,
+            "has_rag_registry": hasattr(agent, 'rag_registry') and agent.rag_registry is not None,
+            "has_broker": hasattr(agent, 'broker') and agent.broker is not None
+        }
+        
+        # System prompt info (complete for debugging dynamic content)
+        if hasattr(agent, 'system_prompt') and agent.system_prompt:
+            system_prompt = str(agent.system_prompt)
+            config["system_prompt_info"] = {
+                "has_system_prompt": True,
+                "system_prompt_length": len(system_prompt),
+                "system_prompt_full": system_prompt  # Full prompt for debugging dynamic content
+            }
+        else:
+            config["system_prompt_info"] = {"has_system_prompt": False}
+        
+        return config
+        
+    except Exception as e:
+        return {
+            "serialization_error": str(e),
+            "agent_type": str(type(agent)),
+            "agent_repr": repr(agent)[:200]
+        }
+
+
+def _safe_serialize(obj, max_depth=3, _current_depth=0):
+    """
+    Safely serialize an object, handling circular references and complex types.
+    """
+    if _current_depth >= max_depth:
+        return {"_serialization_limit_reached": True, "type": str(type(obj))}
+    
+    try:
+        if obj is None:
+            return None
+        elif isinstance(obj, (str, int, float, bool)):
+            return obj
+        elif isinstance(obj, (list, tuple)):
+            return [_safe_serialize(item, max_depth, _current_depth + 1) for item in obj[:10]]  # Limit list length
+        elif isinstance(obj, dict):
+            return {k: _safe_serialize(v, max_depth, _current_depth + 1) for k, v in list(obj.items())[:10]}  # Limit dict size
+        else:
+            # For complex objects, just return type and string representation
+            return {
+                "type": str(type(obj)),
+                "value": str(obj)[:200]  # Truncate long strings
+            }
+    except Exception as e:
+        return {"serialization_error": str(e), "type": str(type(obj))}
 
 
 class TracingMixin:
@@ -361,17 +495,66 @@ def trace_langswarm_config_loader():
                     
                     # Log each initialized agent
                     for agent_id, agent in self.agents.items():
-                        tracer.log_event(
-                            "INFO", "config_loader", "agent_initialized",
-                            f"Agent '{agent_id}' initialized successfully",
-                            data={
-                                "agent_id": agent_id,
-                                "agent_type": type(agent).__name__,
-                                "model": getattr(agent, 'model', 'unknown'),
-                                "has_memory": hasattr(agent, 'memory') and agent.memory is not None,
-                                "tools_count": len(getattr(agent, 'tools', []))
-                            }
-                        )
+                        # Helper function to properly count tools
+                        def count_agent_tools(agent):
+                            # Handle case where agent initialization failed (stored as dict)
+                            if isinstance(agent, dict):
+                                if agent.get('status') == 'pending_api_key':
+                                    # Check the original config for tools
+                                    config = agent.get('config', {})
+                                    tools_config = config.get('tools', [])
+                                    return len(tools_config) if tools_config else 0
+                                return 0
+                            
+                            # Handle normal agent objects
+                            if not hasattr(agent, 'tool_registry') or not agent.tool_registry:
+                                return 0
+                                
+                            # Check different tool registry implementations
+                            if hasattr(agent.tool_registry, 'list_tools'):
+                                try:
+                                    tools = agent.tool_registry.list_tools()
+                                    return len(tools)
+                                except Exception:
+                                    pass
+                                    
+                            # Fallback: check if tool_registry has tools dict
+                            if hasattr(agent.tool_registry, 'tools'):
+                                tools_dict = getattr(agent.tool_registry, 'tools', {})
+                                return len(tools_dict)
+                                
+                            # Fallback: check if tool_registry is a dict itself
+                            if isinstance(agent.tool_registry, dict):
+                                return len(agent.tool_registry)
+                                
+                            return 0
+                        
+                        # Handle different agent states (actual agent vs pending config)
+                        if isinstance(agent, dict) and agent.get('status') == 'pending_api_key':
+                            tracer.log_event(
+                                "WARN", "config_loader", "agent_initialization_skipped",
+                                f"Agent '{agent_id}' initialization skipped due to missing API key",
+                                data={
+                                    "agent_id": agent_id,
+                                    "agent_type": "pending",
+                                    "model": agent.get('config', {}).get('model', 'unknown'),
+                                    "has_memory": False,
+                                    "tools_count": count_agent_tools(agent),
+                                    "error": agent.get('error', 'Unknown error')
+                                }
+                            )
+                        else:
+                            tracer.log_event(
+                                "INFO", "config_loader", "agent_initialized",
+                                f"Agent '{agent_id}' initialized successfully",
+                                data={
+                                    "agent_id": agent_id,
+                                    "agent_type": type(agent).__name__,
+                                    "model": getattr(agent, 'model', 'unknown'),
+                                    "has_memory": hasattr(agent, 'memory') and agent.memory is not None,
+                                    "tools_count": count_agent_tools(agent)
+                                }
+                            )
                     
                     tracer.log_event(
                         "INFO", "config_loader", "agents_init_complete",

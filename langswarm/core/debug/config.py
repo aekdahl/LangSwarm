@@ -274,11 +274,11 @@ class DebugConfigManager:
             },
             "": None,
             "bigquery": {
-                "dataset_id": "vector_search",
+                "dataset_id": "my_dataset",
                 "table_name": "embeddings", 
                 "embedding_model": "text-embedding-3-small",
                 "max_results": 10,
-                "similarity_threshold": 0.7
+                "similarity_threshold": 0.01
             },
             "": None,
             "database": {

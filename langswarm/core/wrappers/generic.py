@@ -187,11 +187,6 @@ class AgentWrapper(LLM, BaseWrapper, LoggingMixin, MemoryMixin, UtilMixin, Middl
         # Store custom configuration options
         self.use_native_tool_calling = kwargs.get('use_native_tool_calling', False)  # Default to False - prefer LangSwarm custom tool calling
         
-        # Debug: Log what we received for bigquery_test_agent
-        if name == "bigquery_test_agent":
-            print(f"🔧 AgentWrapper.__init__ for {name}: use_native_tool_calling in kwargs = {kwargs.get('use_native_tool_calling', 'NOT IN KWARGS')}")
-            print(f"🔧 AgentWrapper.__init__ for {name}: self.use_native_tool_calling = {self.use_native_tool_calling}")
-        
         # PRIORITY 3: Initialize streaming configuration  
         self.streaming_config = self.get_streaming_config(streaming_config)
         self.streaming_enabled = self.should_enable_streaming(streaming_config)
@@ -841,8 +836,8 @@ Do not include any text outside the JSON structure."""
             if hasattr(completion, 'choices') and completion.choices:
                 choice = completion.choices[0]
                 if hasattr(choice, 'message') and hasattr(choice.message, 'content'):
-                    content_preview = choice.message.content[:100] if choice.message.content else "No content"
-                    print(f"🔍 Raw LLM Response for {self.name}: {content_preview}..." + (f" (with {len(choice.message.tool_calls)} tool calls)" if hasattr(choice.message, 'tool_calls') and choice.message.tool_calls else ""))
+                    content_full = choice.message.content if choice.message.content else "No content"
+                    print(f"🔍 Raw LLM Response for {self.name}: {content_full}" + (f" (with {len(choice.message.tool_calls)} tool calls)" if hasattr(choice.message, 'tool_calls') and choice.message.tool_calls else ""))
                     
                     # CRITICAL: Check if response was truncated due to token limit
                     if hasattr(choice, 'finish_reason') and choice.finish_reason == 'length':
@@ -1409,10 +1404,11 @@ Do not include any text outside the JSON structure."""
                             api_params["tools"] = native_tools
                             api_params["tool_choice"] = "auto"
 
-                # Add structured output if supported
+                # Add structured output if supported (but not strict mode for MCP compatibility)
                 if self.supports_native_structured_output():
+                    # Use basic JSON object format for streaming (strict mode doesn't work well with streaming)
                     api_params["response_format"] = {"type": "json_object"}
-                    self._ensure_json_format_instructions(api_params["messages"])
+                    api_params["messages"] = self._ensure_json_format_instructions(api_params["messages"].copy())
 
                 try:
                     self._report_estimated_usage(self.in_memory)
@@ -1441,6 +1437,37 @@ Do not include any text outside the JSON structure."""
                     yield parsed_chunk
                     
                     if parsed_chunk.get("is_complete"):
+                        # Handle MCP tool calls immediately after streaming completes
+                        parsed_json = self.utils.safe_json_loads(full_response)
+                        
+                        if (parsed_json and isinstance(parsed_json, dict) and 
+                            self.__allow_middleware and parsed_json.get('mcp')):
+                            
+                            self.log_event(f"Executing MCP tool call from streamed response", "info")
+                            # Execute MCP tool call
+                            middleware_status, middleware_response = self.to_middleware(parsed_json)
+                            
+                            # Yield the tool execution result as a final chunk
+                            if middleware_status == 201:
+                                yield {
+                                    "content": f"\n\n[Tool executed successfully]\n{middleware_response}",
+                                    "is_complete": True,
+                                    "metadata": {
+                                        "provider": "mcp_tool",
+                                        "streaming_type": "tool_result",
+                                        "tool_status": "success"
+                                    }
+                                }
+                            else:
+                                yield {
+                                    "content": f"\n\n[Tool error]: {middleware_response}",
+                                    "is_complete": True,
+                                    "metadata": {
+                                        "provider": "mcp_tool", 
+                                        "streaming_type": "tool_result",
+                                        "tool_status": "error"
+                                    }
+                                }
                         break
                 
                 # CRITICAL: Check if streaming response hit token limit
@@ -1454,6 +1481,9 @@ Do not include any text outside the JSON structure."""
                     # Parse final response for tool calls
                     self.log_event(f"Agent {self.name} streaming response complete", "info")
                     self._report_estimated_usage(full_response, price_key="ppm_out")
+                    
+                    # Note: MCP tool execution already handled in stream completion above
+                    # This post-processing is kept for memory management and session storage
                     
                     session_id = "default_session"
                     self._store_conversation(f"{q}", full_response, session_id)

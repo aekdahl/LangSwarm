@@ -869,9 +869,30 @@ class UtilMixin:
         return False
     
     def supports_strict_mode(self):
-        """Check if the current model supports strict mode for structured outputs"""
+        """
+        Check if strict mode should be used for structured outputs.
+        Only enable strict mode when using native tool calling with OpenAI/LangChain agents,
+        as it's incompatible with LangSwarm's custom MCP tool calling format.
+        """
         model_info = self.model_details or {}
-        return model_info.get("supports_structured_output", False) and self.supports_response_api()
+        
+        # Only use strict mode if:
+        # 1. Model supports structured output
+        # 2. Agent supports response API 
+        # 3. We're using native tool calling (not LangSwarm custom)
+        # 4. Agent is OpenAI or LangChain-OpenAI based
+        supports_base = model_info.get("supports_structured_output", False) and self.supports_response_api()
+        
+        if not supports_base:
+            return False
+            
+        # Only enable strict mode for native tool calling
+        using_native_tools = self.supports_native_tool_calling()
+        is_openai_compatible = (hasattr(self, 'agent_type') and 
+                               ('openai' in str(self.agent_type).lower() or 'langchain-openai' in str(self.agent_type).lower()))
+        
+        # Strict mode only for native tool calls with compatible agents
+        return using_native_tools and is_openai_compatible
     
     def get_enhanced_structured_response_schema(self, schema_name="langswarm_response", strict=True):
         """Get enhanced JSON schema for structured outputs with strict mode support"""
@@ -902,17 +923,34 @@ class UtilMixin:
         }
         
         if strict and self.supports_strict_mode():
-            # For strict mode, OpenAI requires ALL properties to be in the required array
-            # So we'll create a simplified schema with only required fields
+            # For strict mode, include both response and optional mcp field
             strict_schema = {
                 "type": "object",
                 "properties": {
                     "response": {
                         "type": "string",
                         "description": "The main response text intended for the user"
+                    },
+                    "mcp": {
+                        "type": "object",
+                        "description": "Optional MCP tool call specification",
+                        "properties": {
+                            "tool": {"type": "string"},
+                            "method": {"type": "string"}, 
+                            "params": {
+                                "type": "object",
+                                "properties": {
+                                    "query": {"type": "string"}
+                                },
+                                "required": ["query"],
+                                "additionalProperties": False
+                            }
+                        },
+                        "required": ["tool", "method", "params"],
+                        "additionalProperties": False
                     }
                 },
-                "required": ["response"],
+                "required": ["response"],  # Only response is required, mcp is optional
                 "additionalProperties": False
             }
             return {

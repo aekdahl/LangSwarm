@@ -206,7 +206,9 @@ async def similarity_search(input_data: SimilaritySearchInput, config: dict = No
 async def list_datasets(input_data: ListDatasetsInput) -> ListDatasetsOutput:
     """List available vector search datasets using shared utilities"""
     try:
-        project_id = os.getenv('GOOGLE_CLOUD_PROJECT') or "production-pingday"
+        project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
+        if not project_id:
+            raise ValueError("GOOGLE_CLOUD_PROJECT environment variable is required for BigQuery operations")
         bq_manager = BigQueryManager(project_id)
         datasets = bq_manager.list_embedding_datasets(input_data.pattern)
         
@@ -231,7 +233,9 @@ async def get_content(input_data: GetContentInput) -> GetContentOutput:
         dataset_id = input_data.dataset_id or DEFAULT_CONFIG["dataset_id"]
         table_name = input_data.table_name or DEFAULT_CONFIG["table_name"]
         
-        project_id = os.getenv('GOOGLE_CLOUD_PROJECT') or "production-pingday"
+        project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
+        if not project_id:
+            raise ValueError("GOOGLE_CLOUD_PROJECT environment variable is required for BigQuery operations")
         bq_manager = BigQueryManager(project_id)
         result = bq_manager.get_document_by_id(dataset_id, table_name, input_data.document_id)
         

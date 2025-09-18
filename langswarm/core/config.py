@@ -2617,7 +2617,7 @@ Adapt your approach based on the user's needs, drawing from your combined expert
                 with open(cross_workflow_path, "r", encoding="utf-8") as f:
                     fragments.append(f.read())
         
-        return "\n\n".join(fragments)
+        return "" # "\n\n".join(fragments)
     
     def _agent_has_cross_workflow_tools(self, tool_ids):
         """Check if agent has tools that can invoke sub-workflows"""
@@ -3117,12 +3117,14 @@ If any required parameter is missing or ambiguous, instead return:
             
             agent = self.agents[step['agent']]
             
-            # Debug: Log retrieved agent details
+            # Debug: Log retrieved agent details with full configuration
             if tracer and tracer.enabled:
-                tracer.log_event(
-                    "INFO", "workflow", "agent_retrieved",
-                    f"Successfully retrieved agent {getattr(agent, 'name', 'NONE')}",
-                    data={
+                try:
+                    from langswarm.core.debug.integration import serialize_agent_config
+                    agent_config = serialize_agent_config(agent)
+                except ImportError:
+                    # Fallback to basic data if serialization function is not available
+                    agent_config = {
                         "agent_name": getattr(agent, 'name', None),
                         "agent_type": type(agent).__name__,
                         "agent_id_attr": getattr(agent, 'agent_id', None),
@@ -3131,6 +3133,11 @@ If any required parameter is missing or ambiguous, instead return:
                         "name_value": getattr(agent, 'name', 'MISSING'),
                         "agent_repr": repr(agent)[:200]
                     }
+                
+                tracer.log_event(
+                    "INFO", "workflow", "agent_retrieved",
+                    f"Successfully retrieved agent {getattr(agent, 'name', 'NONE')}",
+                    data=agent_config
                 )
             
             # Initialize navigation_choice for this agent step
@@ -3931,11 +3938,15 @@ If any required parameter is missing or ambiguous, instead return:
             if workflow_id in self.workflows:
                 workflow = self.workflows[workflow_id]
             else:
-                # Try legacy format fallback
-                workflow = next((wf for wf in self.workflows.get("main_workflow", []) if wf.get('id') == workflow_id), None)
+                # Try legacy format fallback - check if workflows contains legacy structure
+                legacy_workflows = self.workflows.get("main_workflow", [])
+                if isinstance(legacy_workflows, list):
+                    workflow = next((wf for wf in legacy_workflows if wf.get('id') == workflow_id), None)
+                else:
+                    workflow = None
         else:
-            # Legacy format fallback
-            workflow = next((wf for wf in self.workflows.get("main_workflow", []) if wf.get('id') == workflow_id), None)
+            # Legacy format fallback - workflows is a list
+            workflow = next((wf for wf in self.workflows if wf.get('id') == workflow_id), None)
 
         if not workflow:
             available_workflows = list(self.workflows.keys()) if isinstance(self.workflows, dict) else []
@@ -4556,11 +4567,22 @@ class WorkflowExecutor:
             List[str]: List of workflow IDs
         """
         if isinstance(self.workflows, dict):
-            # Handle main_workflow structure
-            main_workflows = self.workflows.get('main_workflow', [])
-            if isinstance(main_workflows, list):
-                return [wf.get('id', f'workflow_{i}') for i, wf in enumerate(main_workflows)]
-            return list(self.workflows.keys())
+            # Handle both new unified format and legacy main_workflow structure
+            workflow_ids = []
+            
+            # Check for direct workflow entries (new format)
+            for key, value in self.workflows.items():
+                if isinstance(value, dict) and 'steps' in value:
+                    # This is a workflow definition
+                    workflow_ids.append(key)
+                elif key == 'main_workflow' and isinstance(value, list):
+                    # Legacy main_workflow structure
+                    workflow_ids.extend([wf.get('id', f'workflow_{i}') for i, wf in enumerate(value)])
+            
+            return workflow_ids
+        elif isinstance(self.workflows, list):
+            # Legacy format - workflows is a list
+            return [wf.get('id', f'workflow_{i}') for i, wf in enumerate(self.workflows)]
         return []
     
     def get_workflow_info(self, workflow_id: str) -> Dict[str, Any]:

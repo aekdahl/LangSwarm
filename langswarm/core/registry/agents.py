@@ -152,8 +152,8 @@ Output: {"query": "company policies", "limit": 5}
 Input: ```json\n{"method": "search", "params": {"q": "example"}}\n```
 Output: {"method": "search", "params": {"q": "example"}}
 
-Input: I want to search for information about "Pingday stadsnät" with a limit of 10 results
-Output: {"query": "Pingday stadsnät", "limit": 10}
+Input: I want to search for information about "my company products" with a limit of 10 results
+Output: {"query": "my company products", "limit": 10}
 
 Be precise, efficient, and always return valid JSON without any wrapper or explanation."""
 
@@ -172,7 +172,8 @@ Be precise, efficient, and always return valid JSON without any wrapper or expla
                     agent=agent,
                     model="gpt-4o",
                     agent_type="langchain-openai",
-                    system_prompt=ls_json_parser_prompt
+                    system_prompt=ls_json_parser_prompt,
+                    allow_middleware=False  # CRITICAL: Disable tool calling for JSON parser
                 )
                 
                 return wrapped_agent

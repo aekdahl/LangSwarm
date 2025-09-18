@@ -3,7 +3,7 @@
 **You can use tools in two ways:**
 
 ### 1. Direct Tool Calls (when you know exact parameters):
-```json
+
 {
   "response": "I'll read that specific file for you.",
   "mcp": {
@@ -11,11 +11,11 @@
     "method": "read_file",
     "params": {"path": "/etc/config.json"}
   }
-}
-```
+} 
+
 
 ### 2. Intent-Based Calls (when expressing what you want to accomplish):
-```json
+
 {
   "response": "I need to find and read the configuration file to analyze the settings.",
   "mcp": {
@@ -24,7 +24,7 @@
     "context": "analyze configuration settings for troubleshooting"
   }
 }
-```
+
 
 **Intent-Based Benefits:**
 - The tool workflow can ask for clarification if needed

@@ -8,42 +8,25 @@ agents:
   - id: bigquery_test_agent
     agent_type: openai
     model: gpt-4o
-    behavior: helpful
     # use_native_tool_calling defaults to false (LangSwarm custom tool calling)
     system_prompt: |
-      You are a BigQuery vector search agent. You must call the bigquery_search tool with the EXACT method requested.
+      You are a BigQuery vector search agent that helps users find information by searching through stored document embeddings.
       
-      ⚠️⚠️⚠️ CRITICAL: NEVER USE "similarity_search" unless explicitly asked for similarity search!
+      When users ask about companies, people, events, or any searchable information, you should:
+      1. Use the bigquery_search tool to search for relevant information
+      2. Summarize and present the findings clearly
       
-      TOOL METHODS:
-      - similarity_search: ONLY for "Execute similarity search" or "search for information"
-      - list_datasets: ONLY for "Execute list_datasets" or "show datasets"  
-      - get_content: ONLY for "Execute get_content" or "get document"
+      For searches, use the similarity_search method with appropriate queries.
       
-      REQUEST MAPPING (FOLLOW EXACTLY):
-      
-      Input contains "Execute list_datasets" → Use method "list_datasets" with params {}
-      Input contains "Execute get_content" → Use method "get_content" with params {"document_id": "..."}
-      Input contains "Execute similarity search" → Use method "similarity_search" with params {"query": "..."}
-      Input contains "find information about" → Use method "similarity_search" with params {"query": "..."}
-      
-      ⚠️⚠️⚠️ NEVER put entire MCP structures inside params. NEVER use "similarity_search" as a wrapper.
-      
-      CORRECT EXAMPLES:
-      
-      Input: "Execute list_datasets using the bigquery_search tool"
-      Output: {"response": "I'll list datasets", "mcp": {"tool": "bigquery_search", "method": "list_datasets", "params": {}}}
-      
-      Input: "Execute get_content using bigquery_search tool. Document ID: doc_123"  
-      Output: {"response": "I'll get the document", "mcp": {"tool": "bigquery_search", "method": "get_content", "params": {"document_id": "doc_123"}}}
-      
-      Input: "Execute similarity search for pingday"
-      Output: {"response": "I'll search for pingday", "mcp": {"tool": "bigquery_search", "method": "similarity_search", "params": {"query": "pingday"}}}
-      
-      ❌❌❌ FORBIDDEN - NEVER DO THIS:
-      {"mcp": {"tool": "bigquery_search", "method": "similarity_search", "params": {"response": "...", "mcp": {...}}}}
-      
-      ✅✅✅ ALWAYS USE THE RIGHT METHOD DIRECTLY
+      Example: If user asks about "Pingday" or "ping-day", search for it using:
+      {
+        "response": "I'll search for information about Pingday in our database.",
+        "mcp": {
+          "tool": "bigquery_search",
+          "method": "similarity_search", 
+          "params": {"query": "Pingday ping-day"}
+        }
+      }
     tools:
       - bigquery_search
 
