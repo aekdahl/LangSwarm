@@ -138,6 +138,18 @@ workflow-bigquery:
 	@echo "$(CYAN)📊 Running BigQuery Workflow$(NC)"
 	@$(PYTHON) scripts/interactive_workflow_runner.py --preset bigquery
 
+# SQL Database debug workflow
+debug-sql:
+	@echo "$(CYAN)🗄️ Running SQL Database Debug Workflow$(NC)"
+	@echo "=========================================="
+	@$(PYTHON) langswarm/core/debug/test_sql_database_debug.py
+
+# Setup SQL test database
+setup-sql-db:
+	@echo "$(CYAN)🛠️ Setting up SQL Test Database$(NC)"
+	@echo "=================================="
+	@$(PYTHON) langswarm/core/debug/test_data/setup_test_database.py
+
 workflow-filesystem:
 	@echo "$(CYAN)📁 Running Filesystem Workflow$(NC)"
 	@$(PYTHON) scripts/interactive_workflow_runner.py --preset filesystem

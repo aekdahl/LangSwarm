@@ -78,11 +78,33 @@ SAFE_OPERATIONS = ["SELECT", "INSERT", "UPDATE", "EXPLAIN", "DESCRIBE", "SHOW"]
 # === Schemas ===
 class QueryInput(BaseModel):
     query: str = Field(..., description="SQL query to execute")
+    
+    class Config:
+        repr = False  # Disable automatic repr to prevent circular references
+    
+    def __repr__(self) -> str:
+        """Safe repr that never causes circular references"""
+        try:
+            return f"QueryInput(query='{self.query[:50]}...')"
+        except Exception:
+            return "QueryInput(repr_error)"
     parameters: Optional[Dict[str, Any]] = Field(None, description="Query parameters for prepared statements")
     limit: Optional[int] = Field(None, description="Maximum number of rows to return")
     explain_only: Optional[bool] = Field(False, description="Only explain the query, don't execute")
 
 class QueryOutput(BaseModel):
+    
+    class Config:
+        repr = False  # Disable automatic repr to prevent circular references
+    
+    def __repr__(self) -> str:
+        """Safe repr that never causes circular references"""
+        try:
+            success = getattr(self, 'success', 'unknown')
+            row_count = getattr(self, 'row_count', 'unknown')
+            return f"QueryOutput(success={success}, rows={row_count})"
+        except Exception:
+            return "QueryOutput(repr_error)"
     success: bool
     query: str
     results: Optional[List[Dict[str, Any]]] = None
@@ -95,6 +117,15 @@ class QueryOutput(BaseModel):
 
 class DatabaseInfoInput(BaseModel):
     include_schema: Optional[bool] = Field(True, description="Include table schema information")
+    
+    class Config:
+        repr = False
+    
+    def __repr__(self) -> str:
+        try:
+            return f"DatabaseInfoInput(include_schema={self.include_schema})"
+        except Exception:
+            return "DatabaseInfoInput(repr_error)"
     table_pattern: Optional[str] = Field(None, description="Pattern to filter table names")
 
 class DatabaseInfoOutput(BaseModel):
@@ -871,13 +902,35 @@ server = BaseMCPToolServer(
     local_mode=True
 )
 
-# Add operations
+# Add operations with proper keyword argument handlers
+async def _execute_query_handler(**kwargs):
+    """Handler for execute_query that accepts keyword arguments from call_task"""
+    # Convert keyword arguments to QueryInput object
+    input_data = QueryInput(**kwargs)
+    
+    # Use server's tool_config if available, fallback to DEFAULT_CONFIG
+    config_to_use = getattr(server, 'tool_config', None) or DEFAULT_CONFIG
+    
+    result = await execute_query(input_data, config_to_use)
+    return result.dict()
+
+async def _get_database_info_handler(**kwargs):
+    """Handler for get_database_info that accepts keyword arguments from call_task"""
+    # Convert keyword arguments to DatabaseInfoInput object
+    input_data = DatabaseInfoInput(**kwargs)
+    
+    # Use server's tool_config if available, fallback to DEFAULT_CONFIG
+    config_to_use = getattr(server, 'tool_config', None) or DEFAULT_CONFIG
+    
+    result = await get_database_info(input_data, config_to_use)
+    return result.dict()
+
 server.add_task(
     name="execute_query",
     description="Execute a SQL query with security validation and restrictions",
     input_model=QueryInput,
     output_model=QueryOutput,
-    handler=lambda input_data: execute_query(input_data, DEFAULT_CONFIG)
+    handler=_execute_query_handler
 )
 
 server.add_task(
@@ -885,7 +938,7 @@ server.add_task(
     description="Get information about database structure, tables, and schema",
     input_model=DatabaseInfoInput,
     output_model=DatabaseInfoOutput,
-    handler=lambda input_data: get_database_info(input_data, DEFAULT_CONFIG)
+    handler=_get_database_info_handler
 )
 
 # NOTE: intent_query task removed - intent handling now done in workflows
@@ -917,7 +970,11 @@ try:
         """
         _bypass_pydantic = True
         
-        def __init__(self, identifier: str):
+        def __init__(self, identifier: str, **kwargs):
+            # CRITICAL FIX: Dynamically set server name based on identifier 
+            # This ensures the tool can be found in local mode workflows
+            server.name = identifier
+            
             super().__init__(
                 name="SQL Database Query Tool",
                 description="Execute secure SQL queries with intent-based natural language support",
@@ -968,6 +1025,26 @@ SECURITY: Tool automatically blocks dangerous operations and validates all queri
             )
             object.__setattr__(self, 'server', server)
             object.__setattr__(self, 'config', DEFAULT_CONFIG.copy())
+            
+            # CRITICAL FIX: Apply configuration from kwargs (from YAML settings)
+            if kwargs:
+                # Get settings that should be applied to tool configuration
+                config_settings = {}
+                for key, value in kwargs.items():
+                    if key not in ['identifier', 'description', 'instruction', 'brief']:
+                        config_settings[key] = value
+                
+                if config_settings:
+                    print(f"🔧 SQL Database Tool applying config: {list(config_settings.keys())}")
+                    # Apply the configuration
+                    self.configure(config_settings)
+            
+            # CRITICAL FIX: Store the config on the server for workflow access
+            # This ensures config is available when accessed via workflow context
+            if not hasattr(server, 'tool_config') or server.tool_config is None:
+                # Create a safe copy to avoid circular references
+                config_copy = getattr(self, 'config', DEFAULT_CONFIG).copy()
+                object.__setattr__(server, 'tool_config', config_copy)
         
         def configure(self, config: dict):
             """Configure the SQL tool with database connection and security settings"""
@@ -975,6 +1052,10 @@ SECURITY: Tool automatically blocks dangerous operations and validates all queri
             updated_config = DEFAULT_CONFIG.copy()
             updated_config.update(config)
             object.__setattr__(self, 'config', updated_config)
+            
+            # CRITICAL FIX: Apply config to server for workflow access
+            config_copy = updated_config.copy()
+            object.__setattr__(self.server, 'tool_config', config_copy)
             
             # Validate configuration
             self._validate_config(updated_config)

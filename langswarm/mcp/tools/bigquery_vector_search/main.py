@@ -58,6 +58,16 @@ class SimilaritySearchInput(BaseModel):
     similarity_threshold: Optional[float] = None  # Will be set from config if not provided
     dataset_id: Optional[str] = None
     table_name: Optional[str] = None
+    
+    class Config:
+        repr = False  # Disable automatic repr to prevent circular references
+    
+    def __repr__(self) -> str:
+        """Safe repr that never causes circular references"""
+        try:
+            return f"SimilaritySearchInput(query='{self.query[:30]}...')"
+        except Exception:
+            return "SimilaritySearchInput(repr_error)"
 
 class SimilaritySearchOutput(BaseModel):
     success: bool
@@ -66,6 +76,18 @@ class SimilaritySearchOutput(BaseModel):
     total_results: int
     dataset: str
     error: Optional[str] = None
+    
+    class Config:
+        repr = False  # Disable automatic repr to prevent circular references
+    
+    def __repr__(self) -> str:
+        """Safe repr that never causes circular references"""
+        try:
+            success = getattr(self, 'success', 'unknown')
+            total = getattr(self, 'total_results', 'unknown')
+            return f"SimilaritySearchOutput(success={success}, total_results={total})"
+        except Exception:
+            return "SimilaritySearchOutput(repr_error)"
 
 class ListDatasetsInput(BaseModel):
     pattern: Optional[str] = None

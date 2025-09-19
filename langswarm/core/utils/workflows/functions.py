@@ -249,8 +249,37 @@ def mcp_call(
         config_loader = context.get("config_loader")
         local_server = None
         
-        if config_loader and hasattr(config_loader, 'tools') and tool_name in config_loader.tools:
-            tool_instance = config_loader.tools[tool_name]
+        # DEBUG: Add detailed logging
+        print(f"🔍 DEBUG mcp_call: tool_name='{tool_name}'")
+        print(f"🔍 DEBUG mcp_call: context keys = {list(context.keys()) if context else 'None'}")
+        print(f"🔍 DEBUG mcp_call: config_loader = {type(config_loader) if config_loader else 'None'}")
+        
+        # Handle both dict and list formats for tools
+        tool_found = False
+        tool_instance = None
+        
+        if config_loader and hasattr(config_loader, 'tools'):
+            print(f"🔍 DEBUG mcp_call: config_loader.tools type = {type(config_loader.tools)}")
+            
+            if isinstance(config_loader.tools, dict):
+                # Tools is a dictionary - check if tool_name is a key
+                print(f"🔍 DEBUG mcp_call: tools dict keys = {list(config_loader.tools.keys())}")
+                tool_found = tool_name in config_loader.tools
+                if tool_found:
+                    tool_instance = config_loader.tools[tool_name]
+            elif isinstance(config_loader.tools, list):
+                # Tools is a list - search for tool by identifier
+                print(f"🔍 DEBUG mcp_call: tools list length = {len(config_loader.tools)}")
+                for tool in config_loader.tools:
+                    if hasattr(tool, 'identifier') and tool.identifier == tool_name:
+                        tool_found = True
+                        tool_instance = tool
+                        break
+                print(f"🔍 DEBUG mcp_call: tool identifiers = {[getattr(t, 'identifier', 'No ID') for t in config_loader.tools]}")
+            
+            print(f"🔍 DEBUG mcp_call: tool '{tool_name}' found = {tool_found}")
+        
+        if tool_found and tool_instance:
             print(f"🔧 Found tool in workflow context: {tool_name}")
             
             # Check if tool has a server - use server if available, otherwise use tool directly

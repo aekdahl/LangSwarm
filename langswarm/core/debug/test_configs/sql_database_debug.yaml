@@ -1,0 +1,92 @@
+# LangSwarm Configuration for SQL Database Debug Case
+# Standard LangSwarm config file for debugging SQL database tool
+
+version: "1.0"
+project_name: "SQL Database Debug Test"
+
+agents:
+  - id: sql_test_agent
+    agent_type: openai
+    model: gpt-4o
+    # use_native_tool_calling defaults to false (LangSwarm custom tool calling)
+    is_conversational: true  # Enable multi-turn conversation with tool calls
+    max_iterations: 5  # Allow up to 5 iterations for complex tool sequences
+    enable_tool_loop: true  # Continue until agent provides final response
+    system_prompt: |
+      You are a SQL database agent that helps users query databases safely and efficiently.
+      
+      When users ask for database information or want to query data, you should:
+      1. Use the sql_db tool to execute SQL queries or get database information
+      2. Provide clear, formatted responses about the data
+      3. Always ensure queries are safe and follow best practices
+      
+      Available methods:
+      - execute_query: Run SQL SELECT statements (other operations may be restricted)
+      - get_database_info: Get information about database structure and tables
+      
+      CRITICAL: Always use the exact "method" and "params" format (NOT "intent"):
+      
+      For queries, use the execute_query method with appropriate SQL:
+      {
+        "response": "I'll query the database to find the information you requested.",
+        "mcp": {
+          "tool": "sql_db",
+          "method": "execute_query", 
+          "params": {"query": "SELECT * FROM table_name LIMIT 10"}
+        }
+      }
+      
+      For database exploration:
+      {
+        "response": "I'll check what tables and data are available in the database.",
+        "mcp": {
+          "tool": "sql_db",
+          "method": "get_database_info",
+          "params": {"include_schema": true}
+        }
+      }
+      
+      IMPORTANT: Continue making tool calls until you have the final answer, then provide a natural response without tool calls.
+    tools:
+      - sql_db
+
+tools:
+  - id: sql_db
+    type: mcpsql_database
+    description: "Secure SQL database querying with validation and restrictions"
+    settings:
+      db_type: sqlite
+      db_path: ./langswarm/core/debug/test_data/test_database.db
+      allowed_operations: ["SELECT", "EXPLAIN", "DESCRIBE"]
+      max_rows: 100
+      timeout_seconds: 30
+      enable_query_logging: true
+      enable_intent_parsing: true
+      # Security settings
+      blocked_keywords: ["DROP", "DELETE", "TRUNCATE", "ALTER", "CREATE"]
+      allowed_tables: null  # null means all tables allowed
+
+workflows:
+  - id: sql_debug_workflow
+    name: "SQL Database Debug Workflow"
+    steps:
+      - id: analyze_query
+        agent: sql_test_agent
+        input: |
+          User query: ${context.user_input}
+          
+          Step 1: First, get database information to understand the schema.
+          Step 2: Then execute the appropriate SQL query to answer the user's question.
+          Step 3: Finally, provide a clear response with the results.
+          
+          Start with step 1.
+        output:
+          to: execute_query
+      - id: execute_query  
+        agent: sql_test_agent
+        input: |
+          Previous analysis: ${context.previous_output}
+          
+          Now execute the SQL query to get the actual data and provide the final answer to: ${context.user_input}
+        output:
+          to: user

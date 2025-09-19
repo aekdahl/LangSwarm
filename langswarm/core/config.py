@@ -2380,6 +2380,7 @@ Adapt your approach based on the user's needs, drawing from your combined expert
                 "githubtool": "langswarm/mcp/tools/mcpgithubtool",
                 "dynamicforms": "langswarm/mcp/tools/dynamic_forms",
                 "tasklist": "langswarm/mcp/tools/tasklist",
+                "sqldatabase": "langswarm/mcp/tools/sql_database",
                 # Add more mappings as needed
             }
             
@@ -3132,6 +3133,11 @@ If any required parameter is missing or ambiguous, instead return:
                 )
             
             agent = self.agents[step['agent']]
+            
+            # Execute agent with workflow context
+            # Pass workflow context to agent for tool access
+            if hasattr(agent, 'set_workflow_context'):
+                agent.set_workflow_context(self.context)
             
             # Debug: Log retrieved agent details with full configuration
             if tracer and tracer.enabled:
@@ -4449,11 +4455,38 @@ class WorkflowExecutor:
             tools_metadata: Dictionary of tools metadata (optional)
             **kwargs: Additional configuration options
         """
+        # Apply production safety measures and handle tools safely
+        safety_manager = None
+        try:
+            from langswarm.core.production_safety import get_production_safety_manager
+            safety_manager = get_production_safety_manager()
+            if safety_manager.is_production:
+                import logging
+                logging.getLogger(__name__).info("🐳 WorkflowExecutor initializing with production safety measures")
+        except ImportError:
+            pass  # Production safety module not available
+        
         self.workflows = workflows
         self.agents = agents
-        self.tools = tools or {}
         self.tools_metadata = tools_metadata or {}
         self.config_kwargs = kwargs
+        
+        # Handle tools with safety measures
+        if tools and safety_manager:
+            # Use production-safe tool handling
+            try:
+                import gc
+                gc.collect()  # Clean memory before handling tools
+                self.tools = tools
+                import logging
+                logging.getLogger(__name__).info(f"✅ Tools registered safely: {len(tools)} tools")
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"⚠️ Tool registration had issues, proceeding without tools: {e}")
+                self.tools = {}
+        else:
+            # Standard tool handling for local development
+            self.tools = tools or {}
         
         # Create a minimal config loader instance for workflow execution
         self._config_loader = None

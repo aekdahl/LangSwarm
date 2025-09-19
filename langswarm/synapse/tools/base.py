@@ -37,8 +37,22 @@ class BaseTool(BaseClass):  # Conditional Inheritance
     class Config:
         """Allow additional fields to prevent Pydantic validation errors."""
         extra = "allow"
+        repr = False  # Disable automatic repr to prevent circular references
         #arbitrary_types_allowed = True  # Allow non-Pydantic fields
 
+    def __repr__(self) -> str:
+        """Safe repr that never causes circular references"""
+        try:
+            name = getattr(self, 'name', 'unknown')
+            identifier = getattr(self, 'identifier', 'unknown')
+            return f"{self.__class__.__name__}(name='{name}', id='{identifier}')"
+        except Exception:
+            return f"{self.__class__.__name__}(repr_error)"
+    
+    def __str__(self) -> str:
+        """Safe string representation"""
+        return self.__repr__()
+    
     def __init__(self, name, description, instruction, identifier=None, brief=None, **kwargs):
         """
         Initialize the base tool.

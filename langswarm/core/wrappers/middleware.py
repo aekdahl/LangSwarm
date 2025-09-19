@@ -61,6 +61,7 @@ class MiddlewareMixin:
     
     def set_workflow_context(self, context):
         """Set the workflow context for use in tool calls"""
+        print(f"🔍 DEBUG set_workflow_context called with context keys: {list(context.keys()) if context else 'None'}")
         self.workflow_context = context
     
     def _find_workflow_path(self, handler, filename="workflows.yaml") -> str:
@@ -297,8 +298,12 @@ class MiddlewareMixin:
             context["tool_deployer"] = self.tool_deployer
         
         # Include workflow context if available (contains config_loader for tool instances)
+        print(f"🔍 DEBUG middleware: self.workflow_context = {type(self.workflow_context) if self.workflow_context else 'None'}")
         if self.workflow_context:
+            print(f"🔍 DEBUG middleware: workflow_context keys = {list(self.workflow_context.keys())}")
             context.update(self.workflow_context)
+        else:
+            print(f"🔍 DEBUG middleware: No workflow context available")
             
         result = mcp_call(
             mcp_url=mcp_url,
