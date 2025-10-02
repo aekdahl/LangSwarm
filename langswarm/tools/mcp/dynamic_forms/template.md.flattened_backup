@@ -1,0 +1,66 @@
+# Dynamic Forms MCP Tool
+
+## Description
+
+Intelligent form generation with natural language specification using standard MCP protocol.
+
+## Instructions
+
+🎯 **LangSwarm's Intelligent Intent Processing (Standard MCP)**
+
+Natural language form generation using the standard MCP protocol.
+
+**Preferred: Intent-Based Calling (LangSwarm USP)**
+```json
+{
+  "method": "call_tool",
+  "params": {
+    "name": "dynamic_forms",
+    "arguments": {
+      "intent": "Create a customer feedback form for our mobile app with rating and comments",
+      "context": "user experience, app improvement"
+    }
+  }
+}
+```
+
+**Alternative: Direct Method Calling**
+```json
+{
+  "method": "call_tool",
+  "params": {
+    "name": "dynamic_forms",
+    "arguments": {
+      "method": "create_form",
+      "params": {
+        "fields": [
+          {"name": "rating", "type": "number", "min": 1, "max": 5},
+          {"name": "comments", "type": "textarea", "required": false}
+        ]
+      }
+    }
+  }
+}
+```
+
+**When to use:** User input collection, surveys, registration forms, data gathering interfaces.
+
+**Intent examples:**
+- "Build a sign-up form for enterprise customers"
+- "Create a bug report form with file upload"
+- "Make a simple contact form with validation"
+
+**Available methods:** create_form, validate_form, process_submission, generate_fields
+
+### Standard MCP Protocol Methods
+
+**Discovery & Execution:**
+- `list_tools()` - Discover form generation capabilities
+- `call_tool(name, arguments)` - Execute with intent or direct form specifications
+- `list_prompts()` - Access form generation prompts and templates
+
+**Pro tip:** Intent-based calls optimize field types, add appropriate validation, and improve UX automatically.
+
+## Brief
+
+Dynamic form generation with intelligent intent processing via standard MCP protocol.

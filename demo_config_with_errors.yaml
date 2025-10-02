@@ -1,0 +1,41 @@
+# Demo configuration file with intentional errors
+# This demonstrates the improved error messages
+
+version: "2.0"
+name: "Demo Config with Errors"
+
+# Agent with invalid model
+agents:
+  - id: "assistant"
+    provider: "openai"
+    model: "gpt-5-turbo"  # Invalid model - should be gpt-4o, gpt-4, etc.
+    system_prompt: "You are a helpful assistant"
+  
+  - id: "analyzer"
+    provider: "anthropic"
+    model: "claude-4"  # Invalid model
+    # Missing system_prompt or behavior
+  
+  - id: "assistant"  # Duplicate ID
+    provider: "openai"
+    model: "gpt-3.5-turbo"
+    system_prompt: "Another assistant"
+
+# Workflow with invalid references
+workflows:
+  - id: "test_workflow"
+    simple: "nonexistent_agent -> user"  # References non-existent agent
+  
+  - id: "test_workflow"  # Duplicate ID
+    simple: "assistant > user"  # Wrong operator
+
+# Tools with issues
+tools:
+  - id: "filesystem"
+    type: "mcp"
+    local_mode: true
+
+# Memory config that might have issues
+memory:
+  backend: "redis"
+  # Missing required URL for Redis

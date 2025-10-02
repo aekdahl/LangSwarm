@@ -1,0 +1,282 @@
+# LangSwarm V2 Configuration for BigQuery Vector Search Test
+# Modern V2 config with enhanced middleware, observability, and tool integration
+
+version: "2.0"
+project_name: "BigQuery V2 Debug Test"
+
+# V2 Agent Configuration
+agents:
+  - id: bigquery_v2_agent
+    provider: openai
+    model: gpt-4o
+    name: "BigQuery Vector Search Assistant"
+    description: "V2 agent for BigQuery vector search operations"
+    
+    # V2 System Prompt with enhanced instructions
+    system_prompt: |
+      You are an advanced BigQuery vector search agent powered by LangSwarm V2.
+      
+      You help users find information by searching through stored document embeddings with enhanced capabilities:
+      
+      SEARCH CAPABILITIES:
+      1. Semantic similarity search using vector embeddings
+      2. Hybrid search combining text and vector approaches
+      3. Filtered searches with metadata constraints
+      4. Multi-step search refinement
+      
+      SEARCH PROCESS:
+      1. Analyze the user's query to understand intent
+      2. Use the bigquery_vector_search tool with appropriate parameters
+      3. Evaluate search results for relevance and completeness
+      4. Provide clear, structured summaries of findings
+      5. Suggest follow-up searches if needed
+      
+      TOOL USAGE:
+      - Use similarity_search for standard semantic queries
+      - Use hybrid_search for complex queries requiring both text and semantic matching
+      - Always include relevant metadata in your responses
+      
+      Example responses:
+      ```json
+      {
+        "action": "search",
+        "tool": "bigquery_vector_search",
+        "method": "similarity_search",
+        "params": {
+          "query": "Pingday company information",
+          "max_results": 10,
+          "similarity_threshold": 0.75
+        }
+      }
+      ```
+    
+    # V2 Configuration Options
+    config:
+      temperature: 0.1
+      max_tokens: 2000
+      use_native_tools: true
+      enable_streaming: true
+      retry_attempts: 2
+      timeout_seconds: 30
+    
+    # V2 Tools Integration
+    tools:
+      - bigquery_vector_search
+    
+    # V2 Middleware Configuration
+    middleware:
+      enable_routing: true
+      enable_validation: true
+      enable_context_enrichment: true
+      enable_result_transformation: true
+      enable_audit_logging: true
+      policy_name: "bigquery_policy"
+    
+    # V2 Observability
+    observability:
+      enable_tracing: true
+      enable_metrics: true
+      enable_debug_logging: true
+      trace_level: "detailed"
+
+# V2 Tools Configuration
+tools:
+  - id: bigquery_vector_search
+    type: mcp
+    name: "BigQuery Vector Search"
+    description: "Enhanced BigQuery vector database operations with V2 features"
+    location: "langswarm.tools.mcp.bigquery_vector_search"
+    
+    # Tool Configuration
+    config:
+      project_id: "${GOOGLE_CLOUD_PROJECT:-production-pingday}"
+      dataset_id: "${BIGQUERY_DATASET_ID:-vector_search}"
+      table_name: "${BIGQUERY_TABLE_NAME:-embeddings}"
+      embedding_model: "${EMBEDDING_MODEL:-text-embedding-3-small}"
+      
+      # Search Parameters
+      max_results: 10
+      similarity_threshold: 0.01
+      min_similarity_threshold: 0.01
+      max_similarity_threshold: 0.95
+      
+      # Performance Settings
+      enable_caching: true
+      cache_ttl_seconds: 300
+      timeout_seconds: 30
+      max_retries: 3
+      
+      # V2 Features
+      enable_metadata_filtering: true
+      enable_hybrid_search: true
+      enable_query_expansion: true
+      
+    # V2 Tool Capabilities
+    capabilities:
+      - read
+      - search
+      - async
+      - streaming
+      - metadata
+    
+    # V2 Tool Metadata
+    metadata:
+      version: "2.0"
+      provider: "google_cloud"
+      data_classification: "internal"
+      compliance_required: true
+
+# V2 Workflows Configuration
+workflows:
+  - id: bigquery_v2_debug_workflow
+    name: "Enhanced BigQuery Debug Workflow"
+    description: "V2 workflow with middleware integration and observability"
+    version: "2.0"
+    
+    # V2 Workflow Configuration
+    config:
+      timeout_seconds: 300
+      retry_policy:
+        max_retries: 2
+        exponential_backoff: true
+      error_strategy: "continue"
+      
+    # V2 Variables
+    variables:
+      search_threshold: 0.75
+      max_search_results: 10
+      enable_query_expansion: true
+    
+    # V2 Workflow Steps
+    steps:
+      - id: validate_input
+        type: condition
+        condition: "${input} != null and ${input} != ''"
+        true_step: process_query
+        false_step: request_input
+        metadata:
+          description: "Validate user input is provided"
+      
+      - id: request_input
+        type: agent
+        agent_id: bigquery_v2_agent
+        input_template: "Please provide a search query to find information in the database."
+        depends_on: []
+        
+      - id: process_query
+        type: agent
+        agent_id: bigquery_v2_agent
+        input_template: "${input}"
+        depends_on: ["validate_input"]
+        config:
+          enable_streaming: true
+          include_metadata: true
+        
+      - id: format_results
+        type: transform
+        input_template: "${process_query}"
+        transform_function: "format_search_results"
+        depends_on: ["process_query"]
+        config:
+          include_performance_metrics: true
+          include_confidence_scores: true
+
+# V2 Middleware Policies
+policies:
+  bigquery_policy:
+    max_execution_time: "5m"
+    max_steps: 20
+    max_parallel_steps: 3
+    retry_attempts: 2
+    audit_level: "detailed"
+    security_level: "high"
+    resource_limits:
+      memory: "1GB"
+      cpu: "1.0"
+    data_classification: "internal"
+
+# V2 Configuration Management
+config:
+  # Environment Integration
+  environment: "${LANGSWARM_ENV:-development}"
+  
+  # Provider Configurations
+  providers:
+    openai:
+      api_key: "${OPENAI_API_KEY}"
+      base_url: "${OPENAI_BASE_URL}"
+      organization: "${OPENAI_ORGANIZATION}"
+      default_model: "gpt-4o"
+      
+    google_cloud:
+      project_id: "${GOOGLE_CLOUD_PROJECT:-production-pingday}"
+      credentials_path: "${GOOGLE_APPLICATION_CREDENTIALS}"
+      service_account_key: "${GOOGLE_SERVICE_ACCOUNT_KEY}"
+      
+  # Database Configuration  
+  databases:
+    bigquery:
+      project_id: "${GOOGLE_CLOUD_PROJECT:-production-pingday}"
+      dataset_id: "${BIGQUERY_DATASET_ID:-vector_search}"
+      table_name: "${BIGQUERY_TABLE_NAME:-embeddings}"
+      embedding_model: "${EMBEDDING_MODEL:-text-embedding-3-small}"
+      
+  # V2 Observability Configuration
+  observability:
+    enable_tracing: true
+    enable_metrics: true
+    enable_logging: true
+    
+    # Logging Configuration
+    logging:
+      level: "${LOG_LEVEL:-INFO}"
+      output_dir: "${LOG_OUTPUT_DIR:-debug_traces/v2}"
+      enable_file_logging: true
+      enable_console_logging: true
+      enable_structured_logging: true
+      
+    # Tracing Configuration
+    tracing:
+      provider: "langswarm"
+      sample_rate: 1.0
+      enable_span_events: true
+      enable_performance_tracking: true
+      
+    # Metrics Configuration
+    metrics:
+      provider: "langswarm"
+      enable_performance_metrics: true
+      enable_usage_metrics: true
+      enable_error_metrics: true
+      export_interval_seconds: 60
+      
+  # V2 Middleware Configuration
+  middleware:
+    enable_routing: true
+    enable_validation: true
+    enable_context_enrichment: true
+    enable_result_transformation: true
+    enable_audit_logging: true
+    
+    # Pipeline Configuration
+    pipeline:
+      timeout_seconds: 300
+      max_concurrent_requests: 10
+      enable_caching: true
+      cache_ttl_seconds: 300
+      
+  # V2 Error Handling
+  error_handling:
+    strategy: "graceful_degradation"
+    max_retries: 3
+    retry_delay_seconds: 1.0
+    enable_circuit_breaker: true
+    enable_fallback_responses: true
+    
+  # V2 Performance
+  performance:
+    enable_connection_pooling: true
+    max_connections: 20
+    connection_timeout_seconds: 30
+    request_timeout_seconds: 60
+    enable_request_batching: false

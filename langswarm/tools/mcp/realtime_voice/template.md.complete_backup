@@ -1,0 +1,62 @@
+# Realtime Voice MCP Tool
+
+## Description
+
+Real-time voice processing tool for speech-to-text, text-to-speech, and voice interaction capabilities.
+
+## Instructions
+
+Process voice input and generate speech output for real-time interactions.
+
+**When to use:** Convert speech to text, generate voice responses, or handle voice-based user interactions.
+
+**Main method:**
+```json
+{
+  "tool": "realtime_voice",
+  "method": "process_speech",
+  "params": {
+    "audio_data": "base64_encoded_audio",
+    "language": "en-US"
+  }
+}
+```
+
+**Other methods:** `text_to_speech`, `get_supported_languages`, `configure_voice`
+
+### Standard MCP Protocol Methods
+
+This tool supports standard MCP protocol for discovery and introspection:
+
+**Discovery Methods:**
+- `list_tools()` - Discover all available methods and their schemas
+- `list_prompts()` - Find available agent prompts for workflows  
+- `list_resources()` - See available files (template.md, agents.yaml, etc.)
+
+**Execution Methods:**
+- `call_tool(name, arguments)` - Execute any tool method by name
+- `get_prompt(name, arguments)` - Get formatted prompts with variables
+- `read_resource(uri)` - Access specific resource content
+
+**Example Protocol Usage:**
+```json
+{
+  "method": "list_tools",
+  "params": {}
+}
+```
+```json
+{
+  "method": "call_tool", 
+  "params": {
+    "name": "similarity_search",
+    "arguments": {"query": "pricing", "limit": 5}
+  }
+}
+```
+**Tips:** Use appropriate audio formats, specify correct language codes, handle audio quality.
+
+
+## Brief
+
+Real-time voice processing for speech-to-text and text-to-speech operations.

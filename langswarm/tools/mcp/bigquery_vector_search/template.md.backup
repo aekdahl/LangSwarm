@@ -1,0 +1,254 @@
+# BigQuery Vector Search MCP Tool
+
+## Description
+
+Advanced semantic search tool that finds relevant documents using AI embeddings. Instead of exact keyword matching, this tool understands the meaning and context of your search to find the most relevant information in the knowledge base.
+
+**Key Capabilities:**
+- Semantic search (understands context, not just keywords)
+- Document retrieval by ID
+- Dataset exploration and discovery
+- Embedding generation for text analysis
+
+## Instructions
+
+Use this tool to search the company's knowledge base using AI-powered semantic search. This tool understands meaning and context, not just keywords.
+
+**When to use:** Answer questions about company information, policies, procedures, products, or services.
+
+**Available operations:**
+- `similarity_search`: Find documents related to a query using AI understanding
+- `get_content`: Retrieve full text of a specific document by ID
+- `list_datasets`: See what information is available
+
+**Primary method:**
+```json
+{
+  "tool": "bigquery_vector_search",
+  "method": "similarity_search",
+  "params": {
+    "query": "user's question in natural language",
+    "limit": 5
+  }
+}
+```
+
+**Search tips:**
+- Use natural language: "refund policy for cancelled orders" 
+- Be specific: "enterprise pricing plans" not just "pricing"
+- Include context: "mobile app login issues"
+
+**Response format:** Returns documents with similarity scores, excerpts, and document IDs for follow-up retrieval if needed.
+
+
+## Usage Examples
+
+### Example 1: Customer Support Query
+**User**: "How do I return a damaged product?"
+**Your Response**:
+
+{
+  "response": "I'll search our knowledge base for information about returning damaged products.",
+  "mcp": {
+    "tool": "bigquery_vector_search",
+    "method": "similarity_search",
+    "params": {
+      "query": "return damaged product refund policy",
+      "limit": 5
+    }
+  }
+}
+
+
+### Example 2: Exploring Available Information
+**User**: "What kind of information do you have access to?"
+**Your Response**:
+
+{
+  "response": "Let me show you what datasets and information are available in our knowledge base.",
+  "mcp": {
+    "tool": "bigquery_vector_search",
+    "method": "list_datasets",
+    "params": {}
+  }
+}
+
+
+### Example 3: Following Up on Search Results
+**User**: "Can you get me the full details from that first document?"
+**Your Response** (assuming you have document_id from previous search):
+
+{
+  "response": "I'll retrieve the complete content of that document for you.",
+  "mcp": {
+    "tool": "bigquery_vector_search", 
+    "method": "get_content",
+    "params": {
+      "document_id": "d7de6e72afb2d9c169bd95d0f416d210_12"
+    }
+  }
+}
+
+
+### Example 4: Intent-Based Search
+**User**: "Find pricing information for business customers"
+**Your Response**:
+
+{
+  "response": "I'll search for business pricing information in our knowledge base.",
+  "mcp": {
+    "tool": "bigquery_vector_search",
+    "intent": "Find business and enterprise pricing information",
+    "context": "business customers, enterprise plans, pricing tiers, cost"
+  }
+}
+
+
+## Parameter Requirements
+
+### similarity_search Parameters
+| Parameter | Type | Required | Description | Example |
+|-----------|------|----------|-------------|---------|
+| `query` | string | ✅ **Required** | Your search question or keywords | "refund policy for cancelled orders" |
+| `limit` | integer | ❌ Optional | Number of results (1-50) | 10 |
+| `similarity_threshold` | float | ❌ Optional | Minimum relevance (0.0-1.0) | 0.7 |
+
+### get_content Parameters
+| Parameter | Type | Required | Description | Example |
+|-----------|------|----------|-------------|---------|
+| `document_id` | string | ✅ **Required** | Document ID from search results | "abc123_0" |
+
+### get_embedding Parameters
+| Parameter | Type | Required | Description | Example |
+|-----------|------|----------|-------------|---------|
+| `text` | string | ✅ **Required** | Text to convert to embeddings | "customer support policy" |
+
+### list_datasets Parameters
+No parameters required - always use empty params: `{}`
+
+## ⚠️ Critical Rules - Follow These Exactly
+
+1. **ALWAYS use "query" parameter** - Never use "search", "keyword", "text", or "search_term"
+2. **ALWAYS include "response" field** - Explain what you're doing in human language
+3. **NEVER nest MCP calls** - No MCP structures inside params
+4. **Use exact tool name** - Must be "bigquery_vector_search" 
+5. **Choose direct OR intent** - Don't mix method and intent in same call
+6. **Natural language queries work best** - "how to cancel subscription" vs "cancel"
+
+## Common Mistakes to Avoid
+
+### ❌ WRONG - Missing response field:
+
+{
+  "mcp": {
+    "tool": "bigquery_vector_search",
+    "method": "similarity_search",
+    "params": {"query": "refunds"}
+  }
+}
+
+
+### ✅ CORRECT - Always include response:
+
+{
+  "response": "I'll search for refund information in our knowledge base.",
+  "mcp": {
+    "tool": "bigquery_vector_search", 
+    "method": "similarity_search",
+    "params": {"query": "refunds"}
+  }
+}
+
+
+### ❌ WRONG - Using incorrect parameter name:
+
+{
+  "response": "Searching...",
+  "mcp": {
+    "tool": "bigquery_vector_search",
+    "method": "similarity_search", 
+    "params": {"search_term": "refunds"}  // Should be "query"
+  }
+}
+
+
+### ❌ WRONG - Nested MCP structure:
+
+{
+  "response": "Searching...",
+  "mcp": {
+    "tool": "bigquery_vector_search",
+    "method": "similarity_search",
+    "params": {
+      "mcp": {  // Never put MCP inside params
+        "method": "similarity_search",
+        "params": {"query": "refunds"}
+      }
+    }
+  }
+}
+
+
+## Expected Output Types
+
+### similarity_search Results
+Returns a ranked list of relevant documents with:
+- **Document content** - The actual text content
+- **Similarity score** - How relevant it is (0.0-1.0)
+- **Document ID** - For retrieving full content later
+- **Metadata** - URL, title, creation date, source information
+- **Total results** - How many documents were found
+
+### list_datasets Results  
+Returns information about available datasets:
+- **Dataset names** - What datasets exist
+- **Table information** - What tables are available
+- **Record counts** - How much data is available
+- **Schema details** - What fields are available
+
+### get_content Results
+Returns complete document information:
+- **Full text content** - The entire document
+- **All metadata** - Complete information about the document
+- **Source information** - Where it came from, when it was created
+
+### get_embedding Results
+Returns AI vector embeddings:
+- **Embedding vector** - Array of numbers representing the text
+- **Dimensions** - Size of the embedding vector
+- **Model information** - Which AI model was used
+
+## Error Handling
+
+When you encounter parameter validation errors, help the user by suggesting corrections:
+
+### Method Not Found
+If user tries unknown methods, suggest correct ones:
+- "search" → use "similarity_search"
+- "find" → use "similarity_search"
+- "document" → use "get_content"
+- "datasets" → use "list_datasets"
+- "embed" → use "get_embedding"
+
+### Missing Required Parameters
+Guide users to include required parameters:
+- **similarity_search**: Must include "query"
+- **get_content**: Must include "document_id"  
+- **get_embedding**: Must include "text"
+
+### Example Error Recovery
+If a user provides wrong parameters, respond like this:
+
+{
+  "response": "I encountered an issue with the search parameters. The parameter should be 'query' not 'search_term'. Let me fix that and search for information about refunds.",
+  "mcp": {
+    "tool": "bigquery_vector_search",
+    "method": "similarity_search", 
+    "params": {"query": "refund policy information", "limit": 5}
+  }
+}
+
+
+## Brief
+
+Advanced semantic search tool using AI embeddings to find relevant documents in BigQuery datasets. Understands context and meaning, not just keywords, for intelligent knowledge base querying.

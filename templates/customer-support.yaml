@@ -1,0 +1,34 @@
+# Customer support system with routing
+version: "2.0"
+name: "Customer Support System"
+
+agents:
+  # First agent classifies the inquiry
+  - id: "classifier"
+    model: "gpt-3.5-turbo"
+    system_prompt: |
+      Classify customer inquiries into one of these categories:
+      - technical: Software issues, bugs, how-to questions
+      - billing: Payment, subscription, refund issues
+      - general: Everything else
+      
+      Respond with just the category name.
+    
+  # Technical support specialist
+  - id: "technical"
+    model: "gpt-4"
+    system_prompt: |
+      You are a technical support specialist.
+      Help customers resolve software issues with clear, step-by-step instructions.
+    
+  # Billing support specialist  
+  - id: "billing"
+    model: "gpt-3.5-turbo"
+    system_prompt: |
+      You are a billing support specialist.
+      Help customers with payment, subscription, and refund issues.
+      Be understanding and solution-oriented.
+
+workflows:
+  # Route to appropriate specialist based on classification
+  - "classifier -> (technical | billing) -> user"

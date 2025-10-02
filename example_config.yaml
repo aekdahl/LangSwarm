@@ -1,0 +1,109 @@
+# LangSwarm - Working Configuration Example
+# ============================================
+# This is a complete, working configuration file that demonstrates
+# LangSwarm V2's capabilities with minimal setup.
+
+version: "2.0"
+name: "LangSwarm Example"
+description: "A working example configuration for LangSwarm"
+
+# Agent definitions
+agents:
+  - id: "assistant"
+    name: "General Assistant"
+    provider: "openai"
+    model: "gpt-3.5-turbo"
+    system_prompt: |
+      You are a helpful AI assistant. You provide clear, accurate, and helpful responses.
+      Always be polite and professional in your interactions.
+
+  - id: "analyzer"
+    name: "Data Analyzer"
+    provider: "openai"
+    model: "gpt-3.5-turbo"
+    system_prompt: |
+      You are a data analysis specialist. You help users understand data,
+      identify patterns, and draw meaningful insights from information.
+
+  - id: "writer"
+    name: "Content Writer"
+    provider: "openai"
+    model: "gpt-3.5-turbo"
+    system_prompt: |
+      You are a professional content writer. You create clear, engaging,
+      and well-structured written content for various purposes.
+
+# Tool configurations (MCP-based)
+tools:
+  filesystem:
+    type: "mcp"
+    description: "File system operations"
+    local_mode: true
+    settings:
+      allowed_paths: ["."]
+      read_only: false
+
+# Workflow definitions
+workflows:
+  - id: "simple_chat"
+    name: "Simple Chat Workflow"
+    description: "Basic conversation with an assistant"
+    steps:
+      - id: "chat_step"
+        agent: "assistant"
+        description: "Handle user conversation"
+        output:
+          to: "user"
+
+  - id: "analysis_workflow"
+    name: "Data Analysis Workflow"
+    description: "Analyze data and provide insights"
+    steps:
+      - id: "analyze_step"
+        agent: "analyzer"
+        tools: ["filesystem"]
+        description: "Analyze the provided data"
+        
+      - id: "write_step"
+        agent: "writer"
+        input: "${analyze_step.output}"
+        description: "Write a summary of the analysis"
+        output:
+          to: "user"
+
+# Memory configuration
+memory:
+  backend: "sqlite"
+  settings:
+    persist_directory: "./langswarm_data"
+    enable_embeddings: false
+
+# Security settings
+security:
+  api_key_validation: true
+  rate_limiting:
+    enabled: false
+  input_sanitization: true
+
+# Observability configuration
+observability:
+  logging:
+    level: "INFO"
+    format: "structured"
+  tracing:
+    enabled: false
+  metrics:
+    enabled: false
+
+# Server configuration (if running as service)
+server:
+  host: "localhost"
+  port: 8000
+  cors_enabled: true
+  cors_origins: ["*"]
+
+# Experimental features (optional)
+experimental_features:
+  async_execution: true
+  streaming_responses: true
+  tool_chaining: false

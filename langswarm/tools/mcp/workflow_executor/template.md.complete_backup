@@ -1,0 +1,62 @@
+# Workflow Executor MCP Tool
+
+## Description
+
+Workflow automation and orchestration tool for executing multi-step processes and business logic.
+
+## Instructions
+
+Execute automated workflows and orchestrate business processes.
+
+**When to use:** Run automated processes, orchestrate multi-step workflows, or execute business logic sequences.
+
+**Main method:**
+```json
+{
+  "tool": "workflow_executor",
+  "method": "execute_workflow",
+  "params": {
+    "workflow_id": "data-processing-pipeline",
+    "inputs": {"source": "database"}
+  }
+}
+```
+
+**Other methods:** `list_workflows`, `create_workflow`, `monitor_execution`, `cancel_workflow`
+
+### Standard MCP Protocol Methods
+
+This tool supports standard MCP protocol for discovery and introspection:
+
+**Discovery Methods:**
+- `list_tools()` - Discover all available methods and their schemas
+- `list_prompts()` - Find available agent prompts for workflows  
+- `list_resources()` - See available files (template.md, agents.yaml, etc.)
+
+**Execution Methods:**
+- `call_tool(name, arguments)` - Execute any tool method by name
+- `get_prompt(name, arguments)` - Get formatted prompts with variables
+- `read_resource(uri)` - Access specific resource content
+
+**Example Protocol Usage:**
+```json
+{
+  "method": "list_tools",
+  "params": {}
+}
+```
+```json
+{
+  "method": "call_tool", 
+  "params": {
+    "name": "similarity_search",
+    "arguments": {"query": "pricing", "limit": 5}
+  }
+}
+```
+**Tips:** Define clear workflow steps, handle errors gracefully, monitor execution status.
+
+
+## Brief
+
+Workflow automation and orchestration for business process execution.

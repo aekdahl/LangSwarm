@@ -1,0 +1,62 @@
+# Message Queue Consumer MCP Tool
+
+## Description
+
+Message queue consumer for receiving, processing, and handling messages from various messaging systems.
+
+## Instructions
+
+Consume and process messages from queues and messaging systems.
+
+**When to use:** Process incoming messages, handle events, or integrate with messaging infrastructure.
+
+**Main method:**
+```json
+{
+  "tool": "message_queue_consumer",
+  "method": "consume_messages",
+  "params": {
+    "queue": "notifications",
+    "batch_size": 10
+  }
+}
+```
+
+**Other methods:** `list_queues`, `acknowledge_message`, `reject_message`
+
+### Standard MCP Protocol Methods
+
+This tool supports standard MCP protocol for discovery and introspection:
+
+**Discovery Methods:**
+- `list_tools()` - Discover all available methods and their schemas
+- `list_prompts()` - Find available agent prompts for workflows  
+- `list_resources()` - See available files (template.md, agents.yaml, etc.)
+
+**Execution Methods:**
+- `call_tool(name, arguments)` - Execute any tool method by name
+- `get_prompt(name, arguments)` - Get formatted prompts with variables
+- `read_resource(uri)` - Access specific resource content
+
+**Example Protocol Usage:**
+```json
+{
+  "method": "list_tools",
+  "params": {}
+}
+```
+```json
+{
+  "method": "call_tool", 
+  "params": {
+    "name": "similarity_search",
+    "arguments": {"query": "pricing", "limit": 5}
+  }
+}
+```
+**Tips:** Process messages in batches, handle failures gracefully, acknowledge processed messages.
+
+
+## Brief
+
+Message queue consumer for event processing and system integration.

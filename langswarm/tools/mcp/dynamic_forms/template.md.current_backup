@@ -1,0 +1,80 @@
+# Dynamic Forms MCP Tool
+
+## Description
+
+Intelligent form generation with natural language specification understanding and automatic field optimization.
+
+## Instructions
+
+🎯 **LangSwarm's Intent-Based Tool Calling**
+
+Describe the form you need in natural language and get optimized form structures with proper validation.
+
+**Preferred: Intent-Based Calling (LangSwarm USP)**
+```json
+{
+  "tool": "dynamic_forms",
+  "intent": "Create a customer feedback form for our mobile app with rating and comments",
+  "context": "user experience, app improvement"
+}
+```
+
+**Alternative: Direct Method Calling**
+```json
+{
+  "tool": "dynamic_forms",
+  "method": "create_form",
+  "params": {
+    "fields": [
+      {"name": "rating", "type": "number", "min": 1, "max": 5},
+      {"name": "comments", "type": "textarea", "required": false}
+    ]
+  }
+}
+```
+
+**When to use:** User input collection, surveys, registration forms, data gathering interfaces.
+
+**Intent examples:**
+- "Build a sign-up form for enterprise customers"
+- "Create a bug report form with file upload"
+- "Make a simple contact form with validation"
+
+**Available operations:** create_form, validate_form, process_submission, generate_fields
+
+### Standard MCP Protocol Methods
+
+This tool supports standard MCP protocol for discovery and introspection:
+
+**Discovery Methods:**
+- `list_tools()` - Discover all available methods and their schemas
+- `list_prompts()` - Find available agent prompts for workflows  
+- `list_resources()` - See available files (template.md, agents.yaml, etc.)
+
+**Execution Methods:**
+- `call_tool(name, arguments)` - Execute any tool method by name
+- `get_prompt(name, arguments)` - Get formatted prompts with variables
+- `read_resource(uri)` - Access specific resource content
+
+**Example Protocol Usage:**
+```json
+{
+  "method": "list_tools",
+  "params": {}
+}
+```
+```json
+{
+  "method": "call_tool", 
+  "params": {
+    "name": "similarity_search",
+    "arguments": {"query": "pricing", "limit": 5}
+  }
+}
+```
+**Pro tip:** Intent-based calls optimize field types, add appropriate validation, and improve UX automatically.
+
+
+## Brief
+
+Dynamic form generation with intelligent intent processing for natural language form specifications.

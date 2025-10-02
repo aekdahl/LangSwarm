@@ -1,0 +1,65 @@
+# Tasklist MCP Tool
+
+## Description
+
+Smart task management with natural language task creation using standard MCP protocol.
+
+## Instructions
+
+🎯 **LangSwarm's Intelligent Intent Processing (Standard MCP)**
+
+Natural language task management using the standard MCP protocol.
+
+**Preferred: Intent-Based Calling (LangSwarm USP)**
+```json
+{
+  "method": "call_tool",
+  "params": {
+    "name": "tasklist",
+    "arguments": {
+      "intent": "Add a high-priority task to review and update our security documentation by Friday",
+      "context": "security audit, compliance deadline"
+    }
+  }
+}
+```
+
+**Alternative: Direct Method Calling**
+```json
+{
+  "method": "call_tool",
+  "params": {
+    "name": "tasklist",
+    "arguments": {
+      "method": "add_task",
+      "params": {
+        "title": "Review security documentation",
+        "priority": "high",
+        "due_date": "2024-01-05"
+      }
+    }
+  }
+}
+```
+
+**When to use:** Project management, productivity tracking, deadline management, team coordination.
+
+**Intent examples:**
+- "Show me overdue tasks for the development team"
+- "Create a checklist for onboarding new employees"
+- "Mark the API documentation task as completed"
+
+**Available methods:** add_task, update_task, list_tasks, complete_task, set_priorities
+
+### Standard MCP Protocol Methods
+
+**Discovery & Execution:**
+- `list_tools()` - Discover task management capabilities
+- `call_tool(name, arguments)` - Execute with intent or direct task operations
+- `list_prompts()` - Access task management prompts and templates
+
+**Pro tip:** Intent-based calls parse deadlines, infer priorities, and suggest task breakdown automatically.
+
+## Brief
+
+Task management with intelligent intent processing via standard MCP protocol.

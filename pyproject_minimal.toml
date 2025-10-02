@@ -1,0 +1,98 @@
+[tool.poetry]
+name = "langswarm"
+version = "0.0.54.dev45"
+description = "A multi-agent ecosystem for large language models (LLMs) and autonomous systems."
+readme = "README.md"
+authors = ["Alexander Ekdahl <alexander.ekdahl@gmail.com>"]
+license = "MIT"
+homepage = "https://github.com/aekdahl/langswarm"
+repository = "https://github.com/aekdahl/langswarm"
+keywords = ["LLM", "multi-agent", "langchain", "hugginface", "openai", "MCP", "agent", "orchestration"]
+
+[tool.poetry.dependencies]
+python = ">=3.8,<4.0"
+
+# CORE DEPENDENCIES (Required for basic functionality)
+pyyaml = "^6.0.2"                    # Configuration parsing
+nest-asyncio = "^1.6.0"              # Async support
+pydantic = "^2.11.4"                 # Data validation
+tiktoken = "^0.9.0"                  # Token counting
+requests = "^2.32.3"                 # HTTP requests
+aiohttp = "^3.11.18"                 # Async HTTP
+websockets = "^13.1"                 # WebSocket support
+jinja2 = "^3.1.6"                    # Template rendering
+
+# AI/ML PROVIDERS (Optional - install as needed)
+openai = {version = "^1.79.0", optional = true}
+anthropic = {version = "^0.18.0", optional = true}
+google-generativeai = {version = "^0.3.0", optional = true}
+cohere = {version = "^4.0.0", optional = true}
+mistralai = {version = "^0.1.0", optional = true}
+
+# MEMORY BACKENDS (Optional)
+redis = {version = "*", optional = true}
+aioredis = {version = "^2.0.1", optional = true}
+chromadb = {version = "^0.4.0", optional = true}
+qdrant-client = {version = "^1.14.2", optional = true}
+pinecone-client = {version = "^3.0.0", optional = true}
+psycopg2-binary = {version = "^2.9.0", optional = true}
+asyncpg = {version = "^0.29.0", optional = true}
+
+# CLOUD INTEGRATIONS (Optional)
+google-cloud-bigquery = {version = "^3.0.0", optional = true}
+google-cloud-bigquery-storage = {version = "^2.0.0", optional = true}
+google-cloud-pubsub = {version = "^2.0.0", optional = true}
+boto3 = {version = "^1.38.18", optional = true}
+
+# WEB FRAMEWORKS (Optional)
+fastapi = {version = "^0.115.12", optional = true}
+uvicorn = {version = "^0.34.2", optional = true}
+flask = {version = "^3.1.1", optional = true}
+
+# COMMUNICATION PLATFORMS (Optional)
+discord-py = {version = "^2.5.2", optional = true}
+python-telegram-bot = {version = "^22.1", optional = true}
+slack-bolt = {version = "^1.23.0", optional = true}
+twilio = {version = "^9.6.1", optional = true}
+
+# ML/AI FRAMEWORKS (Optional)
+langchain = {version = "^0.3.0", optional = true}
+langchain-community = {version = "^0.3.24", optional = true}
+langchain-openai = {version = "^0.3.17", optional = true}
+langsmith = {version = "^0.3.42", optional = true}
+llama-index = {version = "^0.12.36", optional = true}
+transformers = {version = "^4.51.3", optional = true}
+
+# MULTIMODAL CAPABILITIES (Optional)
+pillow = {version = "^10.0.0", optional = true}
+opencv-python = {version = "^4.8.0", optional = true}
+speechrecognition = {version = "^3.10.0", optional = true}
+pydub = {version = "^0.25.0", optional = true}
+
+
+
+[tool.poetry.extras]
+# Full installation - everything included for those who want it all
+full = [
+    # All AI providers
+    "openai", "anthropic", "google-generativeai", "cohere", "mistralai",
+    # All memory backends
+    "redis", "aioredis", "chromadb", "qdrant-client", "pinecone-client", "psycopg2-binary", "asyncpg",
+    # Cloud integrations
+    "google-cloud-bigquery", "google-cloud-bigquery-storage", "google-cloud-pubsub", "boto3",
+    # Web frameworks
+    "fastapi", "uvicorn", "flask",
+    # Communication platforms
+    "discord-py", "python-telegram-bot", "slack-bolt", "twilio",
+    # ML frameworks
+    "langchain", "langchain-community", "langchain-openai", "langsmith", "llama-index", "transformers",
+    # Multimodal
+    "pillow", "opencv-python", "speechrecognition", "pydub",
+]
+
+# Alias for backward compatibility
+all = ["openai", "anthropic", "google-generativeai", "cohere", "mistralai", "redis", "aioredis", "chromadb", "qdrant-client", "pinecone-client", "psycopg2-binary", "asyncpg", "google-cloud-bigquery", "google-cloud-bigquery-storage", "google-cloud-pubsub", "boto3", "fastapi", "uvicorn", "flask", "discord-py", "python-telegram-bot", "slack-bolt", "twilio", "langchain", "langchain-community", "langchain-openai", "langsmith", "llama-index", "transformers", "pillow", "opencv-python", "speechrecognition", "pydub"]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

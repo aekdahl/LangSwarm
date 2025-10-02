@@ -1,0 +1,62 @@
+# Gcp Environment MCP Tool
+
+## Description
+
+Google Cloud Platform environment management for resources, services, and infrastructure operations.
+
+## Instructions
+
+Manage GCP resources and cloud infrastructure.
+
+**When to use:** Deploy services, manage cloud resources, configure GCP infrastructure, or monitor cloud operations.
+
+**Main method:**
+```json
+{
+  "tool": "gcp_environment",
+  "method": "deploy_service",
+  "params": {
+    "service_name": "my-app",
+    "region": "us-central1"
+  }
+}
+```
+
+**Other methods:** `list_services`, `create_resource`, `get_metrics`, `configure_firewall`
+
+### Standard MCP Protocol Methods
+
+This tool supports standard MCP protocol for discovery and introspection:
+
+**Discovery Methods:**
+- `list_tools()` - Discover all available methods and their schemas
+- `list_prompts()` - Find available agent prompts for workflows  
+- `list_resources()` - See available files (template.md, agents.yaml, etc.)
+
+**Execution Methods:**
+- `call_tool(name, arguments)` - Execute any tool method by name
+- `get_prompt(name, arguments)` - Get formatted prompts with variables
+- `read_resource(uri)` - Access specific resource content
+
+**Example Protocol Usage:**
+```json
+{
+  "method": "list_tools",
+  "params": {}
+}
+```
+```json
+{
+  "method": "call_tool", 
+  "params": {
+    "name": "similarity_search",
+    "arguments": {"query": "pricing", "limit": 5}
+  }
+}
+```
+**Tips:** Use appropriate regions, follow naming conventions, monitor costs.
+
+
+## Brief
+
+Google Cloud Platform environment and resource management.

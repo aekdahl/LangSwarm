@@ -1,152 +1,188 @@
 """
-Session Storage System
-======================
+LangSwarm V2 Session Storage Backends
 
-Handles persistence and retrieval of sessions and conversation history
+Simple, efficient storage backends for session persistence with focus on
+performance and reliability.
 """
 
 import json
 import sqlite3
-from abc import ABC, abstractmethod
-from pathlib import Path
+import asyncio
+import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
+from pathlib import Path
+import pickle
+from concurrent.futures import ThreadPoolExecutor
 
-from .models import LangSwarmSession, ConversationHistory, SessionMetadata, SessionStatus
-
-# Optional BigQuery support
-try:
-    from .bigquery_storage import BigQuerySessionStorage
-    BIGQUERY_AVAILABLE = True
-except ImportError:
-    BigQuerySessionStorage = None
-    BIGQUERY_AVAILABLE = False
-
-
-class SessionStorage(ABC):
-    """Abstract base class for session storage backends"""
-    
-    @abstractmethod
-    def save_session(self, session: LangSwarmSession) -> bool:
-        """Save a session"""
-        pass
-    
-    @abstractmethod
-    def load_session(self, session_id: str) -> Optional[LangSwarmSession]:
-        """Load a session by ID"""
-        pass
-    
-    @abstractmethod
-    def delete_session(self, session_id: str) -> bool:
-        """Delete a session"""
-        pass
-    
-    @abstractmethod
-    def list_sessions(self, user_id: Optional[str] = None, 
-                     status: Optional[SessionStatus] = None,
-                     limit: int = 100) -> List[SessionMetadata]:
-        """List sessions with optional filtering"""
-        pass
-    
-    @abstractmethod
-    def update_session_metadata(self, session_id: str, metadata: Dict[str, Any]) -> bool:
-        """Update session metadata"""
-        pass
-    
-    @abstractmethod
-    def cleanup_expired_sessions(self, max_age_days: int = 30) -> int:
-        """Clean up expired sessions and return count deleted"""
-        pass
+from .interfaces import (
+    ISessionStorage, SessionMessage, SessionContext, SessionMetrics,
+    SessionStatus, MessageRole, SessionStorageError
+)
+from langswarm.core.errors import handle_error
 
 
-class InMemorySessionStorage(SessionStorage):
-    """In-memory session storage for testing and development"""
+logger = logging.getLogger(__name__)
+
+
+class InMemorySessionStorage(ISessionStorage):
+    """
+    In-memory session storage for development and testing.
+    
+    Fast, simple storage that doesn't persist between restarts.
+    """
     
     def __init__(self):
-        self._sessions: Dict[str, LangSwarmSession] = {}
+        """Initialize in-memory storage"""
+        self._sessions: Dict[str, tuple[List[SessionMessage], SessionContext]] = {}
+        self._metrics: Dict[str, SessionMetrics] = {}
+        self._lock = asyncio.Lock()
+        
+        logger.debug("Initialized in-memory session storage")
     
-    def save_session(self, session: LangSwarmSession) -> bool:
+    async def save_session(
+        self,
+        session_id: str,
+        messages: List[SessionMessage],
+        context: SessionContext
+    ) -> bool:
         """Save session to memory"""
         try:
-            self._sessions[session.session_id] = session
+            async with self._lock:
+                self._sessions[session_id] = (messages.copy(), context)
+                
+                # Update metrics
+                if session_id not in self._metrics:
+                    self._metrics[session_id] = SessionMetrics()
+                
+                metrics = self._metrics[session_id]
+                metrics.message_count = len(messages)
+                metrics.last_activity = datetime.utcnow()
+                
+                # Calculate token count if available
+                total_tokens = sum(msg.token_count or 0 for msg in messages)
+                if total_tokens > 0:
+                    metrics.total_tokens = total_tokens
+            
+            logger.debug(f"Saved session {session_id} to memory")
             return True
-        except Exception:
+            
+        except Exception as e:
+            logger.error(f"Failed to save session {session_id}: {e}")
+            handle_error(e, "memory_storage_save")
             return False
     
-    def load_session(self, session_id: str) -> Optional[LangSwarmSession]:
+    async def load_session(
+        self,
+        session_id: str
+    ) -> Optional[tuple[List[SessionMessage], SessionContext]]:
         """Load session from memory"""
-        return self._sessions.get(session_id)
+        try:
+            async with self._lock:
+                return self._sessions.get(session_id)
+                
+        except Exception as e:
+            logger.error(f"Failed to load session {session_id}: {e}")
+            handle_error(e, "memory_storage_load")
+            return None
     
-    def delete_session(self, session_id: str) -> bool:
+    async def delete_session(self, session_id: str) -> bool:
         """Delete session from memory"""
-        if session_id in self._sessions:
-            del self._sessions[session_id]
-            return True
-        return False
-    
-    def list_sessions(self, user_id: Optional[str] = None, 
-                     status: Optional[SessionStatus] = None,
-                     limit: int = 100) -> List[SessionMetadata]:
-        """List sessions with filtering"""
-        sessions = list(self._sessions.values())
-        
-        # Filter by user_id
-        if user_id:
-            sessions = [s for s in sessions if s.user_id == user_id]
-        
-        # Filter by status
-        if status:
-            sessions = [s for s in sessions if s.metadata.status == status]
-        
-        # Sort by updated_at desc and limit
-        sessions.sort(key=lambda s: s.metadata.updated_at, reverse=True)
-        sessions = sessions[:limit]
-        
-        return [s.metadata for s in sessions]
-    
-    def update_session_metadata(self, session_id: str, metadata: Dict[str, Any]) -> bool:
-        """Update session metadata"""
-        session = self._sessions.get(session_id)
-        if session:
-            for key, value in metadata.items():
-                if hasattr(session.metadata, key):
-                    setattr(session.metadata, key, value)
+        try:
+            async with self._lock:
+                self._sessions.pop(session_id, None)
+                self._metrics.pop(session_id, None)
             
-            # Only update timestamp if not explicitly set
-            if "updated_at" not in metadata:
-                session.metadata.updated_at = datetime.now()
+            logger.debug(f"Deleted session {session_id} from memory")
             return True
-        return False
+            
+        except Exception as e:
+            logger.error(f"Failed to delete session {session_id}: {e}")
+            handle_error(e, "memory_storage_delete")
+            return False
     
-    def cleanup_expired_sessions(self, max_age_days: int = 30) -> int:
-        """Clean up expired sessions"""
-        cutoff = datetime.now() - timedelta(days=max_age_days)
-        expired_sessions = [
-            sid for sid, session in self._sessions.items()
-            if session.metadata.updated_at < cutoff
-        ]
-        
-        for session_id in expired_sessions:
-            del self._sessions[session_id]
-        
-        return len(expired_sessions)
+    async def list_sessions(
+        self,
+        user_id: Optional[str] = None,
+        status: Optional[SessionStatus] = None,
+        limit: int = 100
+    ) -> List[SessionContext]:
+        """List sessions from memory"""
+        try:
+            async with self._lock:
+                contexts = []
+                for session_id, (messages, context) in self._sessions.items():
+                    # Filter by user ID
+                    if user_id and context.user_id != user_id:
+                        continue
+                    
+                    # Filter by status (assume ACTIVE for in-memory)
+                    if status and status != SessionStatus.ACTIVE:
+                        continue
+                    
+                    contexts.append(context)
+                    
+                    if len(contexts) >= limit:
+                        break
+                
+                return contexts
+                
+        except Exception as e:
+            logger.error(f"Failed to list sessions: {e}")
+            handle_error(e, "memory_storage_list")
+            return []
+    
+    async def get_session_metrics(self, session_id: str) -> Optional[SessionMetrics]:
+        """Get session metrics from memory"""
+        try:
+            async with self._lock:
+                return self._metrics.get(session_id)
+                
+        except Exception as e:
+            logger.error(f"Failed to get metrics for session {session_id}: {e}")
+            handle_error(e, "memory_storage_metrics")
+            return None
 
 
-class SQLiteSessionStorage(SessionStorage):
-    """SQLite-based session storage for production use"""
+class SQLiteSessionStorage(ISessionStorage):
+    """
+    SQLite session storage for persistent local storage.
+    
+    Efficient, reliable storage with support for concurrent access.
+    """
     
     def __init__(self, db_path: str = "langswarm_sessions.db"):
         """
-        Initialize SQLite session storage
+        Initialize SQLite storage.
         
         Args:
             db_path: Path to SQLite database file
         """
         self.db_path = Path(db_path)
-        self._init_db()
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Thread pool for database operations
+        self._executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="session_db")
+        
+        # Initialize database
+        asyncio.create_task(self._init_database())
+        
+        logger.info(f"Initialized SQLite session storage: {db_path}")
     
-    def _init_db(self) -> None:
+    async def _init_database(self):
         """Initialize database schema"""
+        try:
+            await asyncio.get_event_loop().run_in_executor(
+                self._executor, self._create_tables
+            )
+            logger.debug("Database schema initialized")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize database: {e}")
+            handle_error(e, "sqlite_storage_init")
+    
+    def _create_tables(self):
+        """Create database tables"""
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS sessions (
@@ -154,216 +190,383 @@ class SQLiteSessionStorage(SessionStorage):
                     user_id TEXT NOT NULL,
                     provider TEXT NOT NULL,
                     model TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    session_control TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    last_activity TEXT,
-                    metadata TEXT NOT NULL,
-                    history TEXT NOT NULL
+                    backend TEXT NOT NULL,
+                    context_data TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
             
             conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_user_id ON sessions(user_id)
+                CREATE TABLE IF NOT EXISTS session_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    message_id TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    timestamp TIMESTAMP NOT NULL,
+                    metadata TEXT,
+                    provider_message_id TEXT,
+                    token_count INTEGER,
+                    finish_reason TEXT,
+                    FOREIGN KEY (session_id) REFERENCES sessions (session_id) ON DELETE CASCADE
+                )
             """)
             
             conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_status ON sessions(status)
+                CREATE TABLE IF NOT EXISTS session_metrics (
+                    session_id TEXT PRIMARY KEY,
+                    message_count INTEGER DEFAULT 0,
+                    total_tokens INTEGER DEFAULT 0,
+                    session_duration REAL DEFAULT 0.0,
+                    last_activity TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (session_id) REFERENCES sessions (session_id) ON DELETE CASCADE
+                )
             """)
             
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_updated_at ON sessions(updated_at)
-            """)
+            # Indexes for performance
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions (user_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_session_id ON session_messages (session_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON session_messages (timestamp)")
+            
+            conn.commit()
     
-    def save_session(self, session: LangSwarmSession) -> bool:
+    async def save_session(
+        self,
+        session_id: str,
+        messages: List[SessionMessage],
+        context: SessionContext
+    ) -> bool:
         """Save session to SQLite"""
         try:
-            session_data = session.to_dict()
+            await asyncio.get_event_loop().run_in_executor(
+                self._executor, self._save_session_sync, session_id, messages, context
+            )
             
-            with sqlite3.connect(self.db_path) as conn:
-                conn.execute("""
-                    INSERT OR REPLACE INTO sessions (
-                        session_id, user_id, provider, model, status, session_control,
-                        created_at, updated_at, last_activity, metadata, history
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    session.session_id,
-                    session.user_id,
-                    session.provider,
-                    session.model,
-                    session.metadata.status.value,
-                    session.metadata.session_control.value,
-                    session.metadata.created_at.isoformat(),
-                    session.metadata.updated_at.isoformat(),
-                    session.metadata.last_activity.isoformat() if session.metadata.last_activity else None,
-                    json.dumps(session_data["metadata"]),
-                    json.dumps(session_data["history"])
-                ))
+            logger.debug(f"Saved session {session_id} to SQLite")
             return True
+            
         except Exception as e:
-            print(f"Error saving session {session.session_id}: {e}")
+            logger.error(f"Failed to save session {session_id}: {e}")
+            handle_error(e, "sqlite_storage_save")
             return False
     
-    def load_session(self, session_id: str) -> Optional[LangSwarmSession]:
+    def _save_session_sync(
+        self,
+        session_id: str,
+        messages: List[SessionMessage],
+        context: SessionContext
+    ):
+        """Synchronous session save"""
+        with sqlite3.connect(self.db_path) as conn:
+            # Save session context
+            context_data = json.dumps({
+                'session_id': context.session_id,
+                'user_id': context.user_id,
+                'provider': context.provider,
+                'model': context.model,
+                'backend': context.backend.value,
+                'max_messages': context.max_messages,
+                'auto_archive': context.auto_archive,
+                'persist_messages': context.persist_messages,
+                'provider_session_id': context.provider_session_id,
+                'provider_context': context.provider_context
+            })
+            
+            conn.execute("""
+                INSERT OR REPLACE INTO sessions 
+                (session_id, user_id, provider, model, backend, context_data, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                session_id, context.user_id, context.provider, context.model,
+                context.backend.value, context_data, datetime.utcnow()
+            ))
+            
+            # Clear existing messages
+            conn.execute("DELETE FROM session_messages WHERE session_id = ?", (session_id,))
+            
+            # Save messages
+            for msg in messages:
+                conn.execute("""
+                    INSERT INTO session_messages 
+                    (session_id, message_id, role, content, timestamp, metadata, 
+                     provider_message_id, token_count, finish_reason)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    session_id, msg.id, msg.role.value, msg.content, msg.timestamp,
+                    json.dumps(msg.metadata), msg.provider_message_id,
+                    msg.token_count, msg.finish_reason
+                ))
+            
+            # Update metrics
+            total_tokens = sum(msg.token_count or 0 for msg in messages)
+            conn.execute("""
+                INSERT OR REPLACE INTO session_metrics 
+                (session_id, message_count, total_tokens, last_activity)
+                VALUES (?, ?, ?, ?)
+            """, (session_id, len(messages), total_tokens, datetime.utcnow()))
+            
+            conn.commit()
+    
+    async def load_session(
+        self,
+        session_id: str
+    ) -> Optional[tuple[List[SessionMessage], SessionContext]]:
         """Load session from SQLite"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
-                conn.row_factory = sqlite3.Row
-                cursor = conn.execute("""
-                    SELECT metadata, history FROM sessions WHERE session_id = ?
-                """, (session_id,))
-                
-                row = cursor.fetchone()
-                if row:
-                    session_data = {
-                        "metadata": json.loads(row["metadata"]),
-                        "history": json.loads(row["history"])
-                    }
-                    return LangSwarmSession.from_dict(session_data)
+            result = await asyncio.get_event_loop().run_in_executor(
+                self._executor, self._load_session_sync, session_id
+            )
+            
+            if result:
+                logger.debug(f"Loaded session {session_id} from SQLite")
+            
+            return result
+            
         except Exception as e:
-            print(f"Error loading session {session_id}: {e}")
-        
-        return None
+            logger.error(f"Failed to load session {session_id}: {e}")
+            handle_error(e, "sqlite_storage_load")
+            return None
     
-    def delete_session(self, session_id: str) -> bool:
+    def _load_session_sync(
+        self,
+        session_id: str
+    ) -> Optional[tuple[List[SessionMessage], SessionContext]]:
+        """Synchronous session load"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            # Load session context
+            session_row = conn.execute(
+                "SELECT * FROM sessions WHERE session_id = ?", (session_id,)
+            ).fetchone()
+            
+            if not session_row:
+                return None
+            
+            # Parse context data
+            context_data = json.loads(session_row['context_data'])
+            context = SessionContext(
+                session_id=context_data['session_id'],
+                user_id=context_data['user_id'],
+                provider=context_data['provider'],
+                model=context_data['model'],
+                backend=context_data['backend'],
+                max_messages=context_data.get('max_messages', 100),
+                auto_archive=context_data.get('auto_archive', True),
+                persist_messages=context_data.get('persist_messages', True),
+                provider_session_id=context_data.get('provider_session_id'),
+                provider_context=context_data.get('provider_context', {})
+            )
+            
+            # Load messages
+            message_rows = conn.execute("""
+                SELECT * FROM session_messages 
+                WHERE session_id = ? 
+                ORDER BY timestamp ASC
+            """, (session_id,)).fetchall()
+            
+            messages = []
+            for row in message_rows:
+                metadata = json.loads(row['metadata']) if row['metadata'] else {}
+                message = SessionMessage(
+                    id=row['message_id'],
+                    role=MessageRole(row['role']),
+                    content=row['content'],
+                    timestamp=datetime.fromisoformat(row['timestamp']),
+                    metadata=metadata,
+                    provider_message_id=row['provider_message_id'],
+                    token_count=row['token_count'],
+                    finish_reason=row['finish_reason']
+                )
+                messages.append(message)
+            
+            return messages, context
+    
+    async def delete_session(self, session_id: str) -> bool:
         """Delete session from SQLite"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.execute("""
-                    DELETE FROM sessions WHERE session_id = ?
-                """, (session_id,))
-                return cursor.rowcount > 0
+            await asyncio.get_event_loop().run_in_executor(
+                self._executor, self._delete_session_sync, session_id
+            )
+            
+            logger.debug(f"Deleted session {session_id} from SQLite")
+            return True
+            
         except Exception as e:
-            print(f"Error deleting session {session_id}: {e}")
+            logger.error(f"Failed to delete session {session_id}: {e}")
+            handle_error(e, "sqlite_storage_delete")
             return False
     
-    def list_sessions(self, user_id: Optional[str] = None, 
-                     status: Optional[SessionStatus] = None,
-                     limit: int = 100) -> List[SessionMetadata]:
-        """List sessions with filtering"""
+    def _delete_session_sync(self, session_id: str):
+        """Synchronous session delete"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+            conn.commit()
+    
+    async def list_sessions(
+        self,
+        user_id: Optional[str] = None,
+        status: Optional[SessionStatus] = None,
+        limit: int = 100
+    ) -> List[SessionContext]:
+        """List sessions from SQLite"""
         try:
-            query = "SELECT metadata FROM sessions WHERE 1=1"
+            result = await asyncio.get_event_loop().run_in_executor(
+                self._executor, self._list_sessions_sync, user_id, status, limit
+            )
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Failed to list sessions: {e}")
+            handle_error(e, "sqlite_storage_list")
+            return []
+    
+    def _list_sessions_sync(
+        self,
+        user_id: Optional[str],
+        status: Optional[SessionStatus],
+        limit: int
+    ) -> List[SessionContext]:
+        """Synchronous session list"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            query = "SELECT * FROM sessions"
             params = []
             
             if user_id:
-                query += " AND user_id = ?"
+                query += " WHERE user_id = ?"
                 params.append(user_id)
-            
-            if status:
-                query += " AND status = ?"
-                params.append(status.value)
             
             query += " ORDER BY updated_at DESC LIMIT ?"
             params.append(limit)
             
-            with sqlite3.connect(self.db_path) as conn:
-                conn.row_factory = sqlite3.Row
-                cursor = conn.execute(query, params)
-                
-                sessions = []
-                for row in cursor.fetchall():
-                    metadata_dict = json.loads(row["metadata"])
-                    sessions.append(SessionMetadata.from_dict(metadata_dict))
-                
-                return sessions
-        except Exception as e:
-            print(f"Error listing sessions: {e}")
-            return []
-    
-    def update_session_metadata(self, session_id: str, metadata: Dict[str, Any]) -> bool:
-        """Update session metadata"""
-        try:
-            session = self.load_session(session_id)
-            if session:
-                for key, value in metadata.items():
-                    if hasattr(session.metadata, key):
-                        # Handle datetime conversion for testing
-                        if key == "updated_at" and isinstance(value, datetime):
-                            setattr(session.metadata, key, value)
-                        else:
-                            setattr(session.metadata, key, value)
-                
-                # Only update timestamp if not explicitly set
-                if "updated_at" not in metadata:
-                    session.metadata.updated_at = datetime.now()
-                
-                return self.save_session(session)
-            return False
-        except Exception as e:
-            print(f"Error updating session metadata {session_id}: {e}")
-            return False
-    
-    def cleanup_expired_sessions(self, max_age_days: int = 30) -> int:
-        """Clean up expired sessions"""
-        try:
-            cutoff = datetime.now() - timedelta(days=max_age_days)
+            rows = conn.execute(query, params).fetchall()
             
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.execute("""
-                    DELETE FROM sessions WHERE updated_at < ?
-                """, (cutoff.isoformat(),))
-                return cursor.rowcount
-        except Exception as e:
-            print(f"Error cleaning up expired sessions: {e}")
-            return 0
-
-
-class SessionStorageFactory:
-    """Factory for creating session storage instances"""
+            contexts = []
+            for row in rows:
+                context_data = json.loads(row['context_data'])
+                context = SessionContext(
+                    session_id=context_data['session_id'],
+                    user_id=context_data['user_id'],
+                    provider=context_data['provider'],
+                    model=context_data['model'],
+                    backend=context_data['backend'],
+                    max_messages=context_data.get('max_messages', 100),
+                    auto_archive=context_data.get('auto_archive', True),
+                    persist_messages=context_data.get('persist_messages', True),
+                    provider_session_id=context_data.get('provider_session_id'),
+                    provider_context=context_data.get('provider_context', {})
+                )
+                contexts.append(context)
+            
+            return contexts
     
-    @classmethod
-    def create_storage(cls, storage_type: str = "sqlite", **kwargs) -> SessionStorage:
+    async def get_session_metrics(self, session_id: str) -> Optional[SessionMetrics]:
+        """Get session metrics from SQLite"""
+        try:
+            result = await asyncio.get_event_loop().run_in_executor(
+                self._executor, self._get_metrics_sync, session_id
+            )
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Failed to get metrics for session {session_id}: {e}")
+            handle_error(e, "sqlite_storage_metrics")
+            return None
+    
+    def _get_metrics_sync(self, session_id: str) -> Optional[SessionMetrics]:
+        """Synchronous metrics get"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            row = conn.execute(
+                "SELECT * FROM session_metrics WHERE session_id = ?", (session_id,)
+            ).fetchone()
+            
+            if not row:
+                return None
+            
+            return SessionMetrics(
+                message_count=row['message_count'],
+                total_tokens=row['total_tokens'],
+                session_duration=row['session_duration'],
+                last_activity=datetime.fromisoformat(row['last_activity']) if row['last_activity'] else None,
+                created_at=datetime.fromisoformat(row['created_at'])
+            )
+    
+    async def cleanup_old_sessions(self, max_age_days: int = 30) -> int:
+        """Clean up old sessions"""
+        try:
+            result = await asyncio.get_event_loop().run_in_executor(
+                self._executor, self._cleanup_old_sessions_sync, max_age_days
+            )
+            
+            logger.info(f"Cleaned up {result} old sessions")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Failed to cleanup old sessions: {e}")
+            handle_error(e, "sqlite_storage_cleanup")
+            return 0
+    
+    def _cleanup_old_sessions_sync(self, max_age_days: int) -> int:
+        """Synchronous old session cleanup"""
+        cutoff_date = datetime.utcnow() - timedelta(days=max_age_days)
+        
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                "DELETE FROM sessions WHERE updated_at < ?", (cutoff_date,)
+            )
+            count = cursor.rowcount
+            conn.commit()
+            
+            return count
+
+
+class StorageFactory:
+    """Factory for creating session storage backends"""
+    
+    @staticmethod
+    def create_storage(storage_type: str, **kwargs) -> ISessionStorage:
         """
-        Create a session storage instance
+        Create session storage backend.
         
         Args:
-            storage_type: Type of storage ("memory", "sqlite", "bigquery")
+            storage_type: Storage type (memory, sqlite)
             **kwargs: Storage-specific configuration
+            
+        Returns:
+            Session storage instance
         """
-        if storage_type == "memory":
+        if storage_type.lower() in ["memory", "in_memory"]:
             return InMemorySessionStorage()
-        elif storage_type == "sqlite":
+        
+        elif storage_type.lower() in ["sqlite", "local"]:
             db_path = kwargs.get("db_path", "langswarm_sessions.db")
             return SQLiteSessionStorage(db_path)
-        elif storage_type == "bigquery":
-            if not BIGQUERY_AVAILABLE:
-                raise ImportError("BigQuery storage requires google-cloud-bigquery package")
-            
-            project_id = kwargs.get("project_id")
-            if not project_id:
-                raise ValueError("BigQuery storage requires 'project_id' parameter")
-            
-            dataset_id = kwargs.get("dataset_id", "langswarm_sessions") 
-            table_id = kwargs.get("table_id", "session_events")
-            
-            return BigQuerySessionStorage(
-                project_id=project_id,
-                dataset_id=dataset_id,
-                table_id=table_id
-            )
+        
         else:
             raise ValueError(f"Unknown storage type: {storage_type}")
-    
-    @classmethod
-    def get_default_storage(cls) -> SessionStorage:
-        """Get default session storage (SQLite)"""
-        return cls.create_storage("sqlite")
 
 
-# Global session storage instance
-_default_storage: Optional[SessionStorage] = None
+# Global storage instance
+_default_storage: Optional[ISessionStorage] = None
 
 
-def get_session_storage() -> SessionStorage:
-    """Get the global session storage instance"""
+def get_default_storage() -> ISessionStorage:
+    """Get default session storage"""
     global _default_storage
     if _default_storage is None:
-        _default_storage = SessionStorageFactory.get_default_storage()
+        _default_storage = SQLiteSessionStorage()
     return _default_storage
 
 
-def set_session_storage(storage: SessionStorage) -> None:
-    """Set the global session storage instance"""
+def set_default_storage(storage: ISessionStorage):
+    """Set default session storage"""
     global _default_storage
-    _default_storage = storage 
+    _default_storage = storage

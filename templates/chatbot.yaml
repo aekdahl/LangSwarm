@@ -1,0 +1,12 @@
+# Simple chatbot configuration
+version: "2.0"
+name: "Simple Chatbot"
+
+agents:
+  - id: "chatbot"
+    model: "gpt-3.5-turbo"
+    system_prompt: |
+      You are a friendly and helpful chatbot.
+      Be conversational, engaging, and supportive.
+      
+# That's it! Memory, security, and error handling are automatic

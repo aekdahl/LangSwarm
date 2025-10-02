@@ -1,0 +1,16 @@
+# AI coding assistant with file access
+version: "2.0"
+name: "Code Assistant"
+
+agents:
+  - id: "coder"
+    model: "gpt-4"
+    system_prompt: |
+      You are an expert programmer and coding assistant.
+      - Write clean, well-commented code
+      - Follow best practices and design patterns
+      - Explain your code when asked
+      - Suggest improvements and optimizations
+    tools: ["filesystem"]  # Can read/write files
+
+# Includes filesystem access for reading/writing code

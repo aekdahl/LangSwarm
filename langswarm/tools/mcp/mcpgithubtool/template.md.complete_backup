@@ -1,0 +1,79 @@
+# Mcpgithubtool MCP Tool
+
+## Description
+
+Intelligent GitHub integration with natural language repository management and automated development workflows.
+
+## Instructions
+
+🎯 **LangSwarm's Intent-Based Tool Calling**
+
+Describe your GitHub workflow needs and get intelligent repository management and automation.
+
+**Preferred: Intent-Based Calling (LangSwarm USP)**
+```json
+{
+  "tool": "mcpgithubtool",
+  "intent": "Create a bug report issue for the login problem with authentication errors",
+  "context": "user reports, authentication system, priority bug"
+}
+```
+
+**Alternative: Direct Method Calling**
+```json
+{
+  "tool": "mcpgithubtool",
+  "method": "create_issue",
+  "params": {
+    "repo": "company/main-app",
+    "title": "Bug: Authentication errors in login",
+    "labels": ["bug", "authentication", "priority"]
+  }
+}
+```
+
+**When to use:** Repository management, issue tracking, pull request automation, development workflows.
+
+**Intent examples:**
+- "Find all open pull requests that need code review"
+- "Create a feature request for mobile app improvements"
+- "Check the deployment status of the latest release"
+
+**Available operations:** create_issue, manage_pull_requests, repository_analysis, workflow_automation
+
+### Standard MCP Protocol Methods
+
+This tool supports standard MCP protocol for discovery and introspection:
+
+**Discovery Methods:**
+- `list_tools()` - Discover all available methods and their schemas
+- `list_prompts()` - Find available agent prompts for workflows  
+- `list_resources()` - See available files (template.md, agents.yaml, etc.)
+
+**Execution Methods:**
+- `call_tool(name, arguments)` - Execute any tool method by name
+- `get_prompt(name, arguments)` - Get formatted prompts with variables
+- `read_resource(uri)` - Access specific resource content
+
+**Example Protocol Usage:**
+```json
+{
+  "method": "list_tools",
+  "params": {}
+}
+```
+```json
+{
+  "method": "call_tool", 
+  "params": {
+    "name": "similarity_search",
+    "arguments": {"query": "pricing", "limit": 5}
+  }
+}
+```
+**Pro tip:** Intent-based calls format issues properly, assign labels, and route to appropriate team members automatically.
+
+
+## Brief
+
+GitHub integration with intelligent intent processing for natural language repository management.

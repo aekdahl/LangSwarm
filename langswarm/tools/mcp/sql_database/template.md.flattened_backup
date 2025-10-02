@@ -1,0 +1,64 @@
+# Sql Database MCP Tool
+
+## Description
+
+Intelligent SQL interface with natural language query understanding using standard MCP protocol.
+
+## Instructions
+
+🎯 **LangSwarm's Intelligent Intent Processing (Standard MCP)**
+
+Transform natural language into optimal SQL queries using the standard MCP protocol.
+
+**Preferred: Intent-Based Calling (LangSwarm USP)**
+```json
+{
+  "method": "call_tool",
+  "params": {
+    "name": "sql_database",
+    "arguments": {
+      "intent": "Show me customers from Stockholm who signed up in the last quarter",
+      "context": "customer analysis, geographic segmentation"
+    }
+  }
+}
+```
+
+**Alternative: Direct Method Calling**
+```json
+{
+  "method": "call_tool",
+  "params": {
+    "name": "sql_database",
+    "arguments": {
+      "method": "execute_query",
+      "params": {
+        "query": "SELECT * FROM customers WHERE city='Stockholm' AND signup_date >= DATE_SUB(NOW(), INTERVAL 3 MONTH)"
+      }
+    }
+  }
+}
+```
+
+**When to use:** Data analysis, reporting, customer insights, business intelligence queries.
+
+**Intent examples:**
+- "Find our top performing products this month"
+- "Show users who haven't logged in recently"
+- "Get revenue breakdown by region"
+
+**Available methods:** execute_query, list_tables, describe_table, analyze_data
+
+### Standard MCP Protocol Methods
+
+**Discovery & Execution:**
+- `list_tools()` - Discover SQL operations and schemas
+- `call_tool(name, arguments)` - Execute with intent or direct SQL
+- `list_prompts()` - Find SQL generation prompts
+- `list_resources()` - Access database schemas and documentation
+
+**Pro tip:** Intent-based calls handle SQL generation, optimization, and error correction automatically.
+
+## Brief
+
+SQL database interface with intelligent natural language query processing via standard MCP.

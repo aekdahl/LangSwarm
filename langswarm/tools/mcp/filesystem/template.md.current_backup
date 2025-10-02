@@ -1,0 +1,79 @@
+# Filesystem MCP Tool
+
+## Description
+
+Smart file system operations with natural language intent understanding for file and directory management.
+
+## Instructions
+
+🎯 **LangSwarm's Intent-Based Tool Calling**
+
+Describe your file operation needs naturally and let the tool determine the best approach.
+
+**Preferred: Intent-Based Calling (LangSwarm USP)**
+```json
+{
+  "tool": "filesystem",
+  "intent": "Find all Python files in the project that were modified today",
+  "context": "code review, recent changes"
+}
+```
+
+**Alternative: Direct Method Calling**
+```json
+{
+  "tool": "filesystem",
+  "method": "list_directory",
+  "params": {
+    "path": "/project",
+    "pattern": "*.py",
+    "modified_since": "today"
+  }
+}
+```
+
+**When to use:** File management, code exploration, content search, directory operations.
+
+**Intent examples:**
+- "Show me the latest log files from the server"
+- "Find configuration files that need updating"
+- "List all documents created this week"
+
+**Available operations:** read_file, write_file, list_directory, search_files, manage_permissions
+
+### Standard MCP Protocol Methods
+
+This tool supports standard MCP protocol for discovery and introspection:
+
+**Discovery Methods:**
+- `list_tools()` - Discover all available methods and their schemas
+- `list_prompts()` - Find available agent prompts for workflows  
+- `list_resources()` - See available files (template.md, agents.yaml, etc.)
+
+**Execution Methods:**
+- `call_tool(name, arguments)` - Execute any tool method by name
+- `get_prompt(name, arguments)` - Get formatted prompts with variables
+- `read_resource(uri)` - Access specific resource content
+
+**Example Protocol Usage:**
+```json
+{
+  "method": "list_tools",
+  "params": {}
+}
+```
+```json
+{
+  "method": "call_tool", 
+  "params": {
+    "name": "similarity_search",
+    "arguments": {"query": "pricing", "limit": 5}
+  }
+}
+```
+**Pro tip:** Intent-based calls can combine multiple operations and handle path resolution intelligently.
+
+
+## Brief
+
+File system operations with intelligent intent processing for natural language file management.

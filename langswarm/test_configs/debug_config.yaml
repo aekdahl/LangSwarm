@@ -1,0 +1,453 @@
+# LangSwarm V2 Debug Configuration
+# Modern configuration for V2 system testing with enhanced observability and middleware integration
+
+version: "2.0"
+config_name: "V2 Debug Configuration"
+description: "Comprehensive debug configuration for LangSwarm V2 system testing"
+
+# Environment Configuration
+environment:
+  name: "${LANGSWARM_ENV:-development}"
+  debug_mode: true
+  verbose_logging: true
+  enable_development_features: true
+
+# V2 Provider Configurations
+providers:
+  # OpenAI Provider (Enhanced V2 Configuration)
+  openai:
+    api_key: "${OPENAI_API_KEY}"
+    base_url: "${OPENAI_BASE_URL}"
+    organization: "${OPENAI_ORGANIZATION}"
+    
+    # V2 Provider Settings
+    default_model: "gpt-4o"
+    max_retries: 3
+    timeout_seconds: 60
+    enable_streaming: true
+    enable_function_calling: true
+    
+    # V2 Connection Pool Settings
+    connection_pool:
+      min_connections: 2
+      max_connections: 10
+      timeout_seconds: 30
+      enable_health_checks: true
+      
+    # V2 Cost Management
+    cost_tracking:
+      enable: true
+      budget_alerts: true
+      cost_per_token: 0.00001
+      
+  # Anthropic Provider (V2)
+  anthropic:
+    api_key: "${ANTHROPIC_API_KEY}"
+    default_model: "claude-3-sonnet-20240229"
+    max_retries: 3
+    timeout_seconds: 60
+    enable_streaming: true
+    
+  # Google Cloud Provider (Enhanced V2)
+  google_cloud:
+    project_id: "${GOOGLE_CLOUD_PROJECT:-production-pingday}"
+    region: "${GOOGLE_CLOUD_REGION:-us-central1}"
+    
+    # Authentication (Multiple Methods)
+    credentials_path: "${GOOGLE_APPLICATION_CREDENTIALS}"
+    service_account_key: "${GOOGLE_SERVICE_ACCOUNT_KEY}"
+    # Falls back to Application Default Credentials if above not set
+    
+    # V2 Provider Features
+    enable_vertex_ai: true
+    enable_bigquery: true
+    enable_cloud_storage: true
+    
+    # BigQuery Specific Configuration
+    bigquery:
+      dataset_id: "${BIGQUERY_DATASET_ID:-vector_search}"
+      location: "${BIGQUERY_LOCATION:-US}"
+      enable_caching: true
+      cache_ttl_seconds: 3600
+      max_results_per_query: 1000
+      
+    # Vertex AI Configuration
+    vertex_ai:
+      location: "${VERTEX_AI_LOCATION:-us-central1}"
+      enable_embeddings: true
+      enable_text_generation: true
+      
+# V2 Database Configurations
+databases:
+  # BigQuery Configuration (Enhanced V2)
+  bigquery:
+    project_id: "${GOOGLE_CLOUD_PROJECT:-production-pingday}"
+    dataset_id: "${BIGQUERY_DATASET_ID:-vector_search}"
+    table_name: "${BIGQUERY_TABLE_NAME:-embeddings}"
+    
+    # V2 Vector Search Settings
+    vector_search:
+      embedding_model: "${EMBEDDING_MODEL:-text-embedding-3-small}"
+      embedding_dimensions: 1536
+      max_results: "${MAX_SEARCH_RESULTS:-10}"
+      similarity_threshold: "${SIMILARITY_THRESHOLD:-0.01}"
+      distance_metric: "cosine"
+      
+    # V2 Performance Settings
+    performance:
+      enable_query_caching: true
+      cache_ttl_seconds: 300
+      max_concurrent_queries: 5
+      query_timeout_seconds: 60
+      enable_query_optimization: true
+      
+    # V2 Monitoring
+    monitoring:
+      enable_query_logging: true
+      enable_performance_metrics: true
+      log_slow_queries: true
+      slow_query_threshold_ms: 5000
+      
+  # PostgreSQL Configuration (V2)
+  postgresql:
+    url: "${POSTGRES_URL}"
+    host: "${POSTGRES_HOST:-localhost}"
+    port: "${POSTGRES_PORT:-5432}"
+    database: "${POSTGRES_DB:-langswarm}"
+    username: "${POSTGRES_USER:-postgres}"
+    password: "${POSTGRES_PASSWORD}"
+    
+    # V2 Connection Pool
+    connection_pool:
+      min_connections: 2
+      max_connections: 20
+      connection_timeout_seconds: 30
+      idle_timeout_seconds: 300
+      
+  # SQLite Configuration (V2)
+  sqlite:
+    path: "${SQLITE_PATH:-./debug.db}"
+    enable_wal_mode: true
+    enable_foreign_keys: true
+    timeout_seconds: 30
+    
+  # Redis Configuration (V2)
+  redis:
+    url: "${REDIS_URL}"
+    host: "${REDIS_HOST:-localhost}"
+    port: "${REDIS_PORT:-6379}"
+    password: "${REDIS_PASSWORD}"
+    db: "${REDIS_DB:-0}"
+    
+    # V2 Redis Settings
+    connection_pool:
+      max_connections: 20
+      connection_timeout_seconds: 30
+    enable_clustering: false
+    enable_ssl: false
+
+# V2 Memory Configuration
+memory:
+  # Default Backend
+  default_backend: "development"
+  
+  # Backend Configurations
+  backends:
+    development:
+      type: "in_memory"
+      max_size_mb: 100
+      ttl_seconds: 3600
+      
+    testing:
+      type: "sqlite"
+      path: ":memory:"
+      enable_persistence: false
+      
+    production:
+      type: "redis"
+      connection: "redis"
+      enable_clustering: true
+      enable_persistence: true
+      
+    cloud:
+      type: "bigquery"
+      connection: "bigquery"
+      table_prefix: "memory_"
+      enable_vector_search: true
+
+# V2 Observability Configuration
+observability:
+  # Global Observability Settings
+  enable_tracing: true
+  enable_metrics: true
+  enable_logging: true
+  enable_profiling: "${ENABLE_PROFILING:-false}"
+  
+  # V2 Logging Configuration
+  logging:
+    level: "${LOG_LEVEL:-DEBUG}"
+    format: "structured"
+    output_dir: "${LOG_OUTPUT_DIR:-debug_traces/v2}"
+    
+    # File Logging
+    file_logging:
+      enable: true
+      max_file_size_mb: 100
+      max_files: 10
+      rotation: "daily"
+      
+    # Console Logging
+    console_logging:
+      enable: true
+      colorize: true
+      include_timestamp: true
+      include_level: true
+      
+    # Structured Logging
+    structured_logging:
+      enable: true
+      format: "json"
+      include_request_id: true
+      include_trace_id: true
+      include_user_id: true
+      
+  # V2 Tracing Configuration
+  tracing:
+    provider: "langswarm_v2"
+    sample_rate: "${TRACE_SAMPLE_RATE:-1.0}"
+    
+    # Span Configuration
+    spans:
+      enable_http_spans: true
+      enable_db_spans: true
+      enable_agent_spans: true
+      enable_tool_spans: true
+      enable_workflow_spans: true
+      
+    # Export Configuration
+    export:
+      enable: true
+      format: "json"
+      output_dir: "${TRACE_OUTPUT_DIR:-debug_traces/v2/traces}"
+      batch_size: 100
+      export_interval_seconds: 10
+      
+  # V2 Metrics Configuration
+  metrics:
+    provider: "langswarm_v2"
+    enable_system_metrics: true
+    enable_application_metrics: true
+    enable_business_metrics: true
+    
+    # Collection Settings
+    collection:
+      interval_seconds: 15
+      enable_histograms: true
+      enable_counters: true
+      enable_gauges: true
+      
+    # Export Configuration
+    export:
+      enable: true
+      format: "prometheus"
+      output_dir: "${METRICS_OUTPUT_DIR:-debug_traces/v2/metrics}"
+      export_interval_seconds: 60
+      
+  # V2 Profiling Configuration (Development)
+  profiling:
+    enable: "${ENABLE_PROFILING:-false}"
+    profile_type: "cpu"
+    output_dir: "${PROFILE_OUTPUT_DIR:-debug_traces/v2/profiles}"
+    profile_duration_seconds: 30
+    
+# V2 Middleware Configuration
+middleware:
+  # Global Middleware Settings
+  enable_pipeline: true
+  enable_observability_integration: true
+  
+  # Pipeline Configuration
+  pipeline:
+    timeout_seconds: 300
+    max_concurrent_requests: 50
+    enable_request_queuing: true
+    queue_size: 1000
+    
+  # Interceptor Configuration
+  interceptors:
+    # Routing Interceptor
+    routing:
+      enable: true
+      priority: 100
+      enable_load_balancing: true
+      enable_failover: true
+      
+    # Validation Interceptor
+    validation:
+      enable: true
+      priority: 200
+      enable_schema_validation: true
+      enable_business_rules: true
+      
+    # Context Enrichment Interceptor
+    context_enrichment:
+      enable: true
+      priority: 300
+      include_system_context: true
+      include_user_context: true
+      include_performance_context: true
+      
+    # Result Transformation Interceptor
+    result_transformation:
+      enable: true
+      priority: 900
+      enable_format_conversion: true
+      enable_data_filtering: true
+      
+    # Audit Interceptor
+    audit:
+      enable: true
+      priority: 1000
+      audit_level: "comprehensive"
+      enable_compliance_logging: true
+
+# V2 Error Handling Configuration
+error_handling:
+  # Global Error Strategy
+  strategy: "graceful_degradation"
+  enable_recovery: true
+  enable_fallbacks: true
+  
+  # Retry Configuration
+  retry:
+    max_attempts: 3
+    base_delay_seconds: 1.0
+    max_delay_seconds: 60.0
+    exponential_backoff: true
+    jitter: true
+    
+  # Circuit Breaker Configuration
+  circuit_breaker:
+    enable: true
+    failure_threshold: 5
+    timeout_seconds: 60
+    half_open_max_calls: 3
+    
+  # Error Reporting
+  reporting:
+    enable: true
+    include_stack_traces: true
+    include_context: true
+    enable_error_aggregation: true
+
+# V2 Performance Configuration
+performance:
+  # Connection Pooling
+  connection_pooling:
+    enable: true
+    default_pool_size: 10
+    max_pool_size: 100
+    connection_timeout_seconds: 30
+    idle_timeout_seconds: 300
+    
+  # Caching
+  caching:
+    enable: true
+    default_ttl_seconds: 300
+    max_cache_size_mb: 500
+    cache_implementation: "memory"
+    
+  # Request Optimization
+  request_optimization:
+    enable_batching: true
+    batch_size: 10
+    batch_timeout_ms: 100
+    enable_compression: true
+    enable_keep_alive: true
+    
+  # Resource Limits
+  resource_limits:
+    max_memory_mb: 2048
+    max_cpu_percent: 80
+    max_concurrent_operations: 100
+    max_request_size_mb: 10
+
+# V2 Security Configuration
+security:
+  # API Security
+  api_security:
+    enable_rate_limiting: true
+    rate_limit_requests_per_minute: 1000
+    enable_request_validation: true
+    enable_response_sanitization: true
+    
+  # Data Security
+  data_security:
+    enable_encryption_at_rest: false
+    enable_encryption_in_transit: true
+    enable_data_masking: true
+    data_retention_days: 30
+    
+  # Authentication & Authorization
+  auth:
+    enable_api_key_auth: false
+    enable_oauth: false
+    enable_rbac: false
+    
+# V2 Testing Configuration
+testing:
+  # Test Execution
+  enable_test_mode: "${TEST_MODE:-false}"
+  mock_external_apis: "${MOCK_APIS:-false}"
+  enable_test_fixtures: true
+  
+  # Test Data
+  test_data_dir: "${TEST_DATA_DIR:-test_data}"
+  enable_test_data_generation: true
+  
+  # Test Reporting
+  test_reporting:
+    enable: true
+    output_dir: "${TEST_OUTPUT_DIR:-debug_traces/v2/tests}"
+    include_performance_metrics: true
+    include_coverage_reports: true
+
+# V2 Development Features
+development:
+  # Debug Features
+  enable_debug_endpoints: true
+  enable_health_checks: true
+  enable_metrics_endpoints: true
+  enable_config_reload: true
+  
+  # Development Tools
+  tools:
+    enable_interactive_console: true
+    enable_workflow_designer: false
+    enable_tool_explorer: true
+    enable_agent_debugger: true
+    
+  # Hot Reload
+  hot_reload:
+    enable: false
+    watch_directories: ["langswarm/v2"]
+    ignore_patterns: ["**/__pycache__/**", "**/*.pyc"]
+
+# Migration Support
+migration:
+  # V1 Compatibility
+  enable_v1_compatibility: true
+  v1_fallback_mode: "warn"
+  enable_migration_warnings: true
+  
+  # Migration Tools
+  tools:
+    enable_config_migration: true
+    enable_tool_migration: true
+    enable_workflow_migration: true
+    
+  # Migration Tracking
+  tracking:
+    enable: true
+    output_dir: "${MIGRATION_OUTPUT_DIR:-debug_traces/v2/migration}"
+    include_usage_analytics: true

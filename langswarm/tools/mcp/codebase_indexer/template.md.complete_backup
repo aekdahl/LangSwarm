@@ -1,0 +1,62 @@
+# Codebase Indexer MCP Tool
+
+## Description
+
+Code analysis and indexing tool for understanding, searching, and documenting software projects.
+
+## Instructions
+
+Analyze and index codebases for documentation and search.
+
+**When to use:** Index code projects, analyze code structure, generate documentation, or search code files.
+
+**Main method:**
+```json
+{
+  "tool": "codebase_indexer",
+  "method": "index_project",
+  "params": {
+    "path": "/path/to/project",
+    "language": "python"
+  }
+}
+```
+
+**Other methods:** `search_code`, `analyze_structure`, `generate_docs`
+
+### Standard MCP Protocol Methods
+
+This tool supports standard MCP protocol for discovery and introspection:
+
+**Discovery Methods:**
+- `list_tools()` - Discover all available methods and their schemas
+- `list_prompts()` - Find available agent prompts for workflows  
+- `list_resources()` - See available files (template.md, agents.yaml, etc.)
+
+**Execution Methods:**
+- `call_tool(name, arguments)` - Execute any tool method by name
+- `get_prompt(name, arguments)` - Get formatted prompts with variables
+- `read_resource(uri)` - Access specific resource content
+
+**Example Protocol Usage:**
+```json
+{
+  "method": "list_tools",
+  "params": {}
+}
+```
+```json
+{
+  "method": "call_tool", 
+  "params": {
+    "name": "similarity_search",
+    "arguments": {"query": "pricing", "limit": 5}
+  }
+}
+```
+**Tips:** Specify correct language, use relative paths, handle large projects incrementally.
+
+
+## Brief
+
+Code analysis and indexing for documentation and project understanding.

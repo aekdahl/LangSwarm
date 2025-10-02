@@ -1,0 +1,215 @@
+# Debug Tools Testing Configuration
+# ================================
+# LangSwarm configuration for testing debug tools with comprehensive tracing
+
+version: "2.0"
+name: "Debug Tools Testing System"
+description: "Comprehensive testing system for debug tools with workflow orchestration and tracing"
+
+# Agent definitions
+agents:
+  - id: "tool_tester"
+    name: "Tool Testing Agent"
+    provider: "openai"
+    model: "gpt-4o"
+    system_prompt: |
+      You are a specialized tool testing agent. Your role is to:
+      1. Execute tool operations based on user queries
+      2. Analyze tool results and provide insights
+      3. Handle errors gracefully and provide debugging information
+      4. Format results in a clear, structured manner
+      
+      When testing tools:
+      - Always validate inputs before execution
+      - Provide detailed analysis of results
+      - Highlight any errors or issues found
+      - Suggest improvements or next steps
+      
+      Be thorough, analytical, and helpful in your responses.
+
+  - id: "query_analyzer"
+    name: "Query Analysis Agent"
+    provider: "openai"
+    model: "gpt-4o"
+    system_prompt: |
+      You are a query analysis specialist. Your role is to:
+      1. Parse and understand user queries
+      2. Determine which tools should be used
+      3. Extract parameters and configuration needed
+      4. Route queries to appropriate tools
+      
+      For each query, analyze:
+      - Intent (what the user wants to accomplish)
+      - Required tools (BigQuery, SQL, etc.)
+      - Parameters needed for tool execution
+      - Expected output format
+      
+      Provide clear, structured analysis to guide tool execution.
+
+  - id: "result_synthesizer"
+    name: "Result Synthesis Agent"
+    provider: "openai"
+    model: "gpt-4o"
+    system_prompt: |
+      You are a result synthesis specialist. Your role is to:
+      1. Combine results from multiple tools
+      2. Provide comprehensive analysis and insights
+      3. Format results for easy understanding
+      4. Identify patterns and correlations
+      
+      When synthesizing results:
+      - Highlight key findings and insights
+      - Compare results across different tools
+      - Provide actionable recommendations
+      - Format output in a clear, structured manner
+
+# Tool configurations
+tools:
+  bigquery_search:
+    type: "debug_tool"
+    module: "debug.tools.bigquery_vector_search.tool"
+    class: "BigQueryVectorSearchTool"
+    config:
+      project_id: "${GOOGLE_CLOUD_PROJECT}"
+      dataset_id: "vector_search"
+      table_name: "embeddings"
+      location: "US"
+      max_results: 10
+      similarity_threshold: 0.01
+      debug_mode: true
+      trace_queries: true
+    description: "BigQuery vector search for knowledge retrieval"
+
+  sql_database:
+    type: "debug_tool"
+    module: "debug.tools.sql_database.tool"
+    class: "SQLDatabaseTool"
+    config:
+      db_type: "sqlite"
+      database_path: "./debug/tools/test_database.db"
+      max_rows: 100
+      query_timeout: 30
+      debug_mode: true
+      trace_queries: true
+      safe_mode: true
+    description: "SQL database operations and analysis"
+
+# Workflow definitions
+workflows:
+  - id: "single_tool_test"
+    name: "Single Tool Testing Workflow"
+    description: "Test a single tool with user query"
+    steps:
+      - id: "analyze_query"
+        agent: "query_analyzer"
+        description: "Analyze user query and determine tool requirements"
+        
+      - id: "execute_tool"
+        agent: "tool_tester"
+        input: "${analyze_query.output}"
+        description: "Execute the appropriate tool based on analysis"
+        
+      - id: "format_results"
+        agent: "result_synthesizer"
+        input: "${execute_tool.output}"
+        description: "Format and present results"
+        output:
+          to: "user"
+
+  - id: "multi_tool_test"
+    name: "Multi-Tool Testing Workflow"
+    description: "Test multiple tools and compare results"
+    steps:
+      - id: "analyze_query"
+        agent: "query_analyzer"
+        description: "Analyze query for multi-tool execution"
+        
+      - id: "test_bigquery"
+        agent: "tool_tester"
+        tools: ["bigquery_search"]
+        input: "${analyze_query.output}"
+        description: "Test BigQuery vector search"
+        
+      - id: "test_sql"
+        agent: "tool_tester"
+        tools: ["sql_database"]
+        input: "${analyze_query.output}"
+        description: "Test SQL database operations"
+        
+      - id: "synthesize_results"
+        agent: "result_synthesizer"
+        input: |
+          BigQuery Results: ${test_bigquery.output}
+          SQL Results: ${test_sql.output}
+        description: "Combine and analyze results from both tools"
+        output:
+          to: "user"
+
+  - id: "tool_health_check"
+    name: "Tool Health Check Workflow"
+    description: "Check health and configuration of all debug tools"
+    steps:
+      - id: "check_bigquery_health"
+        agent: "tool_tester"
+        tools: ["bigquery_search"]
+        input: "Execute health_check method"
+        description: "Check BigQuery tool health"
+        
+      - id: "check_sql_health"
+        agent: "tool_tester"
+        tools: ["sql_database"]
+        input: "Execute health_check method"
+        description: "Check SQL tool health"
+        
+      - id: "summarize_health"
+        agent: "result_synthesizer"
+        input: |
+          BigQuery Health: ${check_bigquery_health.output}
+          SQL Health: ${check_sql_health.output}
+        description: "Summarize overall tool health status"
+        output:
+          to: "user"
+
+# Memory configuration for session persistence
+memory:
+  backend: "sqlite"
+  settings:
+    persist_directory: "./debug/tools/memory"
+    enable_embeddings: false
+
+# Security settings
+security:
+  api_key_validation: true
+  rate_limiting:
+    enabled: false
+  input_sanitization: true
+
+# Observability configuration with comprehensive tracing
+observability:
+  logging:
+    level: "DEBUG"
+    format: "structured"
+    output_file: "./debug/tools/logs/debug_tools.log"
+  tracing:
+    enabled: true
+    output_file: "./debug/tools/traces/tool_traces.jsonl"
+    trace_sampling_rate: 1.0
+    include_tool_calls: true
+    include_agent_responses: true
+  metrics:
+    enabled: true
+    output_file: "./debug/tools/metrics/tool_metrics.json"
+
+# Server configuration (if running as service)
+server:
+  host: "localhost"
+  port: 8001
+  cors_enabled: true
+  cors_origins: ["*"]
+
+# Experimental features
+experimental_features:
+  async_execution: true
+  streaming_responses: true
+  tool_chaining: true
+  advanced_tracing: true

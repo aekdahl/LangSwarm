@@ -1,0 +1,374 @@
+# LangSwarm V2 Token Tracking Configuration
+# This file contains configuration templates for different deployment scenarios
+
+# Production Configuration
+production:
+  observability:
+    enabled: true
+    log_level: "INFO"
+    log_format: "structured"
+    log_output: "both"  # console and file
+    metrics_enabled: true
+    tracing_enabled: true
+    async_processing: true
+    buffer_size: 2000
+    flush_interval: 5
+
+  token_tracking:
+    enabled: true
+    budget_enforcement: true
+    context_monitoring: true
+    
+    # Budget limits
+    budget_limits:
+      daily_token_limit: 1000000     # 1M tokens per day
+      session_token_limit: 50000     # 50K tokens per session
+      hourly_token_limit: 100000     # 100K tokens per hour
+      cost_limit_usd: 100.0          # $100 daily limit
+    
+    # Alert thresholds (0.0-1.0)
+    alerts:
+      token_alert_threshold: 0.8     # Alert at 80% of token limit
+      cost_alert_threshold: 0.8      # Alert at 80% of cost limit
+      context_alert_threshold: 0.9   # Alert at 90% context utilization
+    
+    # Enforcement settings
+    enforcement:
+      enforce_limits: true
+      auto_compress_context: true
+      compression_threshold: 0.85    # Compress at 85% context utilization
+    
+    # Performance settings
+    performance:
+      async_tracking: true
+      batch_size: 100
+      retention_days: 90
+
+# Development Configuration
+development:
+  observability:
+    enabled: true
+    log_level: "DEBUG"
+    log_format: "text"
+    log_output: "console"
+    metrics_enabled: true
+    tracing_enabled: true
+    async_processing: false  # Sync for easier debugging
+
+  token_tracking:
+    enabled: true
+    budget_enforcement: false  # No enforcement in dev
+    context_monitoring: true
+    
+    budget_limits:
+      daily_token_limit: 100000   # 100K tokens per day
+      session_token_limit: 10000  # 10K tokens per session
+      cost_limit_usd: 10.0        # $10 daily limit
+    
+    alerts:
+      token_alert_threshold: 0.9
+      cost_alert_threshold: 0.9
+      context_alert_threshold: 0.95
+    
+    enforcement:
+      enforce_limits: false
+      auto_compress_context: false
+      compression_threshold: 0.95
+    
+    performance:
+      async_tracking: false
+      batch_size: 50
+      retention_days: 7
+
+# Testing Configuration
+testing:
+  observability:
+    enabled: false  # Disabled for faster tests
+    log_level: "ERROR"
+    metrics_enabled: false
+    tracing_enabled: false
+
+  token_tracking:
+    enabled: false  # Disabled for unit tests
+    budget_enforcement: false
+    context_monitoring: false
+
+# Staging Configuration
+staging:
+  observability:
+    enabled: true
+    log_level: "INFO"
+    log_format: "structured"
+    log_output: "both"
+    metrics_enabled: true
+    tracing_enabled: true
+    async_processing: true
+
+  token_tracking:
+    enabled: true
+    budget_enforcement: true
+    context_monitoring: true
+    
+    budget_limits:
+      daily_token_limit: 500000    # 500K tokens per day
+      session_token_limit: 25000   # 25K tokens per session
+      cost_limit_usd: 50.0         # $50 daily limit
+    
+    alerts:
+      token_alert_threshold: 0.8
+      cost_alert_threshold: 0.8
+      context_alert_threshold: 0.9
+    
+    enforcement:
+      enforce_limits: true
+      auto_compress_context: true
+      compression_threshold: 0.85
+    
+    performance:
+      async_tracking: true
+      batch_size: 100
+      retention_days: 30
+
+# High-Volume Configuration (for enterprise deployments)
+enterprise:
+  observability:
+    enabled: true
+    log_level: "WARN"  # Reduced logging for performance
+    log_format: "structured"
+    log_output: "file"
+    metrics_enabled: true
+    tracing_enabled: true
+    async_processing: true
+    buffer_size: 5000   # Larger buffer
+    flush_interval: 2   # More frequent flushing
+
+  token_tracking:
+    enabled: true
+    budget_enforcement: true
+    context_monitoring: true
+    
+    budget_limits:
+      daily_token_limit: 10000000   # 10M tokens per day
+      session_token_limit: 100000   # 100K tokens per session
+      hourly_token_limit: 1000000   # 1M tokens per hour
+      cost_limit_usd: 1000.0        # $1000 daily limit
+    
+    alerts:
+      token_alert_threshold: 0.85
+      cost_alert_threshold: 0.85
+      context_alert_threshold: 0.9
+    
+    enforcement:
+      enforce_limits: true
+      auto_compress_context: true
+      compression_threshold: 0.8   # More aggressive compression
+    
+    performance:
+      async_tracking: true
+      batch_size: 500     # Larger batches
+      retention_days: 180 # Longer retention
+
+# Research Configuration (for ML research with cost tracking)
+research:
+  observability:
+    enabled: true
+    log_level: "DEBUG"
+    log_format: "structured"
+    log_output: "both"
+    metrics_enabled: true
+    tracing_enabled: true
+    async_processing: true
+
+  token_tracking:
+    enabled: true
+    budget_enforcement: false  # No enforcement for research
+    context_monitoring: true
+    
+    budget_limits:
+      daily_token_limit: 5000000   # 5M tokens for experiments
+      session_token_limit: 200000  # Large sessions for research
+      cost_limit_usd: 500.0        # Research budget
+    
+    alerts:
+      token_alert_threshold: 0.95  # Only alert when very close
+      cost_alert_threshold: 0.9
+      context_alert_threshold: 0.95
+    
+    enforcement:
+      enforce_limits: false
+      auto_compress_context: false  # Preserve full context for research
+      compression_threshold: 0.98
+    
+    performance:
+      async_tracking: true
+      batch_size: 200
+      retention_days: 365  # Keep data for analysis
+
+# Minimal Configuration (for lightweight deployments)
+minimal:
+  observability:
+    enabled: true
+    log_level: "WARN"
+    log_format: "text"
+    log_output: "console"
+    metrics_enabled: false
+    tracing_enabled: false
+    async_processing: false
+
+  token_tracking:
+    enabled: true
+    budget_enforcement: false
+    context_monitoring: false  # Minimal monitoring
+    
+    budget_limits:
+      daily_token_limit: 50000
+      session_token_limit: 5000
+      cost_limit_usd: 5.0
+    
+    performance:
+      async_tracking: false
+      batch_size: 20
+      retention_days: 3
+
+# Demo Configuration (for demonstrations and tutorials)
+demo:
+  observability:
+    enabled: true
+    log_level: "INFO"
+    log_format: "text"
+    log_output: "console"
+    metrics_enabled: true
+    tracing_enabled: false
+    async_processing: false
+
+  token_tracking:
+    enabled: true
+    budget_enforcement: true
+    context_monitoring: true
+    
+    budget_limits:
+      daily_token_limit: 10000      # Small limit for demos
+      session_token_limit: 2000
+      cost_limit_usd: 2.0
+    
+    alerts:
+      token_alert_threshold: 0.7    # Early alerts for demos
+      cost_alert_threshold: 0.7
+      context_alert_threshold: 0.8
+    
+    enforcement:
+      enforce_limits: true
+      auto_compress_context: true
+      compression_threshold: 0.8
+    
+    performance:
+      async_tracking: false
+      batch_size: 10
+      retention_days: 1
+
+# Migration Configuration (for existing deployments)
+migration:
+  observability:
+    enabled: true
+    log_level: "INFO"
+    log_format: "structured"
+    log_output: "both"
+    metrics_enabled: true
+    tracing_enabled: true
+    async_processing: true
+
+  token_tracking:
+    enabled: true
+    budget_enforcement: false  # Start without enforcement
+    context_monitoring: true
+    
+    budget_limits:
+      daily_token_limit: 1000000
+      session_token_limit: 50000
+      cost_limit_usd: 100.0
+    
+    alerts:
+      token_alert_threshold: 0.9   # Conservative alerts during migration
+      cost_alert_threshold: 0.9
+      context_alert_threshold: 0.95
+    
+    enforcement:
+      enforce_limits: false        # Gradually enable enforcement
+      auto_compress_context: false # Manual compression during migration
+      compression_threshold: 0.95
+    
+    performance:
+      async_tracking: true
+      batch_size: 100
+      retention_days: 30
+
+# Per-provider model cost rates (for cost estimation)
+model_pricing:
+  openai:
+    gpt-4o:
+      input: 0.0025   # per 1K tokens
+      output: 0.010
+    gpt-4o-mini:
+      input: 0.00015
+      output: 0.0006
+    gpt-4:
+      input: 0.003
+      output: 0.006
+    gpt-4-turbo:
+      input: 0.001
+      output: 0.003
+    gpt-3.5-turbo:
+      input: 0.0005
+      output: 0.0015
+    o1-preview:
+      input: 0.015
+      output: 0.060
+    o1-mini:
+      input: 0.003
+      output: 0.012
+
+  anthropic:
+    claude-3-opus:
+      input: 0.015
+      output: 0.075
+    claude-3-sonnet:
+      input: 0.003
+      output: 0.015
+    claude-3-haiku:
+      input: 0.00025
+      output: 0.00125
+    claude-3-5-sonnet:
+      input: 0.003
+      output: 0.015
+
+  google:
+    gemini-pro:
+      input: 0.0005
+      output: 0.0015
+    gemini-pro-vision:
+      input: 0.0005
+      output: 0.0015
+
+# Context window sizes for different models
+model_context_limits:
+  openai:
+    gpt-4o: 128000
+    gpt-4o-mini: 128000
+    gpt-4: 8192
+    gpt-4-turbo: 128000
+    gpt-3.5-turbo: 4096
+    gpt-3.5-turbo-16k: 16384
+    o1-preview: 128000
+    o1-mini: 128000
+
+  anthropic:
+    claude-3-opus: 200000
+    claude-3-sonnet: 200000
+    claude-3-haiku: 200000
+    claude-3-5-sonnet: 200000
+
+  google:
+    gemini-pro: 1000000
+    gemini-pro-vision: 1000000
+
+  default: 4096

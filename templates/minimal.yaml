@@ -1,0 +1,5 @@
+# Absolute minimum LangSwarm configuration
+version: "2.0"
+agents:
+  - id: "assistant"
+    model: "gpt-3.5-turbo"

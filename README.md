@@ -23,62 +23,63 @@ LangSwarm has been **completely transformed** from a complex, expert-only framew
 
 ---
 
-## ⚡️ **30-Second Quick Start**
+## ⚡ 2-Minute Quick Start (80% Use Case)
 
-### **Option 1: Single Configuration File**
-Create `langswarm.yaml`:
-```yaml
-version: "1.0"
-agents:
-  - id: "assistant"
-    model: "gpt-4o"
-    behavior: "helpful"
-    memory: true
-workflows:
-  - "assistant -> user"
-```
+**Most users want:** A simple AI chatbot with memory. Here's how:
 
-Run it:
+### **1. Install (30 seconds)**
 ```bash
-python -c "
-from langswarm.core.config import LangSwarmConfigLoader
-loader = LangSwarmConfigLoader('langswarm.yaml')
-workflows, agents, tools, brokers, metadata = loader.load()
-print('✅ Your multi-agent AI system is ready!')
-"
+pip install langswarm openai
+export OPENAI_API_KEY='sk-...'  # Get from platform.openai.com
 ```
 
-### **Option 2: Pure Python (Even Simpler)** AE: NOT CORRECT USE/IMPLEMENTATION
+### **2. Create Chatbot (30 seconds)**
 ```python
-from langswarm.core.agents.simple import create_chat_agent
+# chatbot.py
+import asyncio
+from langswarm import create_agent
 
-# One line creates a complete agent with memory and chat capabilities
-agent = create_chat_agent("assistant", memory_enabled=True)
+async def main():
+    # Create chatbot with memory
+    bot = create_agent(model="gpt-3.5-turbo", memory=True)
+    
+    # Chat loop
+    print("Bot: Hi! Type 'quit' to exit.\n")
+    while True:
+        user = input("You: ")
+        if user.lower() == 'quit':
+            break
+        response = await bot.chat(user)
+        print(f"Bot: {response}\n")
 
-# Start using immediately
-response = agent.chat("Hello! Can you help me build an AI system?")
-print(response)
-
-# Clean up when done
-agent.cleanup()
+asyncio.run(main())
 ```
 
-### **Option 3: Voice Agent (NEW!)** AE: NOT CORRECT USE/IMPLEMENTATION
+### **3. Run (1 minute)**
+```bash
+python chatbot.py
+```
+
+**That's it!** You have a working AI chatbot with conversation memory.
+
+### **Common Enhancements**
 ```python
-from langswarm.core.wrappers.realtime_wrapper import create_realtime_agent
+# Better responses
+bot = create_agent(model="gpt-4")
 
-# Create voice agent with same simplicity
-agent = create_realtime_agent("voice_assistant", voice="alloy", memory_enabled=True)
+# Add personality  
+bot = create_agent(system_prompt="You are a pirate")
 
-# Start voice conversation
-async for event in agent.chat_realtime("Hello! Can you help me?"):
-    if event["type"] == "audio_chunk":
-        play_audio(event["data"])  # Voice response
-    elif event["type"] == "transcription":
-        print(f"You: {event['data']}")  # What you said
+# Stream responses
+async for chunk in bot.chat_stream("Hello"):
+    print(chunk, end="")
+
+# Track costs
+bot = create_agent(track_costs=True)
+print(f"Cost: ${bot.get_usage_stats()['estimated_cost']}")
 ```
 
-**🎉 Congratulations!** You just built a complete multi-agent AI system in 30 seconds.
+📚 **[Full Quick Start Guide](docs/QUICK_START.md)** | 🎯 **[10 Simple Examples](examples/simple/)**
 
 ---
 
@@ -107,7 +108,7 @@ memory:
 
 ---
 
-## 🔄 **Workflow Simplification** AE: NOT WORKING, ROLL BACK TO ORIGINAL WORKFLOWS
+## 🔄 **Workflow Simplification**
 
 **90% Complexity Reduction - From 15+ lines to 1 line:**
 
@@ -145,7 +146,7 @@ workflows:
 
 ---
 
-## 🤖 **Simplified Agent Architecture** AE: NOT WORKING, ROLL BACK TO ORIGINAL 
+## 🤖 **Simplified Agent Architecture** 
 
 **95% Parameter Reduction - From 22+ parameters to 1 config object:**
 
@@ -165,22 +166,22 @@ agent = AgentWrapper(
 )
 
 # After (Simple)
-from langswarm.core.agents.simple import create_chat_agent
-agent = create_chat_agent("assistant", memory_enabled=True)
+from langswarm.core.agents import create_openai_agent
+agent = create_openai_agent(model="gpt-4o", api_key="your-key")
 ```
 
 **Factory Functions for Common Use Cases:**
 ```python
-from langswarm.core.agents.simple import (
-    create_chat_agent,
-    create_coding_agent, 
-    create_research_agent
+from langswarm.core.agents import (
+    create_openai_agent,
+    create_anthropic_agent, 
+    create_gemini_agent
 )
 
 # Instant specialized agents
-chat_agent = create_chat_agent("assistant")
-coding_agent = create_coding_agent("coder", tools=["filesystem", "github"])
-research_agent = create_research_agent("researcher", memory_enabled=True)
+chat_agent = create_openai_agent(model="gpt-4o")
+coding_agent = create_anthropic_agent(model="claude-3-sonnet-20240229")
+research_agent = create_gemini_agent(model="gemini-pro")
 ```
 
 ---
@@ -214,11 +215,12 @@ workflows:
 Run with:
 ```bash
 python -c "
-from langswarm.core.config import LangSwarmConfigLoader, WorkflowExecutor
-loader = LangSwarmConfigLoader('langswarm.yaml')
-workflows, agents, tools, brokers, metadata = loader.load()
-executor = WorkflowExecutor(workflows, agents)
-result = executor.run_workflow('content_pipeline', 'Write about AI simplification')
+from langswarm.core.config import load_config
+from langswarm.core.workflows import get_workflow_engine
+
+config = load_config('langswarm.yaml')
+engine = get_workflow_engine()
+result = engine.execute_workflow('content_pipeline', 'Write about AI simplification')
 print(result)
 "
 ```

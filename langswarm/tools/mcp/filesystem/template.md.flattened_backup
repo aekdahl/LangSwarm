@@ -1,0 +1,65 @@
+# Filesystem MCP Tool
+
+## Description
+
+Smart file system operations with natural language intent understanding using standard MCP protocol.
+
+## Instructions
+
+🎯 **LangSwarm's Intelligent Intent Processing (Standard MCP)**
+
+Natural language file operations using the standard MCP protocol.
+
+**Preferred: Intent-Based Calling (LangSwarm USP)**
+```json
+{
+  "method": "call_tool",
+  "params": {
+    "name": "filesystem",
+    "arguments": {
+      "intent": "Find all Python files in the project that were modified today",
+      "context": "code review, recent changes"
+    }
+  }
+}
+```
+
+**Alternative: Direct Method Calling**
+```json
+{
+  "method": "call_tool",
+  "params": {
+    "name": "filesystem",
+    "arguments": {
+      "method": "list_directory",
+      "params": {
+        "path": "/project",
+        "pattern": "*.py",
+        "modified_since": "today"
+      }
+    }
+  }
+}
+```
+
+**When to use:** File management, code exploration, content search, directory operations.
+
+**Intent examples:**
+- "Show me the latest log files from the server"
+- "Find configuration files that need updating"
+- "List all documents created this week"
+
+**Available methods:** read_file, write_file, list_directory, search_files, manage_permissions
+
+### Standard MCP Protocol Methods
+
+**Discovery & Execution:**
+- `list_tools()` - Discover file operations and schemas
+- `call_tool(name, arguments)` - Execute with intent or direct file operations
+- `list_resources()` - Access filesystem metadata and documentation
+
+**Pro tip:** Intent-based calls combine multiple operations and handle path resolution intelligently.
+
+## Brief
+
+File system operations with intelligent intent processing via standard MCP protocol.

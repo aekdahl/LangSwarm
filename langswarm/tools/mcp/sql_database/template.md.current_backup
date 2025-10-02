@@ -1,0 +1,77 @@
+# Sql Database MCP Tool
+
+## Description
+
+Intelligent SQL interface with natural language query understanding and database operation automation.
+
+## Instructions
+
+🎯 **LangSwarm's Intent-Based Tool Calling**
+
+Describe your data needs in natural language and let the tool generate optimal SQL queries and operations.
+
+**Preferred: Intent-Based Calling (LangSwarm USP)**
+```json
+{
+  "tool": "sql_database",
+  "intent": "Show me customers from Stockholm who signed up in the last quarter",
+  "context": "customer analysis, geographic segmentation"
+}
+```
+
+**Alternative: Direct Method Calling**
+```json
+{
+  "tool": "sql_database",
+  "method": "execute_query", 
+  "params": {
+    "query": "SELECT * FROM customers WHERE city='Stockholm' AND signup_date >= DATE_SUB(NOW(), INTERVAL 3 MONTH)"
+  }
+}
+```
+
+**When to use:** Data analysis, reporting, customer insights, business intelligence queries.
+
+**Intent examples:**
+- "Find our top performing products this month"
+- "Show users who haven't logged in recently"
+- "Get revenue breakdown by region"
+
+**Available operations:** execute_query, list_tables, describe_table, analyze_data
+
+### Standard MCP Protocol Methods
+
+This tool supports standard MCP protocol for discovery and introspection:
+
+**Discovery Methods:**
+- `list_tools()` - Discover all available methods and their schemas
+- `list_prompts()` - Find available agent prompts for workflows  
+- `list_resources()` - See available files (template.md, agents.yaml, etc.)
+
+**Execution Methods:**
+- `call_tool(name, arguments)` - Execute any tool method by name
+- `get_prompt(name, arguments)` - Get formatted prompts with variables
+- `read_resource(uri)` - Access specific resource content
+
+**Example Protocol Usage:**
+```json
+{
+  "method": "list_tools",
+  "params": {}
+}
+```
+```json
+{
+  "method": "call_tool", 
+  "params": {
+    "name": "similarity_search",
+    "arguments": {"query": "pricing", "limit": 5}
+  }
+}
+```
+**Pro tip:** Intent-based calls handle SQL generation, optimization, and error correction automatically.
+
+
+## Brief
+
+SQL database interface with intelligent natural language query processing.
