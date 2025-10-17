@@ -345,3 +345,85 @@ class ConfigErrorHelper:
                 f"Issue: {issue}"
             )
         )
+
+
+def get_helpful_suggestions(error_type: str, **kwargs) -> List[str]:
+    """Get helpful suggestions for different error types."""
+    
+    if error_type == "missing_api_key":
+        provider = kwargs.get("provider", "")
+        suggestions = []
+        
+        if provider == "openai":
+            suggestions = [
+                "1. Get an API key from https://platform.openai.com/api-keys",
+                "2. Set environment variable: export OPENAI_API_KEY='your-key-here'",
+                "3. Or add to your shell profile for persistence"
+            ]
+        elif provider == "anthropic":
+            suggestions = [
+                "1. Get an API key from https://console.anthropic.com/", 
+                "2. Set environment variable: export ANTHROPIC_API_KEY='your-key-here'",
+                "3. Or add to your shell profile for persistence"
+            ]
+        elif provider == "google":
+            suggestions = [
+                "1. Get an API key from Google AI Studio",
+                "2. Set environment variable: export GOOGLE_API_KEY='your-key-here'",
+                "3. Or add to your shell profile for persistence"
+            ]
+        else:
+            suggestions = [
+                "1. Check your provider documentation for API key setup",
+                "2. Set the appropriate environment variable",
+                "3. Verify the key has the correct permissions"
+            ]
+        
+        return suggestions
+    
+    elif error_type == "file_not_found":
+        file_type = kwargs.get("file_type", "")
+        suggestions = [
+            "1. Check if the file exists in the current directory",
+            "2. Verify the file path is correct",
+            "3. Ensure you have read permissions"
+        ]
+        
+        if file_type == "config":
+            suggestions.extend([
+                "4. Try creating a minimal langswarm.yaml file",
+                "5. Use absolute path if relative path fails"
+            ])
+        
+        return suggestions
+    
+    elif error_type == "missing_dependency":
+        package = kwargs.get("package", "")
+        suggestions = [
+            f"1. Install the package: pip install {package}",
+            "2. Check if you're in the correct virtual environment",
+            "3. Consider installing optional dependencies: pip install langswarm[full]"
+        ]
+        
+        return suggestions
+    
+    elif error_type == "invalid_provider":
+        suggestions = [
+            "1. Use one of these supported providers:",
+            "   • openai (for GPT models)",
+            "   • anthropic (for Claude models)",
+            "   • google (for Gemini models)",
+            "   • cohere (for Command models)",
+            "   • mistral (for Mistral models)",
+            "2. Check spelling and capitalization",
+            "3. Install provider dependencies if needed"
+        ]
+        
+        return suggestions
+    
+    else:
+        return [
+            "1. Check the documentation for this feature",
+            "2. Verify your configuration syntax",
+            "3. Look for typos or missing required fields"
+        ]

@@ -1,0 +1,4 @@
+2025-10-06 20:55:18,429 - e2e_test_ce66e6a9-fb70-4c95-83e5-8204e004480a - INFO - Setting up test: SQLite Memory Backend
+2025-10-06 20:55:18,429 - e2e_test_ce66e6a9-fb70-4c95-83e5-8204e004480a - INFO - Testing SQLite memory backend
+2025-10-06 20:55:18,543 - e2e_test_ce66e6a9-fb70-4c95-83e5-8204e004480a - ERROR - SQLite memory test failed: cannot import name 'create_session' from 'langswarm.core.session' (/Users/alexanderekdahl/Docker/LangSwarm/langswarm/core/session/__init__.py)
+2025-10-06 20:55:18,544 - e2e_test_ce66e6a9-fb70-4c95-83e5-8204e004480a - INFO - Tearing down test: SQLite Memory Backend

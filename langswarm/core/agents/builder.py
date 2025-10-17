@@ -510,23 +510,97 @@ def create_agent(name: str = "langswarm-agent") -> AgentBuilder:
     return AgentBuilder(name)
 
 
-def create_openai_agent(
+async def create_openai_agent(
     name: str = "openai-agent",
     model: str = "gpt-4o",
     api_key: Optional[str] = None,
-    **kwargs
+    system_prompt: Optional[str] = None,
+    temperature: float = 0.7,
+    **kwargs: Any
 ) -> BaseAgent:
-    """Create an OpenAI agent with smart defaults"""
+    """Create an OpenAI agent with smart defaults.
+    
+    Args:
+        name: Unique identifier for the agent
+        model: OpenAI model name (e.g., "gpt-4o", "gpt-3.5-turbo")
+        api_key: OpenAI API key (uses OPENAI_API_KEY env var if not provided)
+        system_prompt: System instructions for the agent
+        temperature: Sampling temperature (0.0 to 2.0)
+        **kwargs: Additional configuration options
+        
+    Returns:
+        BaseAgent: Configured OpenAI agent ready for use
+        
+    Raises:
+        ValueError: If API key is not provided or found in environment
+        
+    Example:
+        >>> agent = await create_openai_agent(
+        ...     name="researcher",
+        ...     model="gpt-3.5-turbo",
+        ...     system_prompt="You are a research specialist"
+        ... )
+        >>> response = await agent.execute("What is quantum computing?")
+    """
     builder = (AgentBuilder(name)
                .openai(api_key)
                .model(model))
     
+    # Apply explicit parameters
+    if system_prompt:
+        builder.system_prompt(system_prompt)
+    
+    if temperature != 0.7:
+        builder.temperature(temperature)
+    
     # Apply additional kwargs
     for key, value in kwargs.items():
-        if hasattr(builder, key):
+        if hasattr(builder, key) and callable(getattr(builder, key)):
             getattr(builder, key)(value)
     
-    return builder.build()
+    return await builder.build()
+
+
+def create_openai_agent_sync(
+    name: str = "openai-agent",
+    model: str = "gpt-4o",
+    api_key: Optional[str] = None,
+    system_prompt: Optional[str] = None,
+    temperature: float = 0.7,
+    **kwargs: Any
+) -> BaseAgent:
+    """Create an OpenAI agent synchronously (without automatic tool injection).
+    
+    Args:
+        name: Unique identifier for the agent
+        model: OpenAI model name (e.g., "gpt-4o", "gpt-3.5-turbo")
+        api_key: OpenAI API key (uses OPENAI_API_KEY env var if not provided)
+        system_prompt: System instructions for the agent
+        temperature: Sampling temperature (0.0 to 2.0)
+        **kwargs: Additional configuration options
+        
+    Returns:
+        BaseAgent: Configured OpenAI agent ready for use
+        
+    Note:
+        This synchronous version does not automatically inject tools.
+        Use the async version for full functionality.
+    """
+    builder = (AgentBuilder(name)
+               .openai(api_key)
+               .model(model))
+    
+    if system_prompt:
+        builder.system_prompt(system_prompt)
+    
+    if temperature != 0.7:
+        builder.temperature(temperature)
+    
+    for key, value in kwargs.items():
+        if hasattr(builder, key) and callable(getattr(builder, key)):
+            getattr(builder, key)(value)
+    
+    return builder.build_sync()
 
 
 def create_anthropic_agent(

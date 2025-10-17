@@ -15,17 +15,10 @@ from ..utils.optional_imports import OptionalImportManager
 
 # Optional OpenTelemetry imports
 otel_imports = OptionalImportManager()
-otel_imports.add_import('opentelemetry.trace', 'trace')
-otel_imports.add_import('opentelemetry.metrics', 'metrics')
-otel_imports.add_import('opentelemetry.sdk.trace', 'trace_sdk')
-otel_imports.add_import('opentelemetry.sdk.metrics', 'metrics_sdk')
-otel_imports.add_import('opentelemetry.sdk.resources', 'Resource')
-otel_imports.add_import('opentelemetry.exporter.otlp.proto.grpc.trace_exporter', 'OTLPSpanExporter')
-otel_imports.add_import('opentelemetry.exporter.otlp.proto.grpc.metric_exporter', 'OTLPMetricExporter')
-otel_imports.add_import('opentelemetry.exporter.jaeger.thrift', 'JaegerExporter')
-otel_imports.add_import('opentelemetry.exporter.prometheus', 'PrometheusMetricReader')
-otel_imports.add_import('opentelemetry.sdk.trace.export', 'BatchSpanProcessor', 'ConsoleSpanExporter')
-otel_imports.add_import('opentelemetry.sdk.metrics.export', 'PeriodicExportingMetricReader')
+
+# Helper to get OpenTelemetry modules lazily
+def get_otel_module(module_name: str):
+    return otel_imports.try_import(module_name, feature_name="OpenTelemetry observability")
 
 from .interfaces import (
     IObservabilityProvider, ObservabilityConfig, TraceSpan, MetricPoint, LogEvent,

@@ -1,277 +1,624 @@
-# 🚀 LangSwarm
+# 🐝 LangSwarm
 
-**Build powerful multi-agent AI systems in 30 seconds, not hours.**
+**Multi-Agent AI Orchestration Framework**
 
-LangSwarm has been **completely transformed** from a complex, expert-only framework into a **beginner-friendly system** that maintains all advanced capabilities. Get started instantly with simple configurations, then scale to enterprise complexity when needed.
+Build intelligent systems where multiple AI agents collaborate to solve complex tasks. LangSwarm makes it easy to create, orchestrate, and scale AI agent workflows with support for all major LLM providers and a rich ecosystem of tools.
 
-🎤 **NEW: OpenAI Realtime API Integration** - Build voice agents with the same simplicity as text agents!
-
-## 🎉 **LangSwarm Simplification Project - COMPLETE**
-
-### **🎯 Mission Accomplished: From Complex to Simple**
-
-**Before:** 2+ hours setup, 8 config files, 22+ parameters, expert-only  
-**After:** 30 second setup, 1 config file, smart defaults, beginner-friendly
-
-| **Metric** | **Before** | **After** | **Improvement** |
-|------------|------------|-----------|-----------------|
-| **Setup Time** | 2+ hours | 30 seconds | **240x faster** |
-| **Config Files** | 8 separate files | 1 unified file | **87.5% reduction** |
-| **Agent Parameters** | 22+ parameters | 1 config object | **95% reduction** |
-| **Workflow Complexity** | 15+ lines YAML | 1 line syntax | **90% reduction** |
-| **Memory Setup** | 20+ settings | 3 simple tiers | **95% reduction** |
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
 ---
 
-## ⚡ 2-Minute Quick Start (80% Use Case)
+## 🎯 What is LangSwarm?
 
-**Most users want:** A simple AI chatbot with memory. Here's how:
+LangSwarm is a framework for **multi-agent AI orchestration**. Unlike simple chatbot libraries, LangSwarm enables you to:
 
-### **1. Install (30 seconds)**
+- **Orchestrate multiple specialized agents** working together on complex tasks
+- **Build workflows** where agents collaborate, hand off work, and combine their outputs
+- **Integrate tools** through the Model Context Protocol (MCP) for real-world capabilities
+- **Support any LLM provider** (OpenAI, Anthropic, Google, Mistral, local models, and more)
+- **Scale from prototypes to production** with enterprise-grade memory, observability, and deployment options
+
+### Why Multi-Agent?
+
+Single AI agents hit limits quickly. Multi-agent systems unlock:
+
+- **Specialization**: Each agent excels at specific tasks (research, writing, analysis, coding)
+- **Collaboration**: Agents work together, combining strengths and compensating for weaknesses
+- **Scalability**: Distribute workload across multiple agents and providers
+- **Reliability**: Redundancy and validation through multiple perspectives
+- **Modularity**: Build, test, and deploy agents independently
+
+---
+
+## ⚡ Quick Start
+
+### Installation
+
 ```bash
 pip install langswarm openai
-export OPENAI_API_KEY='sk-...'  # Get from platform.openai.com
+export OPENAI_API_KEY="your-api-key-here"
 ```
 
-### **2. Create Chatbot (30 seconds)**
+### Simple Agent (30 seconds)
+
 ```python
-# chatbot.py
 import asyncio
 from langswarm import create_agent
 
 async def main():
-    # Create chatbot with memory
-    bot = create_agent(model="gpt-3.5-turbo", memory=True)
+    # Create an agent
+    agent = create_agent(model="gpt-3.5-turbo")
     
-    # Chat loop
-    print("Bot: Hi! Type 'quit' to exit.\n")
-    while True:
-        user = input("You: ")
-        if user.lower() == 'quit':
-            break
-        response = await bot.chat(user)
-        print(f"Bot: {response}\n")
+    # Chat with it
+    response = await agent.chat("What's the capital of France?")
+    print(response)
 
 asyncio.run(main())
 ```
 
-### **3. Run (1 minute)**
-```bash
-python chatbot.py
-```
-
-**That's it!** You have a working AI chatbot with conversation memory.
-
-### **Common Enhancements**
-```python
-# Better responses
-bot = create_agent(model="gpt-4")
-
-# Add personality  
-bot = create_agent(system_prompt="You are a pirate")
-
-# Stream responses
-async for chunk in bot.chat_stream("Hello"):
-    print(chunk, end="")
-
-# Track costs
-bot = create_agent(track_costs=True)
-print(f"Cost: ${bot.get_usage_stats()['estimated_cost']}")
-```
-
-📚 **[Full Quick Start Guide](docs/QUICK_START.md)** | 🎯 **[10 Simple Examples](examples/simple/)**
-
----
-
-## 🧠 **Memory Made Simple**
-
-**3-Tier System - Choose Your Complexity:**
-
-```yaml
-# Tier 1: Development (instant setup)
-memory: true
-
-# Tier 2: Production (smart auto-configuration)
-memory: production
-
-# Tier 3: Custom (full control)
-memory:
-  backend: chromadb
-  settings: {persist_directory: "/custom/path"}
-```
-
-**Smart Environment Detection:**
-- **Google Cloud** → BigQuery (analytics-ready)
-- **AWS** → Elasticsearch (full-text search)  
-- **Redis Available** → Redis (ultra-fast)
-- **Local/Development** → SQLite (zero-config)
-
----
-
-## 🔄 **Workflow Simplification**
-
-**90% Complexity Reduction - From 15+ lines to 1 line:**
-
-```yaml
-# Before (Complex YAML)
-workflows:
-  - id: analysis_workflow
-    steps:
-      - id: step1
-        agent: extractor
-        input: ${context.user_input}
-        output: {to_step: step2}
-      - id: step2
-        agent: analyzer
-        input: ${step1.output}
-        output: {to_step: step3}
-      - id: step3
-        agent: summarizer
-        input: ${step2.output}
-        output: {to: user}
-
-# After (Simple Syntax)
-workflows:
-  - "extractor -> analyzer -> summarizer -> user"
-```
-
-**Template Library:**
-```yaml
-workflows:
-  - "assistant -> user"                                    # Simple chat
-  - "researcher -> writer -> editor -> user"              # Content pipeline
-  - "expert1, expert2, expert3 -> consensus -> user"      # Expert consensus
-  - "classifier -> (specialist1 | specialist2) -> user"   # Smart routing
-```
-
----
-
-## 🤖 **Simplified Agent Architecture** 
-
-**95% Parameter Reduction - From 22+ parameters to 1 config object:**
+### Multi-Agent Orchestration (Real Power)
 
 ```python
-# Before (Complex)
-agent = AgentWrapper(
-    name="assistant", agent=base_agent, model="gpt-4o", memory=memory_config,
-    agent_type="conversational", is_conversational=True, langsmith_api_key=api_key,
-    rag_registry=rag_registry, context_limit=4000, system_prompt=system_prompt,
-    tool_registry=tool_registry, plugin_registry=plugin_registry,
-    memory_adapter=memory_adapter, memory_summary_adapter=summary_adapter,
-    broker=message_broker, response_mode="structured", streaming_config=streaming_config,
-    session_manager=session_manager, enable_hybrid_sessions=True,
-    enhanced_backend=enhanced_backend, enhanced_config=enhanced_config,
-    allow_middleware=True
-    # ... 5+ more parameters
+from langswarm.core.agents import create_openai_agent, register_agent
+from langswarm.core.workflows import create_simple_workflow, get_workflow_engine
+
+# Create specialized agents
+researcher = create_openai_agent(
+    name="researcher",
+    system_prompt="You are a research specialist. Gather comprehensive information."
 )
 
-# After (Simple)
-from langswarm.core.agents import create_openai_agent
-agent = create_openai_agent(model="gpt-4o", api_key="your-key")
-```
-
-**Factory Functions for Common Use Cases:**
-```python
-from langswarm.core.agents import (
-    create_openai_agent,
-    create_anthropic_agent, 
-    create_gemini_agent
+writer = create_openai_agent(
+    name="writer", 
+    system_prompt="You are a writing specialist. Create clear, engaging content."
 )
 
-# Instant specialized agents
-chat_agent = create_openai_agent(model="gpt-4o")
-coding_agent = create_anthropic_agent(model="claude-3-sonnet-20240229")
-research_agent = create_gemini_agent(model="gemini-pro")
-```
+# Register for orchestration
+register_agent(researcher)
+register_agent(writer)
 
----
+# Create workflow: researcher → writer
+workflow = create_simple_workflow(
+    workflow_id="content_creation",
+    name="Research and Write",
+    agent_chain=["researcher", "writer"]
+)
 
-## 🎯 **Complete Real-World Example**
-
-```yaml
-# langswarm.yaml - Production content creation system
-version: "1.0"
-project_name: "content-pipeline"
-
-agents:
-  - {id: researcher, model: gpt-4o, behavior: research, tools: [web_search]}
-  - {id: writer, model: gpt-4o, behavior: creative, memory_enabled: true}
-  - {id: editor, model: gpt-4o, behavior: analytical, tools: [grammar_check]}
-  - {id: publisher, model: gpt-4o, behavior: helpful, tools: [cms_integration]}
-
-memory: production  # Auto-selects optimal backend (BigQuery/Elasticsearch/Redis/ChromaDB)
-
-workflows:
-  - id: content_pipeline
-    workflow: "researcher -> writer -> editor -> publisher -> user"
-  - id: quick_post
-    simple: "writer -> user"
-  - id: fact_check
-    workflow: "researcher, editor -> consensus -> user"
-
-# Tools auto-discovered based on agent behaviors and environment
-```
-
-Run with:
-```bash
-python -c "
-from langswarm.core.config import load_config
-from langswarm.core.workflows import get_workflow_engine
-
-config = load_config('langswarm.yaml')
+# Execute orchestrated workflow
 engine = get_workflow_engine()
-result = engine.execute_workflow('content_pipeline', 'Write about AI simplification')
-print(result)
-"
+result = await engine.execute_workflow(
+    workflow=workflow,
+    input_data={"input": "Write an article about AI agents"}
+)
+
+print(result.output)  # Final result from both agents working together
 ```
 
 ---
 
-## 📚 **Documentation & Guides**
+## 🧠 Core Concepts
 
-### **New User Guides:**
-- **[📖 Complete Simplified Guide](docs/SIMPLIFIED_LANGSWARM_GUIDE.md)** - Everything you need to get started
-- **[🧠 Memory Made Simple](docs/simplification/04-memory-made-simple.md)** - 3-tier memory system
-- **[🔄 Workflow Simplification](docs/simplification/workflow-examples.md)** - Simple syntax examples
-- **[🤖 Simplified Agents](docs/simplification/agent-architecture.md)** - Clean agent architecture
+### 1. **Agents**
 
-### **Advanced Features (For Experts):**
-- **[🔧 Advanced Configuration](docs/advanced-config.md)** - Full technical details
-- **[🛠️ Tool Development](docs/tool-development.md)** - Building custom tools
-- **[⚡ Performance Optimization](docs/performance.md)** - Enterprise optimization
+Agents are AI-powered entities with specific roles and capabilities. LangSwarm supports:
 
----
+- **Multiple providers**: OpenAI, Anthropic (Claude), Google (Gemini), Mistral, Cohere, local models
+- **Flexible configuration**: System prompts, temperature, tools, memory
+- **Built-in capabilities**: Streaming, structured outputs, cost tracking
 
-## 🆕 Latest Technical Features
+```python
+# Simple agent creation
+agent = create_agent(model="gpt-4", memory=True)
 
-### 🚀 **Revolutionary Structured JSON Responses** (v0.0.50+)
-- **Breakthrough Design**: Agents can now provide BOTH user responses AND tool calls simultaneously
-- **No More Forced Choice**: Previously agents chose between communication OR tool usage - now they do both
-- **Dual Response Modes**: Integrated (polished final answer) or Streaming (immediate feedback + tool results)
-- **Natural Interactions**: Users see what agents are doing while tools execute
+# Advanced agent with tools
+agent = create_openai_agent(
+    name="assistant",
+    model="gpt-4",
+    system_prompt="You are a helpful assistant",
+    tools=["filesystem", "web_search"]
+)
+```
 
-```json
-{
-  "response": "I'll check that configuration file for you to analyze its contents",
-  "mcp": {
-    "tool": "filesystem",
-    "method": "read_file", 
-    "params": {"path": "/tmp/config.json"}
-  }
+### 2. **Workflows**
+
+Workflows define how agents collaborate:
+
+- **Sequential**: Agent A → Agent B → Agent C
+- **Parallel**: Multiple agents work simultaneously
+- **Conditional**: Route based on results or criteria
+- **Nested**: Complex multi-stage pipelines
+
+```python
+# Simple sequential workflow
+workflow = create_simple_workflow("task", "My Task", ["agent1", "agent2"])
+
+# Execute
+engine = get_workflow_engine()
+result = await engine.execute_workflow(workflow, {"input": "task data"})
+```
+
+### 3. **Tools (MCP)**
+
+LangSwarm implements the Model Context Protocol (MCP) for tool integration:
+
+**Built-in Tools:**
+- `filesystem` - File operations (read, write, list)
+- `web_search` - Web search capabilities
+- `github` - GitHub repository operations
+- `sql_database` - SQL database access
+- `bigquery_vector_search` - Semantic search in BigQuery
+- `codebase_indexer` - Code analysis and understanding
+- `workflow_executor` - Dynamic workflow execution
+- `tasklist` - Task management
+- `message_queue` - Pub/sub message handling
+
+```python
+# Agent with tools
+agent = create_agent(
+    model="gpt-4",
+    tools=["filesystem", "web_search"]
+)
+
+# Tools are automatically discovered and injected
+response = await agent.chat("Find the latest Python news and save it to a file")
+```
+
+### 4. **Memory**
+
+Conversation history and context management with multiple backends:
+
+- **SQLite**: Zero-config, local development
+- **Redis**: Fast, distributed caching
+- **ChromaDB**: Vector embeddings and semantic search
+- **BigQuery**: Analytics-ready, enterprise scale
+- **Elasticsearch**: Full-text search and analytics
+- **Qdrant**: High-performance vector search
+- **Pinecone**: Managed vector database
+
+```python
+# Simple memory
+agent = create_agent(model="gpt-3.5-turbo", memory=True)
+
+# Advanced memory configuration
+config = {
+    "memory": {
+        "backend": "chromadb",
+        "settings": {
+            "persist_directory": "./data/memory",
+            "embedding_model": "text-embedding-3-small"
+        }
+    }
 }
 ```
 
-### 🔥 **Local MCP Mode** - Zero Latency Tools
-- **1000x Faster**: Direct function calls vs HTTP (0ms vs 50-100ms)
-- **Zero Setup**: No containers, no external servers
-- **Full Compatibility**: Works with existing MCP workflows
+---
 
-### 💾 **Enhanced Memory System**
-- **BigQuery Integration**: Analytics-ready conversation storage
-- **Multiple Backends**: SQLite, ChromaDB, Redis, Qdrant, Elasticsearch
-- **Auto-Embeddings**: Semantic search built-in
+## 🏗️ Architecture
 
-### 🛠️ **Fixed Dependencies**
-- **Complete Installation**: `pip install langswarm` now installs all dependencies
-- **30+ Libraries**: LangChain, OpenAI, FastAPI, Discord, and more
-- **Ready to Use**: No manual dependency management needed
+```
+┌─────────────────────────────────────────────────────────┐
+│                    LangSwarm Framework                  │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
+│  │   Agents     │  │  Workflows   │  │    Tools     │ │
+│  │              │  │              │  │              │ │
+│  │ • OpenAI     │  │ • Sequential │  │ • MCP Local  │ │
+│  │ • Anthropic  │  │ • Parallel   │  │ • MCP Remote │ │
+│  │ • Google     │  │ • Conditional│  │ • Built-in   │ │
+│  │ • Mistral    │  │ • Nested     │  │ • Custom     │ │
+│  │ • Local      │  │              │  │              │ │
+│  └──────────────┘  └──────────────┘  └──────────────┘ │
+│                                                         │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ┌────────────────────────────────────────────────┐   │
+│  │           Infrastructure Layer                  │   │
+│  │                                                 │   │
+│  │  Memory    Session      Observability   Config │   │
+│  │  • SQLite  • Storage    • OpenTelemetry • YAML │   │
+│  │  • Redis   • Providers  • LangSmith     • JSON │   │
+│  │  • ChromaDB• Lifecycle  • Tracing       • Code │   │
+│  │  • BigQuery                                     │   │
+│  └────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📚 Use Cases
+
+### Content Creation Pipeline
+
+```python
+# Specialized agents
+researcher = create_openai_agent(name="researcher", system_prompt="Research topics")
+writer = create_openai_agent(name="writer", system_prompt="Write engaging content")
+editor = create_openai_agent(name="editor", system_prompt="Edit and polish")
+
+# Register all
+for agent in [researcher, writer, editor]:
+    register_agent(agent)
+
+# Workflow: research → write → edit
+workflow = create_simple_workflow("content", "Content Pipeline", 
+                                 ["researcher", "writer", "editor"])
+
+# Execute
+result = await get_workflow_engine().execute_workflow(
+    workflow, {"input": "AI in Healthcare"}
+)
+```
+
+### Code Analysis & Documentation
+
+```python
+# Agent with code analysis tools
+coder = create_agent(
+    model="gpt-4",
+    tools=["codebase_indexer", "filesystem", "github"]
+)
+
+# Analyze and document
+result = await coder.chat(
+    "Analyze the repository, find all API endpoints, and create documentation"
+)
+```
+
+### Customer Support System
+
+```python
+# Multiple agents for different tasks
+classifier = create_agent(system_prompt="Classify customer inquiries")
+support = create_agent(system_prompt="Provide support answers", tools=["bigquery_vector_search"])
+escalation = create_agent(system_prompt="Handle escalations")
+
+# Conditional workflow based on classification
+# (See docs for advanced workflow patterns)
+```
+
+---
+
+## 🔧 Configuration
+
+### Code Configuration
+
+```python
+from langswarm import create_agent
+
+agent = create_agent(
+    model="gpt-4",
+    system_prompt="You are a helpful assistant",
+    memory=True,
+    tools=["filesystem", "web_search"],
+    temperature=0.7,
+    stream=False,
+    track_costs=True
+)
+```
+
+### YAML Configuration
+
+```yaml
+# langswarm.yaml
+version: "2.0"
+project_name: "my-agents"
+
+agents:
+  - id: assistant
+    model: gpt-4
+    provider: openai
+    system_prompt: "You are a helpful assistant"
+    tools: ["filesystem", "web_search"]
+    
+  - id: analyst
+    model: claude-3-sonnet-20240229
+    provider: anthropic
+    system_prompt: "You are a data analyst"
+    memory_enabled: true
+
+memory:
+  backend: chromadb
+  settings:
+    persist_directory: "./data/memory"
+
+workflows:
+  - id: research_task
+    workflow: "assistant -> analyst -> user"
+```
+
+Load and use:
+
+```python
+from langswarm.core.config import load_config
+
+config = load_config("langswarm.yaml")
+agent = config.get_agent("assistant")
+response = await agent.chat("Hello!")
+```
+
+---
+
+## 🚀 Advanced Features
+
+### Streaming Responses
+
+```python
+agent = create_agent(model="gpt-4")
+
+async for chunk in agent.chat_stream("Tell me a story"):
+    print(chunk, end="", flush=True)
+```
+
+### Cost Tracking
+
+```python
+agent = create_agent(model="gpt-4", track_costs=True)
+
+await agent.chat("Hello!")
+
+stats = agent.get_usage_stats()
+print(f"Tokens used: {stats['total_tokens']}")
+print(f"Estimated cost: ${stats['estimated_cost']}")
+```
+
+### Structured Outputs
+
+```python
+from pydantic import BaseModel
+
+class UserInfo(BaseModel):
+    name: str
+    age: int
+    email: str
+
+agent = create_agent(model="gpt-4")
+result = await agent.chat(
+    "Extract: John Doe, 30 years old, john@example.com",
+    response_format=UserInfo
+)
+# result is a UserInfo instance
+```
+
+### Observability (OpenTelemetry)
+
+```python
+from langswarm.observability import enable_instrumentation
+
+# Enable tracing
+enable_instrumentation(
+    service_name="my-agents",
+    exporter="jaeger",  # or "otlp", "prometheus"
+    endpoint="http://localhost:14268/api/traces"
+)
+
+# All agent/workflow operations now traced
+```
+
+---
+
+## 🛠️ MCP Tool Development
+
+Create custom tools using the Model Context Protocol:
+
+```python
+from langswarm.tools import UnifiedTool
+from langswarm.core.errors import ErrorContext
+
+class MyCustomTool(UnifiedTool):
+    """Custom tool for specific operations"""
+    
+    metadata = {
+        "name": "My Custom Tool",
+        "description": "Does something specific",
+        "version": "1.0.0"
+    }
+    
+    async def execute(self, input_data: dict, context: ErrorContext = None) -> dict:
+        """Main execution method"""
+        operation = input_data.get("operation")
+        
+        if operation == "do_something":
+            result = await self._do_something(input_data)
+            return {"success": True, "result": result}
+        else:
+            return {"success": False, "error": f"Unknown operation: {operation}"}
+    
+    async def _do_something(self, data: dict):
+        # Your tool logic here
+        return {"message": "Operation completed"}
+
+# Register and use
+from langswarm.tools import ToolRegistry
+
+registry = ToolRegistry()
+registry.register_tool(MyCustomTool())
+
+# Now available to agents
+agent = create_agent(model="gpt-4", tools=["my_custom_tool"])
+```
+
+---
+
+## 📖 Documentation
+
+- **[Quick Start Guide](docs/getting-started/quickstart.md)** - Get up and running in minutes
+- **[Multi-Agent Orchestration](docs/MULTI_AGENT_ORCHESTRATION_GUIDE.md)** - Learn workflow patterns
+- **[Simple Examples](examples/simple/)** - 10 working examples to learn from
+- **[Tool Development](docs/tools/mcp/MCP_TOOL_DEVELOPER_GUIDE.md)** - Create custom tools
+- **[API Reference](docs/api-reference/)** - Complete API documentation
+- **[Migration Guide](docs/migration/)** - Upgrading from older versions
+
+---
+
+## 🎯 Production Deployment
+
+### Docker
+
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY . .
+CMD ["python", "app.py"]
+```
+
+### Environment Variables
+
+```bash
+# Required
+export OPENAI_API_KEY="sk-..."
+
+# Optional providers
+export ANTHROPIC_API_KEY="sk-ant-..."
+export GOOGLE_API_KEY="..."
+
+# Memory backends
+export REDIS_URL="redis://localhost:6379"
+export BIGQUERY_PROJECT="my-project"
+export CHROMADB_PATH="./data/chromadb"
+
+# Observability
+export LANGSMITH_API_KEY="..."
+export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4318"
+```
+
+### Cloud Deployment
+
+LangSwarm supports deployment to:
+
+- **Google Cloud Platform** (Cloud Run, Cloud Functions, GKE)
+- **AWS** (Lambda, ECS, EKS)
+- **Azure** (Functions, Container Apps, AKS)
+
+See [deployment documentation](docs/deployment/) for platform-specific guides.
+
+---
+
+## 🧪 Testing
+
+```bash
+# Install dev dependencies
+pip install -e .[dev]
+
+# Run tests
+pytest tests/
+
+# Run specific test suite
+pytest tests/unit/
+pytest tests/integration/
+pytest tests/e2e/
+
+# Run examples
+cd examples/simple
+python 01_basic_chat.py
+```
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+### Development Setup
+
+```bash
+# Clone repository
+git clone https://github.com/aekdahl/langswarm.git
+cd langswarm
+
+# Install in development mode
+pip install -e .[dev]
+
+# Run tests
+pytest
+
+# Run examples
+cd examples/simple && python test_all_examples.py
+```
+
+---
+
+## 📊 Supported Providers
+
+| Provider | Status | Models | Notes |
+|----------|--------|--------|-------|
+| **OpenAI** | ✅ Stable | GPT-4, GPT-3.5, etc. | Full support, function calling |
+| **Anthropic** | ✅ Stable | Claude 3.5, Claude 3 | Full support, tool use |
+| **Google** | ✅ Stable | Gemini Pro, Gemini Pro Vision | Multimodal support |
+| **Mistral** | ✅ Stable | Mixtral, Mistral Large | Function calling |
+| **Cohere** | ✅ Stable | Command R+, Command R | RAG capabilities |
+| **Hugging Face** | ✅ Beta | Open source models | Local & API |
+| **Local** | ✅ Beta | Ollama, LocalAI, etc. | OpenAI-compatible |
+| **Custom** | ✅ Beta | Any OpenAI-compatible API | Community template |
+
+---
+
+## 🛠️ Built-in MCP Tools
+
+| Tool | Description | Status |
+|------|-------------|--------|
+| `filesystem` | File operations (read, write, list) | ✅ Stable |
+| `web_search` | Web search capabilities | ✅ Stable |
+| `github` | GitHub repository operations | ✅ Stable |
+| `sql_database` | SQL database access | ✅ Stable |
+| `bigquery_vector_search` | Semantic search in BigQuery | ✅ Stable |
+| `codebase_indexer` | Code analysis and search | ✅ Stable |
+| `workflow_executor` | Dynamic workflow execution | ✅ Stable |
+| `tasklist` | Task management | ✅ Stable |
+| `message_queue_publisher` | Publish to message queues | ✅ Stable |
+| `message_queue_consumer` | Consume from message queues | ✅ Stable |
+| `realtime_voice` | OpenAI Realtime API integration | ✅ Beta |
+| `daytona_environment` | Dev environment management | ✅ Beta |
+| `gcp_environment` | GCP resource management | ✅ Beta |
+| `dynamic_forms` | Dynamic form generation | ✅ Beta |
+
+---
+
+## 📝 License
+
+LangSwarm is MIT licensed. See [LICENSE](LICENSE) for details.
+
+---
+
+## 🙋 Support
+
+- **Issues**: [GitHub Issues](https://github.com/aekdahl/langswarm/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/aekdahl/langswarm/discussions)
+- **Email**: alexander.ekdahl@gmail.com
+
+---
+
+## 🎉 Examples
+
+See the [`examples/simple/`](examples/simple/) directory for 10 working examples:
+
+1. **Basic Chat** - Simple agent conversation
+2. **Memory Chat** - Agent with conversation memory
+3. **Two Agents** - Multiple agents working together
+4. **Different Models** - Using different LLM providers
+5. **With Tools** - Agents using tools (filesystem, web search)
+6. **Workflow** - Sequential agent workflows
+7. **Web Search** - Agent with web search capabilities
+8. **Config From File** - Loading configuration from YAML
+9. **Streaming Response** - Real-time streaming responses
+10. **Cost Tracking** - Tracking token usage and costs
+
+Each example is **10-25 lines of code** and **fully working**.
+
+---
+
+## 🚀 Quick Links
+
+- **[GitHub Repository](https://github.com/aekdahl/langswarm)**
+- **[Documentation](docs/README.md)**
+- **[Examples](examples/simple/)**
+- **[PyPI Package](https://pypi.org/project/langswarm/)**
+
+---
+
+**Built with ❤️ by the LangSwarm community**

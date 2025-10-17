@@ -23,6 +23,10 @@ from .base import WorkflowExecution, get_workflow_registry
 from ..observability.auto_instrumentation import (
     AutoInstrumentedMixin, auto_trace_operation, auto_record_metric, auto_log_operation
 )
+from ..orchestration_errors import (
+    AgentNotFoundError, WorkflowExecutionError, AgentExecutionError,
+    DataPassingError, agent_not_found, workflow_failed, agent_failed
+)
 
 # Import V2 systems
 try:
@@ -66,7 +70,42 @@ class WorkflowExecutionEngine(IWorkflowEngine, AutoInstrumentedMixin):
         execution_mode: ExecutionMode = ExecutionMode.SYNC,
         context_variables: Optional[Dict[str, Any]] = None
     ) -> Union[WorkflowResult, IWorkflowExecution]:
-        """Execute a workflow with the specified mode and automatic instrumentation"""
+        """Execute a multi-agent workflow with automatic orchestration.
+        
+        This method orchestrates the execution of multiple agents according to
+        the workflow definition, automatically passing data between agents.
+        
+        Args:
+            workflow: The workflow to execute (created with create_simple_workflow)
+            input_data: Initial input data (typically {"input": "your query"})
+            execution_mode: How to execute (SYNC waits for completion, ASYNC returns immediately)
+            context_variables: Additional variables available to all agents
+            
+        Returns:
+            WorkflowResult: For SYNC mode - contains final result and status
+            IWorkflowExecution: For ASYNC mode - can be monitored for progress
+            
+        Raises:
+            WorkflowError: If workflow execution fails
+            AgentError: If an individual agent fails
+            
+        Example:
+            >>> # Synchronous execution (wait for result)
+            >>> result = await engine.execute_workflow(
+            ...     workflow=my_workflow,
+            ...     input_data={"input": "Research AI safety"}
+            ... )
+            >>> print(result.result)  # Final output from last agent
+            >>> 
+            >>> # Asynchronous execution (monitor progress)
+            >>> execution = await engine.execute_workflow(
+            ...     workflow=my_workflow,
+            ...     input_data={"input": "Research AI safety"},
+            ...     execution_mode=ExecutionMode.ASYNC
+            ... )
+            >>> # Check status periodically
+            >>> status = execution.get_status()
+        """
         
         # Create execution context
         execution_id = str(uuid.uuid4())
@@ -188,22 +227,22 @@ class WorkflowExecutionEngine(IWorkflowEngine, AutoInstrumentedMixin):
                     
                     raise ValueError(error_msg)
                 
-        except Exception as e:
-            logger.error(f"Workflow execution {execution_id} failed: {e}")
-            execution.update_status(WorkflowStatus.FAILED)
-            
-            result = WorkflowResult(
-                execution_id=execution_id,
-                status=WorkflowStatus.FAILED,
-                error=e,
-                execution_time=time.time() - execution.start_time.timestamp()
-            )
-            execution.set_result(result)
-            
-            if execution_mode == ExecutionMode.SYNC:
-                return result
-            else:
-                return execution
+            except Exception as e:
+                logger.error(f"Workflow execution {execution_id} failed: {e}")
+                execution.update_status(WorkflowStatus.FAILED)
+                
+                result = WorkflowResult(
+                    execution_id=execution_id,
+                    status=WorkflowStatus.FAILED,
+                    error=e,
+                    execution_time=time.time() - execution.start_time.timestamp()
+                )
+                execution.set_result(result)
+                
+                if execution_mode == ExecutionMode.SYNC:
+                    return result
+                else:
+                    return execution
     
     async def execute_workflow_stream(
         self,
@@ -463,6 +502,22 @@ class WorkflowExecutionEngine(IWorkflowEngine, AutoInstrumentedMixin):
         except Exception as e:
             logger.error(f"Step {step.step_id} failed: {e}")
             
+            # Create more specific error if it's an agent step
+            if hasattr(step, 'agent_id'):
+                # Check if it's an agent not found error
+                if "not found" in str(e).lower() or "no agent" in str(e).lower():
+                    from langswarm.core.agents import list_agents
+                    available = list_agents()
+                    enhanced_error = agent_not_found(step.agent_id, available)
+                else:
+                    # General agent execution error
+                    enhanced_error = agent_failed(
+                        agent_id=step.agent_id,
+                        step_id=step.step_id,
+                        error=e
+                    )
+                e = enhanced_error
+            
             # Handle step failure with error handler if available
             if self._error_handler:
                 try:
@@ -658,5 +713,21 @@ _workflow_engine = WorkflowExecutionEngine()
 
 
 def get_workflow_engine() -> WorkflowExecutionEngine:
-    """Get the global workflow execution engine"""
+    """Get the global workflow execution engine for orchestrating agents.
+    
+    The workflow engine is responsible for executing workflows, managing
+    agent coordination, and passing data between agents in the workflow.
+    
+    Returns:
+        WorkflowExecutionEngine: The global engine instance
+        
+    Example:
+        >>> engine = get_workflow_engine()
+        >>> result = await engine.execute_workflow(
+        ...     workflow=my_workflow,
+        ...     input_data={"input": "Process this data"}
+        ... )
+        >>> print(f"Status: {result.status}")
+        >>> print(f"Result: {result.result}")
+    """
     return _workflow_engine

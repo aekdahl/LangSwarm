@@ -152,7 +152,7 @@ class AutoInstrumentedMixin:
     def _auto_log(self, level: str, message: str, **kwargs):
         """Log a message for this component"""
         kwargs["component"] = self._component_name
-        auto_log_operation(level, message, self._component_name, **kwargs)
+        auto_log_operation(level, message, **kwargs)
 
 
 def auto_instrument_function(operation_name: Optional[str] = None, component: Optional[str] = None):
@@ -216,7 +216,7 @@ def auto_instrument_function(operation_name: Optional[str] = None, component: Op
                             span.add_tag("error.message", str(e))
                             span.set_status("error")
                         
-                        auto_log_operation("error", f"Function {op_name} failed: {e}", comp_name,
+                        auto_log_operation("error", f"Function {op_name} failed: {e}", component=comp_name,
                                          error_type=type(e).__name__, error_message=str(e))
                         raise
             
@@ -269,7 +269,7 @@ def auto_instrument_function(operation_name: Optional[str] = None, component: Op
                             span.add_tag("error.message", str(e))
                             span.set_status("error")
                         
-                        auto_log_operation("error", f"Function {op_name} failed: {e}", comp_name,
+                        auto_log_operation("error", f"Function {op_name} failed: {e}", component=comp_name,
                                          error_type=type(e).__name__, error_message=str(e))
                         raise
             

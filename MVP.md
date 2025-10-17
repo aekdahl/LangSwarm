@@ -32,22 +32,6 @@ result = await engine.execute_workflow(workflow, {"input": "Benefits of AI in he
 
 **This is the real MVP** - multiple agents working together through orchestration, not just a single agent.
 
-## 📋 MVP Requirements
-
-### Core Requirements
-- ✅ **Multi-Agent Creation**: Create multiple specialized agents
-- ✅ **Agent Registration**: Register agents for workflow orchestration
-- ✅ **Workflow Creation**: Define how agents work together
-- ✅ **Orchestration Engine**: Execute workflows with agent coordination
-- ✅ **Provider Support**: OpenAI integration (most common)
-- ✅ **Error Handling**: Graceful failure with clear messages
-
-### Dependencies
-- Python 3.8+
-- `langswarm` package
-- `openai` package
-- OpenAI API key
-
 ## 🏗️ MVP Architecture
 
 ### 1. **Multi-Agent Creation**

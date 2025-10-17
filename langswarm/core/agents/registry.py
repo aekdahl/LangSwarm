@@ -339,27 +339,91 @@ _global_registry = AgentRegistry()
 
 # Convenience functions
 def register_agent(agent: IAgent, metadata: Optional[Dict[str, Any]] = None) -> bool:
-    """Register an agent in the global registry"""
+    """Register an agent in the global registry for orchestration.
+    
+    Args:
+        agent: Agent instance to register (must have agent_id attribute)
+        metadata: Optional metadata about the agent (capabilities, description, etc.)
+        
+    Returns:
+        bool: True if registration successful, False if agent_id already exists
+        
+    Raises:
+        ValueError: If agent doesn't have an agent_id attribute
+        
+    Example:
+        >>> researcher = await create_openai_agent(name="researcher")
+        >>> register_agent(researcher)
+        >>> # Agent is now available for workflows
+    """
     return _global_registry.register(agent, metadata)
 
 
 def get_agent(agent_id: str) -> Optional[IAgent]:
-    """Get an agent from the global registry"""
+    """Get a registered agent by ID from the global registry.
+    
+    Args:
+        agent_id: Unique identifier of the agent
+        
+    Returns:
+        IAgent: The registered agent, or None if not found
+        
+    Example:
+        >>> agent = get_agent("researcher")
+        >>> if agent:
+        ...     response = await agent.execute("Research quantum computing")
+    """
     return _global_registry.get(agent_id)
 
 
 def get_agent_by_name(name: str) -> Optional[IAgent]:
-    """Get an agent by name from the global registry"""
+    """Get a registered agent by name from the global registry.
+    
+    Args:
+        name: Human-readable name of the agent
+        
+    Returns:
+        IAgent: The first agent with matching name, or None if not found
+        
+    Note:
+        Multiple agents can have the same name. This returns the first match.
+        Use get_agent() with agent_id for guaranteed unique lookup.
+    """
     return _global_registry.get_by_name(name)
 
 
 def list_agents() -> List[str]:
-    """List all registered agent IDs"""
+    """List all registered agent IDs available for orchestration.
+    
+    Returns:
+        List[str]: List of all registered agent IDs
+        
+    Example:
+        >>> agents = list_agents()
+        >>> print(f"Available agents: {agents}")
+        Available agents: ['researcher', 'summarizer', 'reviewer']
+    """
     return _global_registry.list_agents()
 
 
 def list_agent_info() -> List[Dict[str, Any]]:
-    """List all agent information"""
+    """List detailed information for all registered agents.
+    
+    Returns:
+        List[Dict[str, Any]]: List of agent information dictionaries
+        
+    Each dictionary contains:
+        - agent_id: Unique identifier
+        - name: Human-readable name
+        - provider: AI provider (openai, anthropic, etc.)
+        - capabilities: List of agent capabilities
+        - metadata: Additional agent metadata
+        
+    Example:
+        >>> info = list_agent_info()
+        >>> for agent in info:
+        ...     print(f"{agent['agent_id']}: {agent['name']} ({agent['provider']})")
+    """
     return _global_registry.list_agent_info()
 
 

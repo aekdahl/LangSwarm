@@ -378,16 +378,44 @@ def create_simple_workflow(
     input_data: Optional[Dict[str, Any]] = None
 ) -> IWorkflow:
     """
-    Create a simple linear workflow from a list of agent IDs.
+    Create a simple linear workflow for multi-agent orchestration.
+    
+    This is the primary way to orchestrate multiple agents working together.
+    Each agent in the chain receives the output from the previous agent,
+    enabling collaborative task completion.
     
     Args:
         workflow_id: Unique workflow identifier
-        name: Human-readable workflow name
+        name: Human-readable workflow name  
         agent_chain: List of agent IDs to execute in sequence
-        input_data: Initial input data template
+        input_data: Initial input data template (defaults to {"input": "..."})
     
     Returns:
-        Complete workflow ready for execution
+        IWorkflow: Complete workflow ready for execution
+        
+    Raises:
+        ValueError: If agent_chain is empty
+        
+    Example:
+        >>> # Create and register specialized agents
+        >>> researcher = await create_openai_agent("researcher")
+        >>> summarizer = await create_openai_agent("summarizer")
+        >>> register_agent(researcher)
+        >>> register_agent(summarizer)
+        >>> 
+        >>> # Create orchestration workflow
+        >>> workflow = create_simple_workflow(
+        ...     workflow_id="research_task",
+        ...     name="Research and Summarize",
+        ...     agent_chain=["researcher", "summarizer"]
+        ... )
+        >>> 
+        >>> # Execute orchestrated workflow
+        >>> engine = get_workflow_engine()
+        >>> result = await engine.execute_workflow(
+        ...     workflow,
+        ...     {"input": "AI in healthcare"}
+        ... )
     """
     if not agent_chain:
         raise ValueError("Agent chain cannot be empty")

@@ -1,0 +1,150 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install pytest pytest-cov pytest-asyncio pytest-timeout
+    
+    - name: Run unit tests
+      run: |
+        pytest tests/unit -v --cov=langswarm --cov-report=term-missing
+    
+    - name: Run integration tests
+      run: |
+        pytest tests/integration -v
+    
+    - name: Test examples structure
+      run: |
+        cd examples/simple
+        python test_all_examples.py
+    
+    - name: Test imports
+      run: |
+        python -c "from langswarm import create_agent, create_workflow, load_config; print('✅ All imports successful')"
+    
+    - name: Test minimal example
+      run: |
+        cat > test_minimal.py << EOF
+        import asyncio
+        from langswarm import create_agent
+        
+        async def test():
+            try:
+                agent = create_agent(model="gpt-3.5-turbo")
+                print("✅ Agent creation successful")
+            except ValueError as e:
+                if "OPENAI_API_KEY" in str(e):
+                    print("✅ Correct error for missing API key")
+                else:
+                    raise
+        
+        asyncio.run(test())
+        EOF
+        python test_minimal.py
+    
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      if: matrix.python-version == '3.11'
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        pip install black isort flake8 mypy
+    
+    - name: Check code formatting
+      run: |
+        black --check langswarm tests
+        isort --check-only langswarm tests
+    
+    - name: Lint with flake8
+      run: |
+        flake8 langswarm tests --max-line-length=100 --ignore=E203,W503
+    
+    - name: Type checking with mypy
+      run: |
+        mypy langswarm --ignore-missing-imports --no-strict-optional
+      continue-on-error: true  # Don't fail on type errors initially
+
+  docs:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install markdown-link-check
+      run: |
+        npm install -g markdown-link-check
+    
+    - name: Check documentation links
+      run: |
+        find . -name "*.md" -not -path "./archived/*" -not -path "./node_modules/*" | xargs -I {} markdown-link-check {} -q
+      continue-on-error: true  # Don't fail on broken links initially
+    
+    - name: Check for empty documentation files
+      run: |
+        find docs -name "*.md" -size 0 -exec echo "Empty file: {}" \;
+        
+    - name: Validate YAML files
+      run: |
+        pip install pyyaml
+        python -c "
+        import yaml
+        import glob
+        for file in glob.glob('**/*.yaml', recursive=True):
+            if 'archived' not in file:
+                try:
+                    with open(file) as f:
+                        yaml.safe_load(f)
+                    print(f'✅ Valid YAML: {file}')
+                except Exception as e:
+                    print(f'❌ Invalid YAML: {file} - {e}')
+        "
