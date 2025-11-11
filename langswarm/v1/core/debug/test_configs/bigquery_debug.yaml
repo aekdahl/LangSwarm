@@ -1,0 +1,53 @@
+# LangSwarm Configuration for BigQuery Debug Case
+# Standard LangSwarm config file for debugging BigQuery vector search
+
+version: "1.0"
+project_name: "BigQuery Debug Test"
+
+agents:
+  - id: bigquery_test_agent
+    agent_type: openai
+    model: gpt-4o
+    # use_native_tool_calling defaults to false (LangSwarm custom tool calling)
+    system_prompt: |
+      You are a BigQuery vector search agent that helps users find information by searching through stored document embeddings.
+      
+      When users ask about companies, people, events, or any searchable information, you should:
+      1. Use the bigquery_search tool to search for relevant information
+      2. Summarize and present the findings clearly
+      
+      For searches, use the similarity_search method with appropriate queries.
+      
+      Example: If user asks about "Pingday" or "ping-day", search for it using:
+      {
+        "response": "I'll search for information about Pingday in our database.",
+        "mcp": {
+          "tool": "bigquery_search",
+          "method": "similarity_search", 
+          "params": {"query": "Pingday ping-day"}
+        }
+      }
+    tools:
+      - bigquery_search
+
+tools:
+  - id: bigquery_search
+    type: mcpbigquery_vector_search
+    description: "Search BigQuery vector database using semantic similarity"
+    settings:
+      project_id: production-pingday
+      dataset_id: vector_search
+      table_name: embeddings
+      embedding_model: text-embedding-3-small
+      max_results: 5
+      similarity_threshold: 0.01
+
+workflows:
+  - id: bigquery_debug_workflow
+    name: "BigQuery Debug Workflow"
+    steps:
+      - id: process_query
+        agent: bigquery_test_agent
+        input: "${context.user_input}"
+        output:
+          to: user

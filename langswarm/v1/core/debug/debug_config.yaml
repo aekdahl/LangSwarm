@@ -1,0 +1,37 @@
+# LangSwarm Debug Configuration
+# This file configures debug operations including API keys, databases, and project settings
+# You can also use environment variables which will override these settings
+
+# OpenAI Configuration (Required for all debug cases)
+openai:
+  api_key: ${OPENAI_API_KEY}  # Set via environment variable
+  model: gpt-4o
+  # base_url: null                    # Optional: custom OpenAI base URL
+  # organization: null                # Optional: OpenAI organization ID
+
+# Google Cloud Configuration (Required only for BigQuery debug cases)
+google_cloud:
+  project_id: production-pingday
+  # credentials_path: null            # Optional: explicit service account file
+                                      # If not set, uses gcloud auth (Application Default Credentials)
+  # service_account_key: null         # Alternative: inline service account JSON
+
+# BigQuery Configuration (Used in BigQuery debug cases)
+bigquery:
+  dataset_id: vector_search
+  table_name: embeddings
+  embedding_model: text-embedding-3-small
+  max_results: 10
+  similarity_threshold: 0.01
+
+# Database Configuration (Optional - for future debug cases)
+database:
+  # postgres_url: null                # Optional: PostgreSQL connection URL
+  # mysql_url: null                   # Optional: MySQL connection URL
+  # sqlite_path: null                 # Optional: SQLite database path
+
+# Debug Output Settings
+output_dir: debug_traces
+log_level: INFO
+enable_file_logging: true
+enable_console_logging: true

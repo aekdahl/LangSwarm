@@ -1,0 +1,50 @@
+# Example configuration for BigQuery Memory Adapter
+
+retrievers:
+  # BigQuery adapter for large-scale analytics and storage
+  bigquery_memory:
+    type: BigQueryAdapter
+    identifier: "analytics_agent_memory"
+    project_id: "your-gcp-project-id"
+    dataset_id: "langswarm_memory"
+    table_id: "agent_conversations"
+    location: "US"  # or "EU", "asia-northeast1", etc.
+  
+  # Optional: Separate BigQuery table for conversation summaries
+  bigquery_summaries:
+    type: BigQueryAdapter
+    identifier: "conversation_summaries"
+    project_id: "your-gcp-project-id"
+    dataset_id: "langswarm_memory"
+    table_id: "conversation_summaries"
+    location: "US"
+
+agents:
+  - id: analytics_agent
+    agent_type: langchain-openai
+    model: gpt-4
+    system_prompt: |
+      You are an analytics-powered assistant with BigQuery-backed memory.
+      You can remember and analyze patterns across all conversations.
+    
+    # BigQuery memory configuration
+    memory_adapter: bigquery_memory
+    memory_summary_adapter: bigquery_summaries
+    
+    # Enable other features
+    is_conversational: true
+    tools: []
+    retrievers: []
+
+# Example usage:
+# 1. Set up Google Cloud credentials:
+#    export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
+#    
+# 2. Install BigQuery dependencies:
+#    pip install google-cloud-bigquery
+#    
+# 3. The adapter will automatically:
+#    - Create the dataset and tables if they don't exist
+#    - Store conversations with full metadata
+#    - Enable SQL-based querying and analytics
+#    - Support time-series analysis of agent interactions 

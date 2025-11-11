@@ -138,7 +138,44 @@ engine = get_workflow_engine()
 result = await engine.execute_workflow(workflow, {"input": "task data"})
 ```
 
-### 3. **Tools (MCP)**
+### 4. **Memory**
+
+LangSwarm's conversational memory system is powered by **[AgentMem](./agentmem)**, a standalone package that provides enterprise-grade memory management for AI agents.
+
+**Key Features:**
+- **Session Management**: Organize conversations with persistent sessions
+- **Multiple Backends**: SQLite, Redis, In-Memory, and vector stores
+- **Auto-Summarization**: Automatic conversation compression when limits reached
+- **Token Management**: Keep context within model limits
+- **LLM Integration**: Native OpenAI and Anthropic format support
+
+```python
+from langswarm.core.memory import create_memory_manager, Message, MessageRole
+
+# Create memory manager
+manager = create_memory_manager("sqlite", db_path="conversations.db")
+await manager.backend.connect()
+
+# Create a session
+session = await manager.create_session(user_id="user123")
+
+# Add messages
+await session.add_message(Message(role=MessageRole.USER, content="Hello"))
+```
+
+**AgentMem as Standalone Package:**
+
+AgentMem can also be used independently in other projects:
+
+```bash
+pip install agentmem
+```
+
+See the [AgentMem documentation](./agentmem/README.md) for more details on standalone usage.
+
+---
+
+## 🛠️ Tools (MCP)
 
 LangSwarm implements the Model Context Protocol (MCP) for tool integration:
 
@@ -443,12 +480,27 @@ agent = create_agent(model="gpt-4", tools=["my_custom_tool"])
 
 ## 📖 Documentation
 
-- **[Quick Start Guide](docs/getting-started/quickstart.md)** - Get up and running in minutes
+**📋 Main Resources**
+- **[Documentation Index](docs/INDEX.md)** - Complete documentation map
+- **[Quick Start Guide](docs/guides/QUICK_START_COMPLETE.md)** - Get up and running in 5 minutes
 - **[Multi-Agent Orchestration](docs/MULTI_AGENT_ORCHESTRATION_GUIDE.md)** - Learn workflow patterns
 - **[Simple Examples](examples/simple/)** - 10 working examples to learn from
+
+**🆕 V2 - Hierarchical Planning**
+- **[Hierarchical Planning](docs/planning/HIERARCHICAL_PLANNING_COMPLETE.md)** - Advanced orchestration system
+- **[Retrospective Validation](docs/planning/RETROSPECTIVE_VALIDATION_COMPLETE.md)** - Async validation & rollback
+- **[Planning Examples](examples/planning/)** - 6 comprehensive workflow examples
+
+**📦 V1 - Legacy Support**
+- **[V1 Quick Start](docs/v1/README_V1_USERS.md)** - Fix V1 bugs (LangChain + UTF-8)
+- **[V1 Migration](docs/v1/V1_MIGRATION_GUIDE.md)** - Upgrade to fixed V1
+- **[V1 Monkey Patch](docs/v1/langswarm_v1_monkey_patch.py)** - Standalone bug fix
+
+**🔧 Advanced Topics**
 - **[Tool Development](docs/tools/mcp/MCP_TOOL_DEVELOPER_GUIDE.md)** - Create custom tools
 - **[API Reference](docs/api-reference/)** - Complete API documentation
 - **[Migration Guide](docs/migration/)** - Upgrading from older versions
+- **[Release Notes](docs/releases/RELEASE_NOTES_v0.0.54.dev46.md)** - Latest release info
 
 ---
 
@@ -615,7 +667,7 @@ Each example is **10-25 lines of code** and **fully working**.
 ## 🚀 Quick Links
 
 - **[GitHub Repository](https://github.com/aekdahl/langswarm)**
-- **[Documentation](docs/README.md)**
+- **[Documentation](docs/INDEX.md)**
 - **[Examples](examples/simple/)**
 - **[PyPI Package](https://pypi.org/project/langswarm/)**
 

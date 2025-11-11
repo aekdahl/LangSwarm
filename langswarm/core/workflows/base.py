@@ -153,14 +153,18 @@ class AgentStep(BaseWorkflowStep):
         if not agent:
             raise ValueError(f"Agent '{self.agent_id}' not found")
         
-        # Execute agent
+        # Create consistent session_id for conversation context isolation
+        # Priority: user-provided session_id > workflow execution session_id
+        session_id = context.variables.get("session_id") or f"{context.workflow_id}_{context.execution_id}"
+        
+        # Execute agent with session_id for proper memory isolation
         if isinstance(agent_input, str):
             # Text input
-            response = await agent.send_message(agent_input)
+            response = await agent.send_message(agent_input, session_id=session_id)
             return response.content
         else:
             # Structured input
-            response = await agent.send_message(str(agent_input))
+            response = await agent.send_message(str(agent_input), session_id=session_id)
             return response.content
     
     def _resolve_template(self, template: str, context: WorkflowContext) -> str:

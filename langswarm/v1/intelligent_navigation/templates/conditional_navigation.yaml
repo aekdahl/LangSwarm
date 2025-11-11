@@ -1,0 +1,152 @@
+# Advanced Navigation Configuration Template
+# This template demonstrates conditional routing with rules and step conditions
+
+mode: hybrid  # Combines conditional rules with agent choice
+
+available_steps:
+  - id: technical_support
+    name: Technical Support
+    description: Route to technical support team for software issues and bugs
+    conditions:
+      - field: output.category
+        operator: eq
+        value: technical
+        description: Issue is categorized as technical
+    weight: 1.5  # Higher weight for technical issues
+    metadata:
+      department: technical
+      estimated_resolution_time: "2-4 hours"
+      
+  - id: billing_support
+    name: Billing Support  
+    description: Route to billing team for payment and subscription issues
+    conditions:
+      - field: output.category
+        operator: eq
+        value: billing
+        description: Issue is related to billing or payments
+      - field: output.complexity
+        operator: lte
+        value: 0.7
+        description: Issue complexity is manageable by billing team
+    metadata:
+      department: billing
+      estimated_resolution_time: "30 minutes"
+      
+  - id: product_feedback
+    name: Product Feedback
+    description: Route feature requests and product suggestions to product team
+    conditions:
+      - field: output.intent
+        operator: contains
+        value: feature
+        description: Request contains feature-related keywords
+    weight: 0.8
+    metadata:
+      department: product
+      follow_up_required: true
+      
+  - id: escalate_high_priority
+    name: Escalate High Priority
+    description: Escalate urgent or high-priority issues to senior support
+    conditions:
+      - field: output.priority
+        operator: in
+        value: [urgent, high, critical]
+        description: Issue has high priority level
+    weight: 2.0
+    metadata:
+      department: escalation
+      sla: "15 minutes"
+      
+  - id: general_inquiry
+    name: General Inquiry
+    description: Handle general questions and information requests
+    # No conditions - always available as fallback
+    weight: 0.5
+    metadata:
+      department: general
+      estimated_resolution_time: "1 hour"
+
+# Conditional routing rules (evaluated before agent choice)
+rules:
+  - conditions:
+      - field: output.priority
+        operator: eq
+        value: critical
+        description: Critical priority issues are auto-escalated
+    target_step: escalate_high_priority
+    priority: 10
+    description: "Automatically escalate all critical priority issues"
+    
+  - conditions:
+      - field: output.customer_tier
+        operator: eq
+        value: premium
+        description: Premium customers get priority routing
+      - field: output.category
+        operator: eq
+        value: technical
+        description: Technical issues for premium customers
+    target_step: technical_support
+    priority: 8
+    description: "Premium customers with technical issues get immediate technical support"
+    
+  - conditions:
+      - field: output.sentiment
+        operator: lt
+        value: 0.3
+        description: Very negative sentiment indicates escalation needed
+    target_step: escalate_high_priority
+    priority: 7
+    description: "Escalate issues with very negative customer sentiment"
+
+# Safety fallback when no valid steps are available
+fallback_step: general_inquiry
+
+# Advanced configuration
+timeout_seconds: 45  # Longer timeout for complex decisions
+max_attempts: 3
+tracking_enabled: true
+analytics_enabled: true
+
+# Custom prompt template for agent decisions
+prompt_template: |
+  You are an intelligent customer support routing system. Based on the analysis below,
+  select the most appropriate support channel for this customer issue.
+  
+  ## Issue Analysis:
+  {context}
+  
+  ## Available Support Channels:
+  {available_steps}
+  
+  ## Recent Routing History:
+  {step_history}
+  
+  ## Instructions:
+  1. Consider the issue category, priority, and customer tier
+  2. Review any automatic routing rules that might apply
+  3. Choose the support channel that can best resolve this issue efficiently
+  4. If uncertain, prefer escalation over auto-resolution for customer satisfaction
+  5. Consider current team capacity and estimated resolution times
+  
+  Provide your decision with clear reasoning explaining why this routing choice
+  is optimal for both customer satisfaction and operational efficiency.
+
+metadata:
+  description: "Advanced navigation template with conditional routing and rules"
+  use_case: "customer_support_routing"
+  complexity: "advanced"
+  features:
+    - conditional_routing
+    - priority_escalation  
+    - customer_tier_routing
+    - sentiment_analysis
+    - automatic_rule_processing
+  departments:
+    - technical
+    - billing
+    - product
+    - escalation
+    - general 

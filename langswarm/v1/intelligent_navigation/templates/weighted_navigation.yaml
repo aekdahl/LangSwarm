@@ -1,0 +1,92 @@
+# Weighted Navigation Configuration Template
+# This template demonstrates probabilistic routing based on step weights
+
+mode: weighted  # Steps are chosen probabilistically based on weights
+
+available_steps:
+  - id: automated_resolution
+    name: Automated Resolution
+    description: Attempt to resolve the issue automatically using AI
+    weight: 3.0  # High weight - preferred for most issues
+    conditions:
+      - field: output.complexity
+        operator: lte
+        value: 0.6
+        description: Issue complexity is suitable for automation
+    metadata:
+      resolution_method: automated
+      success_rate: 0.75
+      
+  - id: human_assisted
+    name: Human-Assisted Resolution
+    description: AI with human oversight for moderately complex issues
+    weight: 2.0  # Medium weight - balanced approach
+    conditions:
+      - field: output.complexity
+        operator: gt
+        value: 0.3
+        description: Issue requires some human judgment
+      - field: output.complexity
+        operator: lte
+        value: 0.8
+        description: Issue is not too complex for assisted resolution
+    metadata:
+      resolution_method: hybrid
+      success_rate: 0.90
+      
+  - id: full_human_support
+    name: Full Human Support
+    description: Route directly to human agent for complex issues
+    weight: 1.0  # Lower weight - used for complex cases
+    conditions:
+      - field: output.complexity
+        operator: gt
+        value: 0.7
+        description: Issue requires full human attention
+    metadata:
+      resolution_method: human
+      success_rate: 0.95
+      
+  - id: specialist_referral
+    name: Specialist Referral
+    description: Route to domain specialist for highly technical issues
+    weight: 0.5  # Very low weight - only for special cases
+    conditions:
+      - field: output.category
+        operator: eq
+        value: technical
+        description: Technical issues may need specialist attention
+      - field: output.complexity
+        operator: gt
+        value: 0.8
+        description: High complexity technical issues
+    metadata:
+      resolution_method: specialist
+      success_rate: 0.98
+
+# No rules for weighted mode - relies on probabilistic selection
+rules: []
+
+# Fallback for edge cases
+fallback_step: human_assisted
+
+# Configuration optimized for weighted decisions
+timeout_seconds: 20  # Faster decisions for weighted mode
+max_attempts: 2
+tracking_enabled: true
+analytics_enabled: true
+
+metadata:
+  description: "Weighted navigation template for probabilistic routing"
+  use_case: "load_balancing"
+  complexity: "intermediate"
+  routing_strategy: "probabilistic"
+  weight_distribution:
+    automated_resolution: "50%" 
+    human_assisted: "33%"
+    full_human_support: "17%"
+    specialist_referral: "8%"
+  notes: |
+    Weights determine probability of selection when conditions are met.
+    Higher weights mean higher likelihood of being chosen.
+    This enables intelligent load balancing across resolution methods. 

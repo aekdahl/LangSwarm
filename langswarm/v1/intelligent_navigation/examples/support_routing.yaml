@@ -1,0 +1,257 @@
+id: "intelligent_support_routing"
+name: "Intelligent Customer Support Routing"
+description: "AI-driven customer support ticket routing with intelligent navigation"
+version: "1.0.0"
+
+# Standard workflow steps leading to navigation
+steps:
+  - id: "ticket_intake"
+    type: "agent"
+    agent: "ticket_analyzer"
+    description: "Analyze incoming support ticket"
+    input:
+      - user_input
+    output:
+      to: "routing_decision"
+  
+  # Navigation step - agent chooses next step intelligently
+  - id: "routing_decision"
+    type: "navigation"
+    description: "Intelligently route ticket to appropriate support channel"
+    navigation:
+      mode: "hybrid"  # Combines conditional rules with agent choice
+      
+      # Available steps for navigation
+      steps:
+        - id: "technical_support"
+          name: "Technical Support"
+          description: "Route to technical support team for bugs, technical issues, and software problems"
+          type: "agent"
+          agent_id: "technical_support_agent"
+          conditions:
+            - field: "output.category"
+              operator: "eq"
+              value: "technical"
+              description: "Ticket is categorized as technical issue"
+            - field: "output.complexity"
+              operator: "lte"
+              value: 0.7
+              description: "Issue complexity is manageable"
+          weight: 1.0
+          metadata:
+            estimated_resolution_time: "2-4 hours"
+            skill_level: "intermediate"
+        
+        - id: "billing_support"
+          name: "Billing Support"
+          description: "Route to billing team for payment issues, subscription problems, and account billing"
+          type: "agent"
+          agent_id: "billing_support_agent"
+          conditions:
+            - field: "output.category"
+              operator: "eq"
+              value: "billing"
+              description: "Ticket is related to billing or payments"
+          weight: 1.0
+          metadata:
+            estimated_resolution_time: "30 minutes"
+            skill_level: "basic"
+        
+        - id: "product_support"
+          name: "Product Support"
+          description: "Route to product team for feature requests, usage questions, and product feedback"
+          type: "agent"
+          agent_id: "product_support_agent"
+          conditions:
+            - field: "output.category"
+              operator: "in"
+              value: ["product", "feature", "usage"]
+              description: "Ticket is product-related"
+          weight: 1.0
+          metadata:
+            estimated_resolution_time: "1-2 hours"
+            skill_level: "intermediate"
+        
+        - id: "enterprise_support"
+          name: "Enterprise Support"
+          description: "Route to enterprise support for high-value customers and complex integrations"
+          type: "agent"
+          agent_id: "enterprise_support_agent"
+          conditions:
+            - field: "output.customer_tier"
+              operator: "eq"
+              value: "enterprise"
+              description: "Customer is enterprise tier"
+          weight: 2.0
+          metadata:
+            estimated_resolution_time: "1 hour"
+            skill_level: "expert"
+            priority: "high"
+        
+        - id: "escalate_to_human"
+          name: "Escalate to Human Agent"
+          description: "Escalate complex or sensitive issues to human support agent"
+          type: "agent"
+          agent_id: "human_escalation_agent"
+          conditions:
+            - field: "output.complexity"
+              operator: "gt"
+              value: 0.8
+              description: "Issue is highly complex"
+          weight: 1.5
+          metadata:
+            estimated_resolution_time: "24 hours"
+            skill_level: "expert"
+            priority: "high"
+        
+        - id: "auto_resolve"
+          name: "Auto-Resolve"
+          description: "Automatically resolve simple issues with predefined responses"
+          type: "agent"
+          agent_id: "auto_resolution_agent"
+          conditions:
+            - field: "output.auto_resolvable"
+              operator: "eq"
+              value: true
+              description: "Issue can be auto-resolved"
+            - field: "output.confidence"
+              operator: "gte"
+              value: 0.9
+              description: "High confidence in resolution"
+          weight: 0.5
+          metadata:
+            estimated_resolution_time: "immediate"
+            skill_level: "automatic"
+        
+        - id: "collect_more_info"
+          name: "Collect More Information"
+          description: "Request additional information from customer before routing"
+          type: "agent"
+          agent_id: "information_collector_agent"
+          conditions:
+            - field: "output.information_sufficient"
+              operator: "eq"
+              value: false
+              description: "Insufficient information to route properly"
+          weight: 0.8
+          metadata:
+            estimated_resolution_time: "pending customer response"
+            skill_level: "basic"
+      
+      # Conditional rules for automatic routing (higher priority)
+      rules:
+        - conditions:
+            - field: "output.priority"
+              operator: "eq"
+              value: "critical"
+              description: "Critical priority issues"
+          target_step: "escalate_to_human"
+          priority: 10
+          description: "Auto-escalate all critical issues"
+        
+        - conditions:
+            - field: "output.customer_tier"
+              operator: "eq"
+              value: "enterprise"
+              description: "Enterprise customers"
+            - field: "output.category"
+              operator: "ne"
+              value: "billing"
+              description: "Non-billing issues"
+          target_step: "enterprise_support"
+          priority: 9
+          description: "Route enterprise customers to specialized support"
+        
+        - conditions:
+            - field: "output.auto_resolvable"
+              operator: "eq"
+              value: true
+              description: "Auto-resolvable issues"
+            - field: "output.confidence"
+              operator: "gte"
+              value: 0.95
+              description: "Very high confidence"
+          target_step: "auto_resolve"
+          priority: 8
+          description: "Auto-resolve highly confident simple issues"
+        
+        - conditions:
+            - field: "output.category"
+              operator: "eq"
+              value: "security"
+              description: "Security-related issues"
+          target_step: "escalate_to_human"
+          priority: 7
+          description: "Security issues require human attention"
+      
+      # Custom prompt for navigation decision
+      prompt_template: |
+        You are an intelligent customer support routing system. Based on the ticket analysis, 
+        select the most appropriate support channel.
+        
+        ## Ticket Analysis Results:
+        {context}
+        
+        ## Available Support Channels:
+        {available_steps}
+        
+        ## Recent Routing History:
+        {step_history}
+        
+        ## Instructions:
+        1. Consider the ticket category, complexity, and customer tier
+        2. Review any automatic routing rules that might apply
+        3. Choose the support channel that can best resolve this issue
+        4. If uncertain, prefer human escalation over auto-resolution
+        5. Consider estimated resolution times and current team capacity
+        
+        Use the `navigate_workflow` tool to make your selection and explain your reasoning.
+      
+      max_attempts: 3
+      timeout_seconds: 30
+      fallback_step: "collect_more_info"
+      metadata:
+        routing_strategy: "hybrid_intelligent"
+        optimization_enabled: true
+
+# Follow-up steps after navigation
+  - id: "handle_resolution"
+    type: "agent"
+    agent: "resolution_handler"
+    description: "Handle the resolution process for the routed ticket"
+    input:
+      - navigation_result
+      - original_ticket
+    output:
+      to: "follow_up_check"
+  
+  - id: "follow_up_check"
+    type: "agent"
+    agent: "follow_up_agent"
+    description: "Check if customer needs additional support"
+    input:
+      - resolution_result
+    output:
+      format: "structured"
+
+# Global configuration
+global_config:
+  tracking_enabled: true
+  analytics_enabled: true
+  optimization_enabled: true
+  max_navigation_loops: 3
+  
+  # Pricing tier features
+  features:
+    intelligent_routing: true
+    analytics_dashboard: true
+    a_b_testing: true
+    custom_conditions: true
+    advanced_tracking: true
+
+metadata:
+  use_case: "customer_support"
+  complexity: "intermediate"
+  estimated_tokens_per_decision: 150
+  author: "LangSwarm Navigation Team"
+  tags: ["navigation", "support", "routing", "intelligent"] 

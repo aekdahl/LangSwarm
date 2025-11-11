@@ -1,66 +1,87 @@
-# Compiled Python files
-*.pyc
-*.pyo
-*.pyd
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
 *.so
-
-# Virtual environment
-venv/
-.env
-.venv/
-
-# Distribution / build directories
+.Python
 build/
+develop-eggs/
 dist/
-*.egg
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
 *.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# PyInstaller
-*.spec
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
 
-# Checkpoints (e.g., for ML frameworks)
-checkpoints/
-*.ckpt
-
-# Jupyter Notebook checkpoints
-.ipynb_checkpoints/
-
-# IDE / Editor settings
+# IDEs
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+.DS_Store
 
-# Runtime data files
-data/
+# Testing
+.pytest_cache/
+.coverage
+.tox/
+htmlcov/
+.benchmarks/
+test_artifacts/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Environment
+.env
+.env.local
+credentials.env
+
+# Databases
 *.db
 *.sqlite
 *.sqlite3
 
-# Mac / OS X
-.DS_Store
+# Logs
+*.log
+logs/
 
-# Windows
+# OS
+.DS_Store
 Thumbs.db
 
-# Development tools and user-specific directories
-.ipython/              # IPython configuration and history
-.jupyter/              # Jupyter configuration and runtime files
-.local/                # Local user data and configurations
-.npm/                  # npm cache and configuration
-.pytest_cache/         # pytest cache files
-.pytest_*/            # Other pytest temporary files
-.coverage              # Coverage.py reports
-.tox/                  # tox testing environments
-.mypy_cache/           # mypy type checker cache
-.ruff_cache/           # ruff linter cache
-
-# Package manager files
-node_modules/          # npm dependencies
-package-lock.json      # npm lock file (if not needed)
-yarn.lock              # yarn lock file (if not needed)
+# Package managers
+.pipreqsignore
+poetry.lock
 
 # Temporary files
 *.tmp
-*.temp
-.temp/
-tmp/
+*.bak
+*.swp
+*~
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# LangSwarm specific
+langswarm_memory.db
+e2e_test_history.db
