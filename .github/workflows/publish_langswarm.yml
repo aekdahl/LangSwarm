@@ -1,0 +1,90 @@
+name: 🐝 Publish LangSwarm to PyPI
+
+on:
+  push:
+    tags:
+      - 'langswarm-v*.*.*'  # Matches: langswarm-v0.0.54.dev46, langswarm-v0.1.0, etc.
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v3
+      
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: 📦 Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      
+      - name: 🔍 Extract version from tag
+        id: get_version
+        run: |
+          TAG=${GITHUB_REF#refs/tags/langswarm-v}
+          echo "version=$TAG" >> $GITHUB_OUTPUT
+          echo "📌 Publishing LangSwarm version: $TAG"
+      
+      - name: ✅ Verify version matches pyproject.toml
+        run: |
+          PYPROJECT_VERSION=$(poetry version -s)
+          TAG_VERSION="${{ steps.get_version.outputs.version }}"
+          
+          echo "📦 Package version: $PYPROJECT_VERSION"
+          echo "🏷️  Tag version: $TAG_VERSION"
+          
+          if [ "$TAG_VERSION" != "$PYPROJECT_VERSION" ]; then
+            echo ""
+            echo "❌ ERROR: Version mismatch!"
+            echo "   Tag: langswarm-v$TAG_VERSION"
+            echo "   pyproject.toml: $PYPROJECT_VERSION"
+            echo ""
+            echo "Fix: Run 'poetry version $TAG_VERSION' and commit"
+            exit 1
+          fi
+          
+          echo "✅ Version matches!"
+      
+      - name: 🔍 Verify agentmem dependency
+        run: |
+          AGENTMEM_DEP=$(grep -A1 'agentmem' pyproject.toml | grep -v 'path' | grep -v '#' || echo "")
+          
+          if grep -q 'path.*agentmem' pyproject.toml; then
+            echo "❌ ERROR: agentmem uses local path dependency!"
+            echo ""
+            echo "Current:"
+            grep -A1 'agentmem' pyproject.toml
+            echo ""
+            echo "Fix: Change to: agentmem = \"^0.1.0\""
+            exit 1
+          fi
+          
+          echo "✅ agentmem dependency is correct (not using local path)"
+      
+      - name: 🏗️ Build package
+        run: |
+          poetry build
+          echo "📦 Built packages:"
+          ls -lh dist/
+      
+      - name: 🔧 Configure PyPI credentials
+        run: |
+          poetry config pypi-token.pypi ${{ secrets.PYPI_API_TOKEN }}
+      
+      - name: 🚀 Publish to PyPI
+        run: |
+          poetry publish --no-interaction --verbose
+      
+      - name: 🎉 Success message
+        run: |
+          echo "✅ LangSwarm v${{ steps.get_version.outputs.version }} published to PyPI!"
+          echo "📦 Install with: pip install langswarm==${{ steps.get_version.outputs.version }}"
+          echo "🔗 View on PyPI: https://pypi.org/project/langswarm/${{ steps.get_version.outputs.version }}/"
+

@@ -1,0 +1,74 @@
+name: 📦 Publish AgentMem to PyPI
+
+on:
+  push:
+    tags:
+      - 'agentmem-v*.*.*'  # Matches: agentmem-v0.1.0, agentmem-v0.1.1, etc.
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v3
+      
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: 📦 Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+      
+      - name: 🔍 Extract version from tag
+        id: get_version
+        run: |
+          TAG=${GITHUB_REF#refs/tags/agentmem-v}
+          echo "version=$TAG" >> $GITHUB_OUTPUT
+          echo "📌 Publishing AgentMem version: $TAG"
+      
+      - name: ✅ Verify version matches pyproject.toml
+        run: |
+          cd agentmem
+          PYPROJECT_VERSION=$(python -c "import tomli; print(tomli.load(open('pyproject.toml', 'rb'))['project']['version'])" 2>/dev/null || grep -oP '(?<=version = ")[^"]+' pyproject.toml)
+          TAG_VERSION="${{ steps.get_version.outputs.version }}"
+          
+          echo "📦 Package version: $PYPROJECT_VERSION"
+          echo "🏷️  Tag version: $TAG_VERSION"
+          
+          if [ "$TAG_VERSION" != "$PYPROJECT_VERSION" ]; then
+            echo ""
+            echo "❌ ERROR: Version mismatch!"
+            echo "   Tag: agentmem-v$TAG_VERSION"
+            echo "   pyproject.toml: $PYPROJECT_VERSION"
+            echo ""
+            echo "Fix: Update agentmem/pyproject.toml version to $TAG_VERSION"
+            exit 1
+          fi
+          
+          echo "✅ Version matches!"
+      
+      - name: 🏗️ Build package
+        run: |
+          cd agentmem
+          python -m build
+          echo "📦 Built packages:"
+          ls -lh dist/
+      
+      - name: 🚀 Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          cd agentmem
+          python -m twine upload dist/* --verbose
+      
+      - name: 🎉 Success message
+        run: |
+          echo "✅ AgentMem v${{ steps.get_version.outputs.version }} published to PyPI!"
+          echo "📦 Install with: pip install agentmem==${{ steps.get_version.outputs.version }}"
+          echo "🔗 View on PyPI: https://pypi.org/project/agentmem/${{ steps.get_version.outputs.version }}/"
+

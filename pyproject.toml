@@ -1,6 +1,7 @@
 [tool.poetry]
 name = "langswarm"
 version = "0.0.54.dev46"
+# langswarm-v0.0.54.dev46
 description = "A multi-agent ecosystem for large language models (LLMs) and autonomous systems."
 readme = "README.md"
 authors = ["Alexander Ekdahl <alexander.ekdahl@gmail.com>"]
@@ -13,7 +14,8 @@ keywords = ["LLM", "multi-agent", "langchain", "hugginface", "openai", "MCP", "a
 python = ">=3.8,<4.0"
 
 # AgentMem - Memory system (local development)
-agentmem = {path = "./agentmem", develop = true}
+# agentmem = {path = "./agentmem", develop = true}
+agentmem = "^0.1.0"  # PyPI version
 
 # Core dependencies
 pyyaml = "^6.0.2"

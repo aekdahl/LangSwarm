@@ -5,6 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "agentmem"
 version = "0.1.0"
+# agentmem-v0.1.0
 description = "Enterprise-grade conversational memory for AI agents"
 readme = "README.md"
 authors = [{name = "Alexander Ekdahl", email = "alexander.ekdahl@gmail.com"}]
