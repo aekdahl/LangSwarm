@@ -1,5 +1,5 @@
 #!/bin/bash
-# Publish LangSwarm or AgentMem - reads version from pyproject.toml
+# Publish LangSwarm or LangSwarm-Memory - reads version from pyproject.toml
 # Creates and pushes tag automatically with correct prefix
 
 set -e
@@ -7,11 +7,11 @@ set -e
 PACKAGE=$1
 
 if [ -z "$PACKAGE" ]; then
-    echo "Usage: $0 [langswarm|agentmem]"
+    echo "Usage: $0 [langswarm|memory]"
     echo ""
     echo "Examples:"
     echo "  $0 langswarm   # Publish langswarm"
-    echo "  $0 agentmem    # Publish agentmem"
+    echo "  $0 memory      # Publish langswarm-memory"
     exit 1
 fi
 
@@ -23,16 +23,16 @@ case $PACKAGE in
         FILE="pyproject.toml"
         ;;
     
-    agentmem)
-        # Get version from agentmem/pyproject.toml
-        VERSION=$(grep -m 1 '^version = ' agentmem/pyproject.toml | cut -d'"' -f2)
-        TAG="agentmem-v${VERSION}"
-        FILE="agentmem/pyproject.toml"
+    memory)
+        # Get version from langswarm-memory/pyproject.toml
+        VERSION=$(grep -m 1 '^version = ' langswarm-memory/pyproject.toml | cut -d'"' -f2)
+        TAG="langswarm-memory-v${VERSION}"
+        FILE="langswarm-memory/pyproject.toml"
         ;;
     
     *)
         echo "❌ Unknown package: $PACKAGE"
-        echo "   Must be 'langswarm' or 'agentmem'"
+        echo "   Must be 'langswarm' or 'memory'"
         exit 1
         ;;
 esac

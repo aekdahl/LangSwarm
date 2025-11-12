@@ -1,11 +1,11 @@
 """
-AgentMem - Enterprise-grade conversational memory for AI agents
+LangSwarm Memory - Enterprise-grade conversational memory for AI agents
 
 A standalone memory management system that provides session-based conversation
 handling, multiple storage backends, and LLM provider integration.
 
 Quick Start:
-    from agentmem import create_memory_manager, Message, MessageRole
+    from langswarm_memory import create_memory_manager, Message, MessageRole
     
     # Create memory manager
     manager = create_memory_manager("sqlite", db_path="memory.db")
@@ -85,7 +85,7 @@ from .factory import (
 
 # Error classes
 from .errors import (
-    AgentMemError,
+    LangSwarmMemoryError,
     MemoryBackendError,
     MemoryConfigurationError,
     EmbeddingError,
@@ -135,7 +135,7 @@ __all__ = [
     "create_memory_backend",
     
     # Error classes
-    "AgentMemError",
+    "LangSwarmMemoryError",
     "MemoryBackendError",
     "MemoryConfigurationError",
     "EmbeddingError",

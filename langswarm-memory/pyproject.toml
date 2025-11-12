@@ -3,10 +3,10 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "agentmem"
-version = "0.1.1"
-# agentmem-v0.1.1
-# Tag format: agentmem-v{version}
+name = "langswarm-memory"
+version = "0.1.0"
+# langswarm-memory-v0.1.0
+# Tag format: langswarm-memory-v{version}
 description = "Enterprise-grade conversational memory for AI agents"
 readme = "README.md"
 authors = [{name = "Alexander Ekdahl", email = "alexander.ekdahl@gmail.com"}]
@@ -40,14 +40,14 @@ all = ["redis", "numpy", "chromadb", "qdrant-client", "pinecone-client"]
 dev = ["pytest>=7.0", "pytest-asyncio>=0.21", "black", "mypy", "twine", "build"]
 
 [project.urls]
-Homepage = "https://github.com/aekdahl/agentmem"
-Documentation = "https://github.com/aekdahl/agentmem#readme"
-Repository = "https://github.com/aekdahl/agentmem"
-Issues = "https://github.com/aekdahl/agentmem/issues"
+Homepage = "https://github.com/aekdahl/langswarm"
+Documentation = "https://github.com/aekdahl/langswarm#readme"
+Repository = "https://github.com/aekdahl/langswarm"
+Issues = "https://github.com/aekdahl/langswarm/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["agentmem*"]
+include = ["langswarm_memory*"]
 
 [tool.black]
 line-length = 100

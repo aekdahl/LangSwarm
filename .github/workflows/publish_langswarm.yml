@@ -52,21 +52,21 @@ jobs:
           
           echo "✅ Version matches!"
       
-      - name: 🔍 Verify agentmem dependency
+      - name: 🔍 Verify langswarm-memory dependency
         run: |
-          AGENTMEM_DEP=$(grep -A1 'agentmem' pyproject.toml | grep -v 'path' | grep -v '#' || echo "")
+          MEMORY_DEP=$(grep -A1 'langswarm-memory' pyproject.toml | grep -v 'path' | grep -v '#' || echo "")
           
-          if grep -q 'path.*agentmem' pyproject.toml; then
-            echo "❌ ERROR: agentmem uses local path dependency!"
+          if grep -q 'path.*langswarm-memory' pyproject.toml; then
+            echo "❌ ERROR: langswarm-memory uses local path dependency!"
             echo ""
             echo "Current:"
-            grep -A1 'agentmem' pyproject.toml
+            grep -A1 'langswarm-memory' pyproject.toml
             echo ""
-            echo "Fix: Change to: agentmem = \"^0.1.0\""
+            echo "Fix: Change to: langswarm-memory = \"^0.1.0\""
             exit 1
           fi
           
-          echo "✅ agentmem dependency is correct (not using local path)"
+          echo "✅ langswarm-memory dependency is correct (not using local path)"
       
       - name: 🏗️ Build package
         run: |
