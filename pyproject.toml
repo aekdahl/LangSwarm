@@ -16,7 +16,7 @@ python = ">=3.8,<4.0"
 
 # AgentMem - Memory system (local development)
 # agentmem = {path = "./agentmem", develop = true}
-agentmem = "^0.1.0"  # PyPI version
+agentmem = "^0.1.1"  # PyPI version
 
 # Core dependencies
 pyyaml = "^6.0.2"

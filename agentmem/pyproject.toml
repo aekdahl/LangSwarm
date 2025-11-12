@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentmem"
-version = "0.1.0"
-# agentmem-v0.1.0
+version = "0.1.1"
+# agentmem-v0.1.1
 # Tag format: agentmem-v{version}
 description = "Enterprise-grade conversational memory for AI agents"
 readme = "README.md"
