@@ -1,7 +1,8 @@
 [tool.poetry]
 name = "langswarm"
-version = "0.0.54.dev46"
-# langswarm-v0.0.54.dev46
+version = "0.0.54.dev47"
+# langswarm-v0.0.54.dev47
+# Tag format: langswarm-v{version}
 description = "A multi-agent ecosystem for large language models (LLMs) and autonomous systems."
 readme = "README.md"
 authors = ["Alexander Ekdahl <alexander.ekdahl@gmail.com>"]
