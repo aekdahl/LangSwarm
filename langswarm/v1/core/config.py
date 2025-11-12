@@ -867,8 +867,16 @@ class LangSwarmConfigLoader:
             # CRITICAL: The load() method returns workflows but doesn't assign them!
             # This was the root cause of "AttributeError: 'LangSwarmConfigLoader' object has no attribute 'workflows'"
             self.workflows = workflows
+        except ConfigurationNotFoundError as e:
+            # GRACEFUL FALLBACK: Allow initialization without configuration files
+            # This enables programmatic use of MCP tools without requiring YAML config
+            # This is normal for programmatic usage, not an error
+            self.workflows = {}
+            self.agents = {}
+            self.brokers = {}
+            # tools and tools_metadata are already initialized above
         except Exception as e:
-            # NO FALLBACKS! Surface the error immediately
+            # Only raise for ACTUAL errors (parsing, validation, etc.)
             raise RuntimeError(f"LangSwarmConfigLoader initialization failed during load(): {e}") from e
 
     def _load_builtin_tool_classes(self):
