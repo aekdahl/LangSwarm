@@ -199,3 +199,25 @@ class ConfigurationError(Exception):
 
 # Re-export for convenience
 from langswarm.core.errors import ConfigurationError, ValidationError
+
+
+# =============================================================================
+# V1 Backward Compatibility
+# =============================================================================
+# Many existing docs and user code import V1 classes from langswarm.core.config
+# Re-export V1 classes here for backward compatibility
+try:
+    from langswarm.v1.core.config import (
+        LangSwarmConfigLoader,
+        WorkflowExecutor,
+    )
+    
+    # Add to __all__ for discoverability
+    __all__.extend([
+        'LangSwarmConfigLoader',  # V1 compatibility
+        'WorkflowExecutor',        # V1 compatibility
+    ])
+except ImportError:
+    # V1 not available - that's okay, V2-only installations won't break
+    LangSwarmConfigLoader = None
+    WorkflowExecutor = None
