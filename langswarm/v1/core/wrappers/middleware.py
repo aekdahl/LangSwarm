@@ -36,6 +36,56 @@ class MiddlewareMixin:
     Middleware layer for routing agent inputs to tools, plugins, or the agent itself.
     Instance-specific implementation for agent-specific tools and plugins.
     """
+    
+    @staticmethod
+    def _fix_utf8_encoding(text):
+        """Fix UTF-8 encoding issues in tool responses"""
+        if not text:
+            return text
+        
+        # Handle bytes
+        if isinstance(text, bytes):
+            try:
+                text = text.decode('utf-8')
+            except UnicodeDecodeError:
+                text = text.decode('latin-1')
+        elif not isinstance(text, str):
+            text = str(text)
+        
+        # Fix hex corruption patterns
+        if isinstance(text, str) and MiddlewareMixin._has_hex_corruption(text):
+            text = MiddlewareMixin._fix_hex_patterns(text)
+        
+        return text
+    
+    @staticmethod
+    def _has_hex_corruption(text):
+        """Detect hex corruption patterns like 'e4', 'f6', 'e5'"""
+        import re
+        # Swedish chars: ä=e4, ö=f6, å=e5
+        # Look for suspicious patterns: letter followed by 2-char hex code
+        suspicious_patterns = ['e4', 'f6', 'e5', 'c4', 'd6', 'c5', 'e9', 'c9', 'fc', 'dc']
+        return any(pattern in text.lower() for pattern in suspicious_patterns)
+    
+    @staticmethod
+    def _fix_hex_patterns(text):
+        """Fix common hex corruption patterns"""
+        import re
+        hex_map = {
+            'e4': 'ä', 'c4': 'Ä',
+            'f6': 'ö', 'd6': 'Ö', 
+            'e5': 'å', 'c5': 'Å',
+            'e9': 'é', 'c9': 'É',
+            'fc': 'ü', 'dc': 'Ü',
+        }
+        
+        # Replace hex patterns within words
+        for hex_code, char in hex_map.items():
+            # Match hex code within words: e.g., "anve4nde" -> "använde"
+            text = text.replace(hex_code, char)
+        
+        return text
+    
     def __init__(self, tool_registry=None, plugin_registry=None, rag_registry=None):
         """
         Initialize the middleware.
@@ -471,6 +521,10 @@ class MiddlewareMixin:
         else:
             final_status = 200
 
+        # Fix individual responses before concatenation (UTF-8 encoding fix)
+        responses = [self._fix_utf8_encoding(r) if isinstance(r, str) else str(r) 
+                     for r in responses]
+
         # Concatenate responses into one string
         final_response = "\n\n".join(responses)
 
@@ -513,6 +567,9 @@ class MiddlewareMixin:
             # otherwise fall back to your existing HTTP / handler.run path
             try:
                 result = self._execute_with_timeout(handler, method, params)
+                # Fix UTF-8 encoding in tool response
+                if isinstance(result, str):
+                    result = self._fix_utf8_encoding(result)
             except Exception as e:
                 self._log_event(f"Tool {_id} error: {e}", "error")
                 return 500, f"[ERROR] {str(e)}"
