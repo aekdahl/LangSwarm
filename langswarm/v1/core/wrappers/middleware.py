@@ -52,6 +52,19 @@ class MiddlewareMixin:
         elif not isinstance(text, str):
             text = str(text)
         
+        # Remove null bytes that corrupt Swedish characters (from OpenAI responses)
+        if isinstance(text, str):
+            text = text.replace('\x00', '')
+            text = text.replace('\u0000', '')
+            
+            # Handle Unicode escape sequences that may have been literalized
+            if '\\u' in text or '\\x' in text:
+                try:
+                    # Try to decode Unicode escape sequences
+                    text = text.encode('latin-1').decode('unicode-escape')
+                except:
+                    pass
+        
         # Fix hex corruption patterns
         if isinstance(text, str) and MiddlewareMixin._has_hex_corruption(text):
             text = MiddlewareMixin._fix_hex_patterns(text)
@@ -463,7 +476,7 @@ class MiddlewareMixin:
                         intent=mcp_data['intent'],
                         context=mcp_data.get('context', '')
                     )
-                    return 201, json.dumps(result, indent=2)
+                    return 201, json.dumps(result, indent=2, ensure_ascii=False)
                     
                 elif 'method' in mcp_data:
                     # Direct pattern: Call specific method
@@ -484,7 +497,7 @@ class MiddlewareMixin:
                             # Handle parameter validation errors with actionable feedback
                             self._handle_parameter_validation_error(tool_id, mcp_data['method'], result)
                     
-                    return 201, json.dumps(result, indent=2)
+                    return 201, json.dumps(result, indent=2, ensure_ascii=False)
                     
                 else:
                     return 400, "MCP request must have either 'intent' or 'method' field"

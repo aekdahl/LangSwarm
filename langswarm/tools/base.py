@@ -14,7 +14,21 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, AsyncIterator
 import logging
 
-from langswarm.core.errors import handle_error, ToolError, ErrorContext
+# V1/V2 compatibility for error handling
+try:
+    from langswarm.core.errors import handle_error, ToolError, ErrorContext
+except ImportError:
+    try:
+        from langswarm.v1.core.errors import handle_error, ToolError, ErrorContext
+    except ImportError:
+        # Fallback for minimal environments
+        class ToolError(Exception):
+            pass
+        class ErrorContext:
+            def __init__(self, **kwargs):
+                pass
+        def handle_error(func):
+            return func
 
 from .interfaces import (
     IToolInterface,

@@ -1612,6 +1612,26 @@ Do not include any text outside the JSON structure."""
         else:
             result = str(response)
         
+        # FIX: Handle null bytes that corrupt Swedish characters (from OpenAI responses)
+        if isinstance(result, str):
+            result = result.replace('\x00', '')
+            result = result.replace('\u0000', '')
+            
+            # Handle Unicode escape sequences that may have been literalized
+            if '\\u' in result or '\\x' in result:
+                try:
+                    # Try to decode Unicode escape sequences
+                    result = result.encode('latin-1').decode('unicode-escape')
+                except:
+                    pass
+        
+        # Ensure proper UTF-8 encoding
+        if isinstance(result, bytes):
+            try:
+                result = result.decode('utf-8')
+            except UnicodeDecodeError:
+                result = result.decode('latin-1', errors='replace')
+        
         # CRITICAL FIX: Prevent infinite loops from enormous responses
         if len(result) > self.max_response_length:
             warning_msg = f"RESPONSE TRUNCATED: Agent '{self.name}' generated {len(result)} characters, truncating to {self.max_response_length}"

@@ -9,7 +9,18 @@ import inspect
 from typing import Any, Dict, List, Optional
 import logging
 
-from langswarm.core.errors import handle_error, ToolError
+# V1/V2 compatibility for error handling
+try:
+    from langswarm.core.errors import handle_error, ToolError
+except ImportError:
+    try:
+        from langswarm.v1.core.errors import handle_error, ToolError
+    except ImportError:
+        # Fallback for minimal environments
+        class ToolError(Exception):
+            pass
+        def handle_error(func):
+            return func
 
 from ..interfaces import IToolInterface, IToolAdapter, ToolType, ToolCapability
 from ..base import BaseTool, ToolMetadata, ToolResult, ToolSchema

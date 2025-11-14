@@ -12,14 +12,19 @@ import uvicorn
 from langswarm.mcp.server_base import BaseMCPToolServer
 from langswarm.tools.mcp._error_standards import create_error_response, create_parameter_error, create_authentication_error, create_connection_error, ErrorTypes
 
-# Python 3.11+ compatibility
+# Python 3.11+ compatibility (V1/V2)
 try:
     from langswarm.core.utils.python_compat import (
         OpenAIClientFactory, IS_PYTHON_311_PLUS
     )
 except ImportError:
-    IS_PYTHON_311_PLUS = sys.version_info >= (3, 11)
-    OpenAIClientFactory = None
+    try:
+        from langswarm.v1.core.utils.python_compat import (
+            OpenAIClientFactory, IS_PYTHON_311_PLUS
+        )
+    except ImportError:
+        IS_PYTHON_311_PLUS = sys.version_info >= (3, 11)
+        OpenAIClientFactory = None
 
 # Optional BigQuery support
 try:
@@ -144,14 +149,23 @@ async def get_embedding(text: str, model: str = "text-embedding-3-small") -> Lis
     except ImportError:
         # Fallback to V1 tracing
         try:
+            # Try V2 path first
             from langswarm.core.debug import get_debug_tracer
             tracer = get_debug_tracer()
             if tracer and hasattr(tracer, 'enabled') and tracer.enabled:
                 logger.info(f"🎯 V1_INTERNAL_LLM_CALL | get_embedding | model={model} | text_length={len(text)}")
             return await _perform_embedding_call(text, model)
         except ImportError:
-            # No tracing available, proceed without tracing
-            return await _perform_embedding_call(text, model)
+            try:
+                # Try V1 path
+                from langswarm.v1.core.debug import get_debug_tracer
+                tracer = get_debug_tracer()
+                if tracer and hasattr(tracer, 'enabled') and tracer.enabled:
+                    logger.info(f"🎯 V1_INTERNAL_LLM_CALL | get_embedding | model={model} | text_length={len(text)}")
+                return await _perform_embedding_call(text, model)
+            except ImportError:
+                # No tracing available, proceed without tracing
+                return await _perform_embedding_call(text, model)
 
 async def _perform_embedding_call(text: str, model: str) -> List[float]:
     """Perform the actual embedding API call"""
@@ -722,8 +736,11 @@ try:
             print(f"🧠 LangSwarm Workflow: Processing intent '{intent}' with context '{context}'")
             logger.info(f"🧠 LangSwarm Workflow: Processing intent '{intent}' with context '{context}'")
             
-            # Import LangSwarm workflow system - NO TRY BLOCK
-            from langswarm.core.config import LangSwarmConfigLoader
+            # Import LangSwarm workflow system (V1/V2 compatibility)
+            try:
+                from langswarm.core.config import LangSwarmConfigLoader
+            except ImportError:
+                from langswarm.v1.core.config import LangSwarmConfigLoader
             import os
             from pathlib import Path
             

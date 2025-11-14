@@ -325,8 +325,11 @@ class WorkflowExecutor:
             # Create temporary workflow configuration
             config_path = self._create_temp_config(execution_id, workflow_name, config_content, config_override)
             
-            # Import LangSwarm components
-            from langswarm.core.config import LangSwarmConfigLoader
+            # Import LangSwarm components (V1/V2 compatibility)
+            try:
+                from langswarm.core.config import LangSwarmConfigLoader
+            except ImportError:
+                from langswarm.v1.core.config import LangSwarmConfigLoader
             
             # Load and execute workflow
             loader = LangSwarmConfigLoader(config_path)
@@ -422,7 +425,12 @@ class WorkflowExecutor:
             script_content = f"""
 import sys
 import json
-from langswarm.core.config import LangSwarmConfigLoader
+
+# V1/V2 compatibility
+try:
+    from langswarm.core.config import LangSwarmConfigLoader
+except ImportError:
+    from langswarm.v1.core.config import LangSwarmConfigLoader
 
 # Load configuration
 loader = LangSwarmConfigLoader('{os.path.dirname(config_path)}')

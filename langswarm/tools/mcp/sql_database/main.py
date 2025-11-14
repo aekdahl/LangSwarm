@@ -1062,8 +1062,11 @@ try:
             logger.info(f"🧠 LangSwarm Workflow: Processing intent '{intent}' with context '{context}'")
             
             try:
-                # Import LangSwarm workflow system
-                from langswarm.core.config import LangSwarmConfigLoader
+                # Import LangSwarm workflow system (V1/V2 compatibility)
+                try:
+                    from langswarm.core.config import LangSwarmConfigLoader
+                except ImportError:
+                    from langswarm.v1.core.config import LangSwarmConfigLoader
                 import os
                 from pathlib import Path
                 

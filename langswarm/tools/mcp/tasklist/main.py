@@ -95,7 +95,11 @@ class TaskStorage:
     def _create_default_adapter(self):
         """Create default memory adapter using LangSwarm's memory made simple"""
         try:
-            from langswarm.core.config import MemoryConfig
+            # V1/V2 compatibility for MemoryConfig
+            try:
+                from langswarm.core.config import MemoryConfig
+            except ImportError:
+                from langswarm.v1.core.config import MemoryConfig
             
             # Use memory made simple auto-detection
             memory_config = MemoryConfig.setup_memory("production")
