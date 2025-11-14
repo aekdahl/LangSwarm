@@ -31,6 +31,14 @@ class TestCompatibilityShims:
         except ImportError:
             pytest.skip("Workflow utils not available")
     
+    def test_workflow_functions_import(self):
+        """Test workflow functions can be imported from compatibility path"""
+        try:
+            from langswarm.core.utils.workflows import functions
+            assert functions is not None
+        except ImportError:
+            pytest.skip("Workflow functions not available")
+    
     def test_subutilities_import(self):
         """Test subutilities can be imported"""
         try:

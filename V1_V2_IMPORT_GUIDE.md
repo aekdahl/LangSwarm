@@ -52,6 +52,19 @@ from langswarm.core.utils.workflows.intelligence import WorkflowIntelligence
 # - langswarm.v1.core.utils.workflows.intelligence (if only V1 available)
 ```
 
+### 1b. Workflow Functions
+
+**Location**: `langswarm/core/utils/workflows/functions.py`
+
+```python
+# This import works for both V1 and V2 users:
+from langswarm.core.utils.workflows.functions import external_function
+
+# Internally routes to:
+# - langswarm.core.v2.utils.workflows.functions (if V2 available)
+# - langswarm.v1.core.utils.workflows.functions (if only V1 available)
+```
+
 ### 2. Formatting Utilities
 
 **Location**: `langswarm/core/utils/subutilities/formatting.py`
