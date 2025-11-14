@@ -40,6 +40,8 @@ pip install langswarm openai
 export OPENAI_API_KEY="your-api-key-here"
 ```
 
+> **Note**: LangSwarm supports both V1 (archived) and V2 (current) versions with full backward compatibility. See [V1/V2 Import Guide](V1_V2_IMPORT_GUIDE.md) for details on using either version.
+
 ### Simple Agent (30 seconds)
 
 ```python
