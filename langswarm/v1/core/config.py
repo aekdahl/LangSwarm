@@ -7,6 +7,7 @@ import sys
 import time
 import json
 import yaml
+import signal
 import socket
 import asyncio
 import inspect
@@ -2828,6 +2829,9 @@ Adapt your approach based on the user's needs, drawing from your combined expert
 
     def _handle_step_error(self, step: Dict, step_id: str, visit_key: str, error: Exception):
         print(f"❌ Error in step {step_id}: {error}")
+        
+        # Increment consecutive error counter for circuit breaker
+        self.context['consecutive_errors'] = self.context.get('consecutive_errors', 0) + 1
 
         if step.get("retry"):
             retries = self.context["retry_counters"].get(visit_key, 0)
@@ -3144,6 +3148,38 @@ If any required parameter is missing or ambiguous, instead return:
         if not step:
             return
     
+        # SAFETY CHECK 1: Check for graceful shutdown signal (Ctrl+C)
+        if hasattr(self, 'killer') and self.killer.kill_now:
+            raise KeyboardInterrupt("🛑 Manual abort via Ctrl+C to prevent runaway costs")
+        
+        # SAFETY CHECK 2: Check execution timeout
+        if hasattr(self, 'execution_start_time') and self.execution_start_time:
+            elapsed = time.time() - self.execution_start_time
+            max_time = self.context.get('max_execution_time', getattr(self, 'max_execution_time', 300))
+            if elapsed > max_time:
+                raise TimeoutError(
+                    f"⏱️ Workflow execution exceeded maximum time limit ({max_time}s). "
+                    f"Elapsed: {elapsed:.1f}s. Emergency abort to prevent runaway costs."
+                )
+        
+        # SAFETY CHECK 3: Check max API calls
+        api_count = self.context.get('api_call_count', 0)
+        max_calls = self.context.get('max_api_calls', 100)
+        if api_count >= max_calls:
+            raise RuntimeError(
+                f"🚨 Emergency abort: Maximum API calls ({max_calls}) exceeded. "
+                f"Current count: {api_count}. This prevents runaway loops from consuming credits."
+            )
+        
+        # SAFETY CHECK 4: Check circuit breaker
+        consecutive_errors = self.context.get('consecutive_errors', 0)
+        max_errors = self.context.get('max_consecutive_errors', 10)
+        if consecutive_errors >= max_errors:
+            raise RuntimeError(
+                f"🔴 Circuit breaker triggered: {consecutive_errors} consecutive errors. "
+                f"Emergency abort to prevent runaway costs."
+            )
+    
         step_id   = step['id']
         visit_key = self._get_visit_key(step)
         print(f"\n▶ Executing step: {step_id} (visit_key={visit_key}) (async=False)")
@@ -3313,6 +3349,10 @@ If any required parameter is missing or ambiguous, instead return:
             agent.update_system_prompt(system_prompt=system_prompt)
         
             agent_input = self._resolve_input(step.get("input"))
+            
+            # Increment API call counter for safety tracking
+            self.context['api_call_count'] = self.context.get('api_call_count', 0) + 1
+            
             response = agent.chat(agent_input)
         
             try:
@@ -3360,12 +3400,29 @@ If any required parameter is missing or ambiguous, instead return:
                     agent_history.setdefault(tool_name, []).append(result)
                     agent_retries[tool_name] = agent_retries.get(tool_name, 0) + 1
         
+                    # Check if result indicates failure before retrying
+                    should_retry = False
+                    if result is None or result == "":
+                        should_retry = True
+                        retry_reason = "empty or None result"
+                    elif isinstance(result, str) and any(err in result.lower() for err in ['error', 'failed', 'exception', 'traceback']):
+                        should_retry = True
+                        retry_reason = "error indicators in result"
+                    elif isinstance(result, dict) and (result.get('error') or result.get('status') == 'error'):
+                        should_retry = True
+                        retry_reason = "error status in result dict"
+                    
                     max_retry = opts.get("retry_limit", 3)
-                    if agent_retries[tool_name] < max_retry:
+                    if should_retry and agent_retries[tool_name] < max_retry:
+                        print(f"🔄 Retrying tool '{tool_name}' (attempt {agent_retries[tool_name]}/{max_retry}): {retry_reason}")
                         history_str = "\n".join(f"- {r}" for r in agent_history[tool_name])
                         step["input"] = f"{agent_input}\n\nHistory for tool '{tool_name}':\n{history_str}"
                         self._execute_step(step, mark_visited=False)
                         return
+                    elif not should_retry:
+                        print(f"✅ Tool '{tool_name}' succeeded, skipping retry")
+                    elif agent_retries[tool_name] >= max_retry:
+                        print(f"⚠️ Tool '{tool_name}' retry limit reached ({max_retry})")
             elif tool_name:
                 raise ValueError(f"Unknown tool selected by agent: {tool_name}")
             else:
@@ -3473,6 +3530,38 @@ If any required parameter is missing or ambiguous, instead return:
         if not step:
             return
     
+        # SAFETY CHECK 1: Check for graceful shutdown signal (Ctrl+C)
+        if hasattr(self, 'killer') and self.killer.kill_now:
+            raise KeyboardInterrupt("🛑 Manual abort via Ctrl+C to prevent runaway costs")
+        
+        # SAFETY CHECK 2: Check execution timeout
+        if hasattr(self, 'execution_start_time') and self.execution_start_time:
+            elapsed = time.time() - self.execution_start_time
+            max_time = self.context.get('max_execution_time', getattr(self, 'max_execution_time', 300))
+            if elapsed > max_time:
+                raise TimeoutError(
+                    f"⏱️ Workflow execution exceeded maximum time limit ({max_time}s). "
+                    f"Elapsed: {elapsed:.1f}s. Emergency abort to prevent runaway costs."
+                )
+        
+        # SAFETY CHECK 3: Check max API calls
+        api_count = self.context.get('api_call_count', 0)
+        max_calls = self.context.get('max_api_calls', 100)
+        if api_count >= max_calls:
+            raise RuntimeError(
+                f"🚨 Emergency abort: Maximum API calls ({max_calls}) exceeded. "
+                f"Current count: {api_count}. This prevents runaway loops from consuming credits."
+            )
+        
+        # SAFETY CHECK 4: Check circuit breaker
+        consecutive_errors = self.context.get('consecutive_errors', 0)
+        max_errors = self.context.get('max_consecutive_errors', 10)
+        if consecutive_errors >= max_errors:
+            raise RuntimeError(
+                f"🔴 Circuit breaker triggered: {consecutive_errors} consecutive errors. "
+                f"Emergency abort to prevent runaway costs."
+            )
+    
         step_id   = step['id']
         visit_key = self._get_visit_key(step)
         print(f"\n▶ Executing step: {step_id} (visit_key={visit_key}) (async=True)")
@@ -3504,6 +3593,10 @@ If any required parameter is missing or ambiguous, instead return:
             agent.update_system_prompt(system_prompt=system_prompt)
         
             agent_input = self._resolve_input(step.get("input"))
+            
+            # Increment API call counter for safety tracking
+            self.context['api_call_count'] = self.context.get('api_call_count', 0) + 1
+            
             response = agent.chat(agent_input)
         
             try:
@@ -3551,12 +3644,29 @@ If any required parameter is missing or ambiguous, instead return:
                     agent_history.setdefault(tool_name, []).append(result)
                     agent_retries[tool_name] = agent_retries.get(tool_name, 0) + 1
         
+                    # Check if result indicates failure before retrying
+                    should_retry = False
+                    if result is None or result == "":
+                        should_retry = True
+                        retry_reason = "empty or None result"
+                    elif isinstance(result, str) and any(err in result.lower() for err in ['error', 'failed', 'exception', 'traceback']):
+                        should_retry = True
+                        retry_reason = "error indicators in result"
+                    elif isinstance(result, dict) and (result.get('error') or result.get('status') == 'error'):
+                        should_retry = True
+                        retry_reason = "error status in result dict"
+                    
                     max_retry = opts.get("retry_limit", 3)
-                    if agent_retries[tool_name] < max_retry:
+                    if should_retry and agent_retries[tool_name] < max_retry:
+                        print(f"🔄 Retrying tool '{tool_name}' (attempt {agent_retries[tool_name]}/{max_retry}): {retry_reason}")
                         history_str = "\n".join(f"- {r}" for r in agent_history[tool_name])
                         step["input"] = f"{agent_input}\n\nHistory for tool '{tool_name}':\n{history_str}"
                         await self._execute_step_async(step, mark_visited=False)
                         return
+                    elif not should_retry:
+                        print(f"✅ Tool '{tool_name}' succeeded, skipping retry")
+                    elif agent_retries[tool_name] >= max_retry:
+                        print(f"⚠️ Tool '{tool_name}' retry limit reached ({max_retry})")
             elif tool_name:
                 raise ValueError(f"Unknown tool selected by agent: {tool_name}")
             else:
@@ -3579,6 +3689,8 @@ If any required parameter is missing or ambiguous, instead return:
             if mark_visited:
                 visit_key = self._get_visit_key(step)
                 self.context["visited_steps"].add(visit_key)
+                # Reset consecutive error counter on successful step completion
+                self.context['consecutive_errors'] = 0
         
             return
         else:
@@ -3645,6 +3757,8 @@ If any required parameter is missing or ambiguous, instead return:
                             # Mark this step as visited
                             if mark_visited:
                                 self.context["visited_steps"].add(visit_key)
+                                # Reset consecutive error counter on successful step completion
+                                self.context['consecutive_errors'] = 0
                             
                             # Route to chosen step
                             self._route_to_step(chosen_step, output)
@@ -3690,12 +3804,16 @@ If any required parameter is missing or ambiguous, instead return:
                 await self._handle_output_async(step_id, step["output"], output, step)
                 if mark_visited:
                     self.context["visited_steps"].add(visit_key)
+                    # Reset consecutive error counter on successful step completion
+                    self.context['consecutive_errors'] = 0
                 return  # Important: return here explicitly after handling condition
             else:
                 await self._handle_output_async(step_id, step["output"], output, step)
         
         if mark_visited:
             self.context["visited_steps"].add(visit_key)
+            # Reset consecutive error counter on successful step completion
+            self.context['consecutive_errors'] = 0
         
         if step.get("fan_key"):
             self._recheck_pending_fanins()
@@ -4430,7 +4548,10 @@ def _add_workflow_methods_to_config_loader():
                 }
             )
         
-        # Initialize workflow context
+        # Initialize execution start time for timeout protection
+        self.execution_start_time = time.time()
+        
+        # Initialize workflow context with safety mechanisms
         self.context = {
             'user_input': user_input,
             'previous_output': None,
@@ -4440,6 +4561,13 @@ def _add_workflow_methods_to_config_loader():
             'pending_fanins': {},
             'current_workflow_id': workflow_id,  # Add missing workflow ID to context
             'config_loader': self,  # Add config_loader reference for function calls
+            # Safety mechanisms to prevent runaway costs
+            'api_call_count': 0,
+            'max_api_calls': kwargs.get('max_api_calls', 100),
+            'consecutive_errors': 0,
+            'max_consecutive_errors': kwargs.get('max_consecutive_errors', 10),
+            'execution_start_time': time.time(),
+            'max_execution_time': kwargs.get('max_execution_time_sec', 300),
             **kwargs
         }
         
@@ -4469,7 +4597,10 @@ def _add_workflow_methods_to_config_loader():
         Returns:
             Workflow execution result
         """
-        # Initialize workflow context
+        # Initialize execution start time for timeout protection
+        self.execution_start_time = time.time()
+        
+        # Initialize workflow context with safety mechanisms
         self.context = {
             'user_input': user_input,
             'previous_output': None,
@@ -4479,6 +4610,13 @@ def _add_workflow_methods_to_config_loader():
             'pending_fanins': {},
             'current_workflow_id': workflow_id,  # Add missing workflow ID to context
             'config_loader': self,  # Add config_loader reference for function calls
+            # Safety mechanisms to prevent runaway costs
+            'api_call_count': 0,
+            'max_api_calls': kwargs.get('max_api_calls', 100),
+            'consecutive_errors': 0,
+            'max_consecutive_errors': kwargs.get('max_consecutive_errors', 10),
+            'execution_start_time': time.time(),
+            'max_execution_time': kwargs.get('max_execution_time_sec', 300),
             **kwargs
         }
         
@@ -4504,6 +4642,26 @@ def _add_workflow_methods_to_config_loader():
 _add_workflow_methods_to_config_loader()
 
 
+class GracefulKiller:
+    """
+    Handles graceful shutdown signals (Ctrl+C, SIGTERM) to prevent runaway costs.
+    
+    Usage:
+        killer = GracefulKiller()
+        while not killer.kill_now:
+            # do work
+    """
+    kill_now = False
+    
+    def __init__(self):
+        signal.signal(signal.SIGINT, self.exit_gracefully)
+        signal.signal(signal.SIGTERM, self.exit_gracefully)
+    
+    def exit_gracefully(self, signum, frame):
+        print("\n🛑 Received shutdown signal. Aborting workflow to prevent further costs...")
+        self.kill_now = True
+
+
 class WorkflowExecutor:
     """
     Workflow execution wrapper for legacy compatibility.
@@ -4522,8 +4680,15 @@ class WorkflowExecutor:
             agents: Dictionary of agents from LangSwarmConfigLoader.load()
             tools: Dictionary of tools to make available to workflows (optional)
             tools_metadata: Dictionary of tools metadata (optional)
-            **kwargs: Additional configuration options
+            **kwargs: Additional configuration options including:
+                - max_execution_time_sec: Maximum workflow execution time (default: 300)
+                - max_api_calls: Maximum API calls per workflow (default: 100)
+                - max_consecutive_errors: Circuit breaker threshold (default: 10)
         """
+        # Safety mechanisms to prevent runaway costs
+        self.max_execution_time = kwargs.get('max_execution_time_sec', 300)  # 5 minutes default
+        self.execution_start_time = None
+        self.killer = GracefulKiller()  # Handle Ctrl+C gracefully
         # Apply production safety measures and handle tools safely
         safety_manager = None
         try:

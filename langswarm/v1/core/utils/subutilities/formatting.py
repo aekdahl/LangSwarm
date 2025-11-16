@@ -228,10 +228,22 @@ Ensure your call follows the correct format.
         """
         return re.sub(r',\s*([\]}])', r'\1', json_string)
 
-    def safe_json_loads(self, json_string: str, agent=None, **kwargs):
+    def safe_json_loads(self, json_string: str, agent=None, _retry_depth=0, **kwargs):
         """
         Safely loads a JSON string after attempting corrections.
+        
+        Args:
+            json_string: The JSON string to parse
+            agent: Optional agent to use for JSON conversion
+            _retry_depth: Internal counter to prevent infinite loops (DO NOT SET MANUALLY)
+            **kwargs: Additional arguments
         """
+        # Hard limit on retry depth to prevent infinite loops
+        MAX_RETRY_DEPTH = 2
+        if _retry_depth >= MAX_RETRY_DEPTH:
+            print(f"❌ Maximum JSON parse retry depth ({MAX_RETRY_DEPTH}) reached. Returning None to prevent infinite loop.")
+            return None
+        
         # Handle Mock objects from tests
         if hasattr(json_string, '_mock_name'):
             return {"mock_response": str(json_string)}
@@ -299,10 +311,16 @@ Ensure your call follows the correct format.
                 json_string, 
                 agent=agent, 
                 requirements = kwargs.get('requirements', 'Output only a JSON dict.'),
+                _retry_depth=_retry_depth + 1,
                 **kwargs
             )
             if result:
-                return json.loads(json_string)
+                try:
+                    return json.loads(json_string)
+                except json.JSONDecodeError:
+                    # If still can't parse, recursively call with incremented depth
+                    print(f"⚠️ JSON still invalid after agent conversion, retrying with depth {_retry_depth + 1}")
+                    return self.safe_json_loads(json_string, agent=agent, _retry_depth=_retry_depth + 1, **kwargs)
             else:
                 return json_string
         
@@ -385,10 +403,23 @@ Ensure your call follows the correct format.
         #sanitized = self._remove_placeholder_requests(sanitized)
         return sanitized
 
-    def to_json(self, data, agent=None, instructions = '', retries = 3, requirements = 'Output as JSON list.', **kwargs):
+    def to_json(self, data, agent=None, instructions = '', retries = 3, requirements = 'Output as JSON list.', _retry_depth=0, **kwargs):
         """
         If agent is None, try to fetch the agent designated in the agent registry. Otherwise return None.
+        
+        Args:
+            data: The data to convert to JSON
+            agent: Optional agent to use for conversion
+            instructions: Additional instructions for the agent
+            retries: Number of retries (default 3)
+            requirements: JSON requirements string
+            _retry_depth: Internal counter to prevent infinite loops (DO NOT SET MANUALLY)
+            **kwargs: Additional arguments
         """
+        # Prevent nested retries that can cause infinite loops
+        if _retry_depth >= 2:
+            print(f"❌ to_json() called at retry depth {_retry_depth}. Aborting to prevent infinite loop.")
+            return False, data
         
         agent = agent or AgentRegistry.get("ls_json_parser")
         if agent is None:
