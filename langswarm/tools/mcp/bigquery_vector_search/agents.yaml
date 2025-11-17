@@ -216,6 +216,9 @@ agents:
       - Format information clearly
       - If there are errors, explain them in simple terms
 
+      CRITICAL: You are a formatting agent ONLY. You CANNOT call tools or use MCP commands.
+      Simply format the results into helpful text. Return ONLY plain text responses.
+
   - id: context_enhancer
     agent_type: langchain-openai
     model: gpt-4o
