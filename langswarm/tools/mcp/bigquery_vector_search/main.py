@@ -53,7 +53,7 @@ DEFAULT_CONFIG = {
     "embedding_model": "text-embedding-3-small",
     "default_similarity_threshold": 0.01,  # Use more permissive default
     "max_results": 5,                      # Match working configuration
-    "location": "EU"                       # Default to EU location
+    "location": "europe-west1"             # Default to europe-west1 location, could also be EU
 }
 
 # === Schemas ===
