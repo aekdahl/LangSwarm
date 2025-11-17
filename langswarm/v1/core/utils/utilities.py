@@ -16,40 +16,66 @@ from .subutilities.formatting import Formatting
 
 logger = logging.getLogger(__name__)
 
+# Shared tokenizer singleton to prevent multiple loads
+_SHARED_GPT2_TOKENIZER = None
+_TOKENIZER_LOAD_ATTEMPTED = False
+_TOKENIZER_LOAD_LOCK = None
+
 class Utils(Formatting):
     def __init__(self):
-        self.gpt2_tokenizer = None
+        global _SHARED_GPT2_TOKENIZER, _TOKENIZER_LOAD_ATTEMPTED, _TOKENIZER_LOAD_LOCK
         
-        # Check if HuggingFace tokenizer should be disabled
-        disable_hf = os.getenv('LANGSWARM_DISABLE_HF_TOKENIZER', '').lower() == 'true'
-        if disable_hf:
-            logger.info("🚫 HuggingFace tokenizer loading disabled via LANGSWARM_DISABLE_HF_TOKENIZER")
-        elif not GPT2Tokenizer:
-            logger.info("GPT2Tokenizer not available, using tiktoken fallback only")
+        # Import threading lock on first use
+        if _TOKENIZER_LOAD_LOCK is None:
+            import threading
+            _TOKENIZER_LOAD_LOCK = threading.Lock()
+        
+        # Use cached result if we've already attempted to load
+        if _TOKENIZER_LOAD_ATTEMPTED:
+            self.gpt2_tokenizer = _SHARED_GPT2_TOKENIZER
         else:
-            # Quick connectivity check to avoid rate limiting
-            try:
-                import requests
-                # Quick HEAD request to check HuggingFace accessibility
-                response = requests.head("https://huggingface.co", timeout=2)
-                if response.status_code == 429:
-                    logger.info("⚠️ HuggingFace rate limited, skipping tokenizer loading")
-                    self.gpt2_tokenizer = None
-                elif response.status_code >= 400:
-                    logger.info(f"⚠️ HuggingFace not accessible (HTTP {response.status_code}), skipping tokenizer loading")
-                    self.gpt2_tokenizer = None
+            # Thread-safe: only first instance loads the tokenizer
+            with _TOKENIZER_LOAD_LOCK:
+                # Double-check in case another thread loaded while we waited
+                if _TOKENIZER_LOAD_ATTEMPTED:
+                    self.gpt2_tokenizer = _SHARED_GPT2_TOKENIZER
                 else:
-                    # HuggingFace seems accessible, try loading tokenizer
-                    logger.info("Loading GPT2 tokenizer...")
-                    self.gpt2_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-                    logger.info("✅ GPT2 tokenizer loaded successfully")
-            except requests.RequestException:
-                logger.info("⚠️ Network connectivity issue, skipping HuggingFace tokenizer")
-                self.gpt2_tokenizer = None
-            except Exception as e:
-                logger.info(f"⚠️ Skipping GPT2 tokenizer due to: {e}")
-                logger.info("🔄 Will use tiktoken fallback for all tokenization")
-                self.gpt2_tokenizer = None
+                    _TOKENIZER_LOAD_ATTEMPTED = True
+                    self.gpt2_tokenizer = None
+                    
+                    # Check if HuggingFace tokenizer should be disabled
+                    disable_hf = os.getenv('LANGSWARM_DISABLE_HF_TOKENIZER', '').lower() == 'true'
+                    if disable_hf:
+                        logger.info("🚫 HuggingFace tokenizer loading disabled via LANGSWARM_DISABLE_HF_TOKENIZER")
+                    elif not GPT2Tokenizer:
+                        logger.info("GPT2Tokenizer not available, using tiktoken fallback only")
+                    else:
+                        # Quick connectivity check to avoid rate limiting
+                        try:
+                            import requests
+                            # Quick HEAD request to check HuggingFace accessibility
+                            response = requests.head("https://huggingface.co", timeout=2)
+                            if response.status_code == 429:
+                                logger.info("⚠️ HuggingFace rate limited, skipping tokenizer loading")
+                                self.gpt2_tokenizer = None
+                            elif response.status_code >= 400:
+                                logger.info(f"⚠️ HuggingFace not accessible (HTTP {response.status_code}), skipping tokenizer loading")
+                                self.gpt2_tokenizer = None
+                            else:
+                                # HuggingFace seems accessible, try loading tokenizer
+                                logger.info("Loading GPT2 tokenizer...")
+                                self.gpt2_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+                                logger.info("✅ GPT2 tokenizer loaded successfully")
+                        except requests.RequestException:
+                            logger.info("⚠️ Network connectivity issue, skipping HuggingFace tokenizer")
+                            self.gpt2_tokenizer = None
+                        except Exception as e:
+                            logger.info(f"⚠️ Skipping GPT2 tokenizer due to: {e}")
+                            logger.info("🔄 Will use tiktoken fallback for all tokenization")
+                            self.gpt2_tokenizer = None
+                    
+                    # Cache the result (whether successful, None, or failed)
+                    _SHARED_GPT2_TOKENIZER = self.gpt2_tokenizer
         
         self.bot_logs = []
 

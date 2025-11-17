@@ -126,6 +126,7 @@ agents:
     agent_type: langchain-openai
     model: gpt-4o
     allow_middleware: false  # CRITICAL: Internal agent should not have tool access
+    # response_format: json_object  # Force valid JSON output (no markdown, no Python literals)
     system_prompt: |
       You are a parameter builder for the bigquery_vector_search MCP tool. Given the operation type and extracted parameters,
       create the exact JSON parameters needed for the bigquery_vector_search tool call.

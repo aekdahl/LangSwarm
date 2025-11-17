@@ -346,8 +346,25 @@ def mcp_call(
                         print(f"🔧 Parsed JSON string arguments: {task_args}")
                     except (json.JSONDecodeError, ValueError) as e:
                         print(f"⚠️  Failed to parse arguments as JSON: {e}")
-                        # If it's not valid JSON, treat as empty dict
-                        task_args = {}
+                        
+                        # Try Python literal eval (handles single quotes, e.g., {'key': 'value'})
+                        try:
+                            import ast
+                            task_args = ast.literal_eval(task_args)
+                            print(f"🔧 Parsed Python literal arguments: {task_args}")
+                        except (ValueError, SyntaxError) as eval_error:
+                            print(f"⚠️  Failed to parse as Python literal: {eval_error}")
+                            
+                            # Last resort: try replacing single quotes with double quotes
+                            try:
+                                # Simple heuristic: replace ' with " but preserve escaped quotes
+                                sanitized = task_args.replace("'", '"')
+                                task_args = json.loads(sanitized)
+                                print(f"🔧 Parsed sanitized JSON: {task_args}")
+                            except json.JSONDecodeError:
+                                print(f"⚠️  All parsing attempts failed, treating as empty dict")
+                                # If it's not valid JSON, treat as empty dict
+                                task_args = {}
             else:
                 raise ValueError("Invalid payload format")
             

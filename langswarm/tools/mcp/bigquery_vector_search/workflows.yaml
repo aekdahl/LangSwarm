@@ -46,7 +46,7 @@ workflows:
           output:
             to:
               - condition:
-                  if: "${context.step_outputs.classify_intent} == 'similarity_search'"
+                  if: "'${context.step_outputs.classify_intent}' == 'similarity_search'"
                   then: enhance_query
                   else: build_tool_parameters
 
