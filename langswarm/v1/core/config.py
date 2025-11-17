@@ -4089,10 +4089,17 @@ If any required parameter is missing or ambiguous, instead return:
             matches = pattern.findall(value)
     
             if len(matches) == 1 and value.strip() == f"${{{matches[0]}}}":
-                keys = matches[0].split(".")
-                if keys[0] == "context":
-                    keys = keys[1:]
-                return self._safe_resolve(keys, self.context)
+                try:
+                    keys = matches[0].split(".")
+                    if keys[0] == "context":
+                        keys = keys[1:]
+                    return self._safe_resolve(keys, self.context)
+                except Exception as e:
+                    error_msg = f"⚠️ Failed to resolve single variable ${{{matches[0]}}}: {e}"
+                    print(error_msg)
+                    # For single variable references that fail, return None instead of error string
+                    # This prevents invalid data from being passed to tools
+                    return None
     
             # Otherwise resolve inline substitutions
             for match in matches:
@@ -4103,7 +4110,10 @@ If any required parameter is missing or ambiguous, instead return:
                     resolved = self._safe_resolve(keys, self.context)
                     value = value.replace(f"${{{match}}}", str(resolved))
                 except Exception as e:
-                    print(f"⚠️ Failed to resolve: ${{{match}}} — {e}")
+                    error_msg = f"⚠️ Failed to resolve: ${{{match}}} — {e}"
+                    print(error_msg)
+                    # Return the original template with error marker for debugging
+                    value = value.replace(f"${{{match}}}", f"<UNRESOLVED:{match}>")
             return value
     
         # Recursively resolve containers
@@ -4115,14 +4125,60 @@ If any required parameter is missing or ambiguous, instead return:
         return value
 
     def _safe_resolve(self, path_parts, context):
+        """
+        Safely resolve a path through nested context structure.
+        Provides detailed error messages when resolution fails.
+        """
         current = context
+        resolved_path = []
+        
         for part in path_parts:
+            resolved_path.append(part)
+            path_str = ".".join(resolved_path)
+            
             # Handle indexed access like [0]
             if "[" in part and "]" in part:
-                base, index = re.match(r"(.*?)\[(\d+)\]", part).groups()
-                current = current[base][int(index)]
+                try:
+                    base, index = re.match(r"(.*?)\[(\d+)\]", part).groups()
+                    if isinstance(current, dict) and base in current:
+                        current = current[base]
+                        if isinstance(current, list):
+                            current = current[int(index)]
+                        else:
+                            raise TypeError(f"Expected list for indexed access at '{path_str}', got {type(current).__name__}")
+                    else:
+                        raise KeyError(f"Key '{base}' not found at '{path_str}'")
+                except (ValueError, AttributeError) as e:
+                    raise ValueError(f"Invalid indexed access format in '{part}': {e}")
             else:
-                current = current[part]
+                # Type-safe access with clear error messages
+                if isinstance(current, dict):
+                    if part in current:
+                        current = current[part]
+                    else:
+                        # Provide helpful error message with available keys
+                        available_keys = list(current.keys()) if isinstance(current, dict) else []
+                        raise KeyError(
+                            f"Key '{part}' not found in context path '{path_str}'. "
+                            f"Available keys: {available_keys[:10]}"
+                        )
+                elif isinstance(current, list):
+                    try:
+                        current = current[int(part)]
+                    except (ValueError, IndexError) as e:
+                        raise TypeError(
+                            f"Cannot access '{part}' on list at '{path_str}'. "
+                            f"List has {len(current)} items. Error: {e}"
+                        )
+                else:
+                    # This is the key fix - don't try to access non-containers!
+                    raise TypeError(
+                        f"Cannot access property '{part}' on {type(current).__name__} value at '{path_str}'. "
+                        f"Current value: {repr(current)[:100]}. "
+                        f"Hint: The step output may be a simple value instead of a dict. "
+                        f"Ensure the step returns structured data if you need to access properties."
+                    )
+        
         return current
    
     def _resolve_function(self, path: str, script: Optional[str] = None):
