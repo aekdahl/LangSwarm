@@ -3852,15 +3852,42 @@ If any required parameter is missing or ambiguous, instead return:
 
                 # 1a. send to user ----------------------------------------------------------------
                 if target == "user":
+                    # Strip hallucinated MCP tool calls from responses before returning to user
+                    cleaned_output = output
+                    
+                    # Handle dict outputs with mcp field
+                    if isinstance(output, dict) and 'mcp' in output:
+                        print(f"⚠️  Stripping hallucinated 'mcp' block from response before returning to user")
+                        # Keep only the 'response' field if it exists
+                        if 'response' in output:
+                            cleaned_output = output['response']
+                        else:
+                            # Remove mcp but keep other fields
+                            cleaned_output = {k: v for k, v in output.items() if k != 'mcp'}
+                    
+                    # Handle string outputs that might contain JSON with mcp field
+                    elif isinstance(output, str):
+                        try:
+                            import json
+                            parsed = json.loads(output)
+                            if isinstance(parsed, dict) and 'mcp' in parsed:
+                                print(f"⚠️  Detected and stripping 'mcp' block from JSON string response")
+                                cleaned_output = parsed.get('response', parsed)
+                                if isinstance(cleaned_output, dict):
+                                    cleaned_output = {k: v for k, v in cleaned_output.items() if k != 'mcp'}
+                        except (json.JSONDecodeError, ValueError):
+                            # Not JSON, keep as-is
+                            pass
+                    
                     # ── keep whichever branch you already use ───────────
                     if hasattr(self, "message_broker") and self.message_broker:
                         self.message_broker.return_to_user(
-                            output,
+                            cleaned_output,
                             context={"step_id": step_id,
                                      "request_id": self.context.get("request_id")},
                         )
                     else:                                                # ← fallback
-                        self.context["user_output"] = output
+                        self.context["user_output"] = cleaned_output
                     print("💬  Output was returned to user\n")
                     continue  # nothing else to do for the "user" pseudo‑step
 

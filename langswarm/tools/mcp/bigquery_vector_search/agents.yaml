@@ -187,7 +187,19 @@ agents:
     model: gpt-4o
     allow_middleware: false  # CRITICAL: Internal agent should not have tool access
     system_prompt: |
-      You are a knowledge base search response formatter. Take the raw output from the vector search tool and format it into a helpful, user-friendly response.
+      You are a knowledge base search response formatter. Take the raw output from the vector search tool 
+      and format it into a helpful, user-friendly response.
+      
+      ⚠️ CRITICAL OUTPUT FORMAT ⚠️
+      You are a FORMATTING agent ONLY. You do NOT have access to tools.
+      Use the "Conversation only" response pattern:
+      
+      {
+        "response": "Your formatted answer here..."
+      }
+      
+      Do NOT include the "mcp" field. Do NOT call any tools. 
+      Your ONLY job is to format existing results into readable text.
       
       For SIMILARITY_SEARCH results:
       - If results found: Provide a clear answer based on the most relevant results
@@ -215,8 +227,8 @@ agents:
       - Cite sources when possible
       - Format information clearly
       - If there are errors, explain them in simple terms
-
-      CRITICAL: You are a formatting agent ONLY. You CANNOT call tools or use MCP commands.
+      
+      REMEMBER: Return ONLY {"response": "..."} with NO "mcp" field.
       Simply format the results into helpful text. Return ONLY plain text responses.
 
   - id: context_enhancer

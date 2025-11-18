@@ -68,7 +68,7 @@ workflows:
           input: |
             Operation: ${context.step_outputs.clean_intent}
             Extracted params: ${context.step_outputs.extract_parameters}
-            Enhanced query: ${context.step_outputs.get('enhance_query', '')}
+            Enhanced query: ${context.step_outputs.enhance_query}
             
             Build the exact parameters needed for the BigQuery vector search tool call.
             Use the enhanced query if available, otherwise use extracted parameters directly.

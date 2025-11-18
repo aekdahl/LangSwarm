@@ -340,6 +340,7 @@ def mcp_call(
                 
                 # Handle case where arguments is a JSON string instead of dict
                 if isinstance(task_args, str):
+                    print(f"🔍 Raw task_args string (length={len(task_args)}): {repr(task_args)[:500]}")
                     try:
                         import json
                         task_args = json.loads(task_args)
