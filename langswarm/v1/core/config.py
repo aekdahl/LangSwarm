@@ -3323,6 +3323,15 @@ If any required parameter is missing or ambiguous, instead return:
                     print(f"⚠️  Failed to parse json_object response from agent '{step['agent']}': {e}")
                     # Keep output as string if parsing fails
             
+            # Validate parsed output structure for workflow debugging
+            if isinstance(output, dict) and hasattr(agent, 'response_format') and agent.response_format == 'json_object':
+                # Check for common issues
+                if 'mcp' in output:
+                    print(f"⚠️  Internal agent '{step['agent']}' returned MCP block (will be stripped)")
+                
+                # Log the dict keys for debugging
+                print(f"📋 Step '{step['id']}' output keys: {list(output.keys())}")
+            
             # NAVIGATION SUPPORT: Check if agent made a navigation choice
             if 'navigation' in step:
                 navigation_choice = self._extract_navigation_choice(output, step)
@@ -3765,6 +3774,15 @@ If any required parameter is missing or ambiguous, instead return:
                         except (json.JSONDecodeError, ValueError) as e:
                             print(f"⚠️  Failed to parse json_object response from agent '{step['agent']}' (async): {e}")
                             # Keep output as string if parsing fails
+                    
+                    # Validate parsed output structure for workflow debugging
+                    if isinstance(output, dict) and hasattr(agent, 'response_format') and agent.response_format == 'json_object':
+                        # Check for common issues
+                        if 'mcp' in output:
+                            print(f"⚠️  Internal agent '{step['agent']}' returned MCP block (will be stripped)")
+                        
+                        # Log the dict keys for debugging
+                        print(f"📋 Step '{step['id']}' output keys: {list(output.keys())}")
                     
                     # NAVIGATION SUPPORT: Check if agent made a navigation choice
                     if 'navigation' in step:
