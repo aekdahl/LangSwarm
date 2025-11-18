@@ -1,7 +1,7 @@
 agents:
   - id: input_normalizer
     agent_type: langchain-openai
-    model: gpt-4o
+    model: gpt-4o-mini
     allow_middleware: false  # CRITICAL: Internal agent should not have tool access
     system_prompt: |
       You are an input normalizer that handles multiple input variable formats for the BigQuery vector search tool.
@@ -15,7 +15,7 @@ agents:
 
   - id: search_intent_classifier
     agent_type: langchain-openai
-    model: gpt-4o
+    model: gpt-4o-mini
     allow_middleware: false  # CRITICAL: Internal agent should not have tool access
     system_prompt: |
       You are a knowledge base search intent classifier. Based on the user's request, determine which vector search operation they want to perform.
@@ -36,7 +36,7 @@ agents:
 
   - id: intent_cleaner
     agent_type: langchain-openai
-    model: gpt-4o
+    model: gpt-4o-mini
     allow_middleware: false  # CRITICAL: Internal agent should not have tool access
     system_prompt: |
       Extract operation names from text. Return ONLY the operation name, nothing else.
@@ -73,7 +73,7 @@ agents:
 
   - id: query_extractor
     agent_type: langchain-openai
-    model: gpt-4o
+    model: gpt-4o-mini
     allow_middleware: false  # CRITICAL: Internal agent should not have tool access
     system_prompt: |
       You are a parameter extraction agent for the bigquery_vector_search tool. Based on the user's request and operation type, 
@@ -124,7 +124,7 @@ agents:
 
   - id: parameter_builder
     agent_type: langchain-openai
-    model: gpt-4o
+    model: gpt-4o-mini
     allow_middleware: false  # CRITICAL: Internal agent should not have tool access
     # response_format: json_object  # Force valid JSON output (no markdown, no Python literals)
     system_prompt: |
@@ -184,7 +184,7 @@ agents:
 
   - id: search_response_formatter
     agent_type: langchain-openai
-    model: gpt-4o
+    model: gpt-4o-mini
     allow_middleware: false  # CRITICAL: Internal agent should not have tool access
     system_prompt: |
       You are a knowledge base search response formatter. Take the raw output from the vector search tool 
@@ -233,7 +233,7 @@ agents:
 
   - id: context_enhancer
     agent_type: langchain-openai
-    model: gpt-4o
+    model: gpt-4o-mini
     allow_middleware: false  # CRITICAL: Internal agent should not have tool access
     system_prompt: |
       You are a search context enhancer. Your job is to improve search queries to get better results from the vector search.
@@ -254,7 +254,7 @@ agents:
 
   - id: error_handler
     agent_type: langchain-openai
-    model: gpt-4o
+    model: gpt-4o-mini
     allow_middleware: false  # CRITICAL: Internal agent should not have tool access
     system_prompt: |
       You are an error handler for knowledge base search operations. When errors occur, provide helpful guidance to the user.
