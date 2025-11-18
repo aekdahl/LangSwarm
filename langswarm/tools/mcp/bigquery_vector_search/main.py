@@ -674,7 +674,20 @@ try:
                         )
                     
                     # Structured input
-                    if "method" in input_data and "params" in input_data:
+                    # Check for MCP structure first (from user-facing agents)
+                    if "mcp" in input_data and isinstance(input_data["mcp"], dict):
+                        mcp_data = input_data["mcp"]
+                        if "method" in mcp_data and "params" in mcp_data:
+                            method = mcp_data["method"]
+                            params = mcp_data["params"]
+                            print(f"🔍 Extracted from MCP structure: method={method}, params={params}")
+                        else:
+                            # MCP structure but incomplete, treat as ambiguous
+                            return await self._handle_intent_call({
+                                "intent": input_data.get("response", "Process this request"),
+                                "context": f"incomplete MCP structure: {mcp_data}",
+                            })
+                    elif "method" in input_data and "params" in input_data:
                         method = input_data["method"]
                         params = input_data["params"]
                     elif "query" in input_data:

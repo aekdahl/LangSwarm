@@ -6,72 +6,25 @@ workflows:
         - user_input
         - user_query
       steps:
-        - id: normalize_input
-          agent: input_normalizer
+        # CONSOLIDATED STEP 1: Parse intent and extract base parameters
+        # Replaces: normalize_input + classify_intent + clean_intent + extract_parameters
+        - id: parse_and_extract
+          agent: intent_and_param_extractor
           input: |
-            user_input: ${user_input}
-            user_query: ${user_query}
-          output:
-            to: classify_intent
-
-        - id: classify_intent
-          agent: search_intent_classifier
-          input: |
-            User request: ${context.step_outputs.normalize_input}
+            User input: ${user_input}
+            User query: ${user_query}
             
-            Classify this request as one of:
-            - similarity_search: Semantic search for information
-            - get_content: Retrieve specific document by ID
-            - list_datasets: Browse available knowledge sources
-            - dataset_info: Get metadata about specific dataset/table
-            
-            Return ONLY the operation name (e.g., "similarity_search").
+            Parse this request and extract the operation type and base parameters.
           output:
-            to: clean_intent
+            to: enhance_and_finalize
 
-        - id: clean_intent
-          agent: intent_cleaner
+        # CONSOLIDATED STEP 2: Enhance query and finalize parameters
+        # Replaces: enhance_query + build_tool_parameters
+        # Note: Enhancement only applied for similarity_search, others pass through unchanged
+        - id: enhance_and_finalize
+          agent: query_enhancer_and_finalizer
           input: |
-            ${context.step_outputs.classify_intent}
-          output:
-            to: extract_parameters
-
-        - id: extract_parameters
-          agent: query_extractor
-          input: |
-            User request: ${context.step_outputs.normalize_input}
-            Operation type: ${context.step_outputs.clean_intent}
-            
-            Extract the relevant parameters for this operation.
-          output:
-            to:
-              - condition:
-                  if: "'${context.step_outputs.classify_intent}' == 'similarity_search'"
-                  then: enhance_query
-                  else: build_tool_parameters
-
-        - id: enhance_query
-          agent: context_enhancer
-          input: |
-            Original query: ${context.step_outputs.extract_parameters}
-            
-            Enhance this query for better vector search results by:
-            1. Adding relevant context and synonyms
-            2. Expanding abbreviations
-            3. Including related terms
-            4. Optimizing for semantic similarity
-          output:
-            to: build_tool_parameters
-
-        - id: build_tool_parameters
-          agent: parameter_builder
-          input: |
-            Operation: ${context.step_outputs.clean_intent}
-            Extracted params: ${context.step_outputs.extract_parameters}
-            Enhanced query: ${context.step_outputs.enhance_query}
-            
-            Build the exact parameters needed for the BigQuery vector search tool call.
-            Use the enhanced query if available, otherwise use extracted parameters directly.
+            ${context.step_outputs.parse_and_extract}
           output:
             to: execute_search
 
@@ -80,8 +33,8 @@ workflows:
           args:
             mcp_url: "local://bigquery_vector_search"
             payload:
-              name: ${context.step_outputs.clean_intent}
-              arguments: ${context.step_outputs.build_tool_parameters}
+              name: ${context.step_outputs.parse_and_extract.operation}
+              arguments: ${context.step_outputs.enhance_and_finalize}
           output:
             to:
               - condition:
