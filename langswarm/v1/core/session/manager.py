@@ -57,7 +57,7 @@ class LangSwarmSessionManager:
         # Active sessions in memory for quick access
         self._active_sessions: Dict[str, LangSwarmSession] = {}
         
-        logger.info("LangSwarm Session Manager initialized")
+        #logger.info("LangSwarm Session Manager initialized")
     
     def create_session(
         self,

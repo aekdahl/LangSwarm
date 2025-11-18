@@ -3309,6 +3309,20 @@ If any required parameter is missing or ambiguous, instead return:
             
             output = agent.chat(resolved_input)
             
+            # FIX: Parse JSON responses for agents with response_format: json_object
+            # This ensures internal workflow agents return proper dicts, not JSON strings
+            if hasattr(agent, 'response_format') and agent.response_format == 'json_object':
+                try:
+                    import json
+                    if isinstance(output, str):
+                        parsed_output = json.loads(output)
+                        if isinstance(parsed_output, dict):
+                            output = parsed_output
+                            print(f"✅ Parsed json_object response from agent '{step['agent']}' into dict")
+                except (json.JSONDecodeError, ValueError) as e:
+                    print(f"⚠️  Failed to parse json_object response from agent '{step['agent']}': {e}")
+                    # Keep output as string if parsing fails
+            
             # NAVIGATION SUPPORT: Check if agent made a navigation choice
             if 'navigation' in step:
                 navigation_choice = self._extract_navigation_choice(output, step)
@@ -3737,6 +3751,20 @@ If any required parameter is missing or ambiguous, instead return:
                         output = agent.chat(f"{resolved}")
                     else:
                         output = agent.chat(self._resolve_input(raw_input))
+                    
+                    # FIX: Parse JSON responses for agents with response_format: json_object
+                    # This ensures internal workflow agents return proper dicts, not JSON strings
+                    if hasattr(agent, 'response_format') and agent.response_format == 'json_object':
+                        try:
+                            import json
+                            if isinstance(output, str):
+                                parsed_output = json.loads(output)
+                                if isinstance(parsed_output, dict):
+                                    output = parsed_output
+                                    print(f"✅ Parsed json_object response from agent '{step['agent']}' into dict (async)")
+                        except (json.JSONDecodeError, ValueError) as e:
+                            print(f"⚠️  Failed to parse json_object response from agent '{step['agent']}' (async): {e}")
+                            # Keep output as string if parsing fails
                     
                     # NAVIGATION SUPPORT: Check if agent made a navigation choice
                     if 'navigation' in step:

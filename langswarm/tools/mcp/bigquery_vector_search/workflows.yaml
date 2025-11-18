@@ -45,9 +45,9 @@ workflows:
         - id: format_response
           agent: search_response_formatter
           input: |
-            Operation: ${context.step_outputs.clean_intent}
+            Operation: ${context.step_outputs.parse_and_extract.operation}
             Raw results: ${context.step_outputs.execute_search}
-            Original request: ${context.step_outputs.normalize_input}
+            Original request: ${user_query}
             
             Format this into a comprehensive, user-friendly response.
           output:
@@ -57,8 +57,8 @@ workflows:
           agent: error_handler
           input: |
             Error details: ${context.step_outputs.execute_search}
-            User request: ${context.step_outputs.normalize_input}
-            Attempted operation: ${context.step_outputs.clean_intent}
+            User request: ${user_query}
+            Attempted operation: ${context.step_outputs.parse_and_extract.operation}
             
             Provide helpful error guidance and suggest alternatives.
           output:
