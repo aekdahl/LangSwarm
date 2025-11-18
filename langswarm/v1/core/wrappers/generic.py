@@ -795,9 +795,12 @@ Do not include any text outside the JSON structure."""
             api_params = {
                 "model": self.model,
                 "messages": messages,
-                "temperature": 0.0,
-                "max_tokens": self.max_tokens  # CRITICAL: Prevent infinite generation
+                "temperature": 0.0
             }
+            
+            # Only add max_tokens if explicitly set (required for GPT-5/GPT-5.1 compatibility)
+            if self.max_tokens is not None:
+                api_params["max_tokens"] = self.max_tokens
             
             # PRIORITY 3: Add streaming parameters if enabled
             streaming_params = self.get_streaming_parameters(config.get("streaming", {}) if config else {})
@@ -1403,9 +1406,12 @@ Do not include any text outside the JSON structure."""
                     "model": self.model,
                     "messages": self.in_memory,
                     "temperature": 0.0,
-                    "stream": True,  # Force streaming for this method
-                    "max_tokens": self.max_tokens  # CRITICAL: Prevent infinite generation
+                    "stream": True  # Force streaming for this method
                 }
+                
+                # Only add max_tokens if explicitly set (required for GPT-5/GPT-5.1 compatibility)
+                if self.max_tokens is not None:
+                    api_params["max_tokens"] = self.max_tokens
                 
                 # Add native tool calling if supported
                 if self.tool_registry and self.supports_native_tool_calling():
