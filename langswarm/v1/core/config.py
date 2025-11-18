@@ -3456,6 +3456,15 @@ If any required parameter is missing or ambiguous, instead return:
         # Handle regular output routing (if no navigation was used)
         if 'output' in step and not navigation_choice:
             self._handle_output(step['id'], step['output'], result, step)
+        elif not navigation_choice:
+            # No output defined and no navigation - continue to next step sequentially
+            workflow = self.context.get('_current_workflow')
+            if workflow and workflow.get('steps'):
+                current_index = next((i for i, s in enumerate(workflow['steps']) if s.get('id') == step['id']), None)
+                if current_index is not None and current_index + 1 < len(workflow['steps']):
+                    next_step = workflow['steps'][current_index + 1]
+                    print(f"➡️  No output defined, continuing to next step: {next_step['id']}")
+                    self._execute_step(next_step)
     
     def _extract_navigation_choice(self, response: str, step: Dict) -> Optional[Dict]:
         """Extract navigation choice from agent response"""
@@ -3809,6 +3818,15 @@ If any required parameter is missing or ambiguous, instead return:
                 return  # Important: return here explicitly after handling condition
             else:
                 await self._handle_output_async(step_id, step["output"], output, step)
+        else:
+            # No output defined - continue to next step sequentially
+            workflow = self.context.get('_current_workflow')
+            if workflow and workflow.get('steps'):
+                current_index = next((i for i, s in enumerate(workflow['steps']) if s.get('id') == step_id), None)
+                if current_index is not None and current_index + 1 < len(workflow['steps']):
+                    next_step = workflow['steps'][current_index + 1]
+                    print(f"➡️  No output defined, continuing to next step: {next_step['id']}")
+                    await self._execute_step_async(next_step)
         
         if mark_visited:
             self.context["visited_steps"].add(visit_key)
@@ -4657,11 +4675,14 @@ def _add_workflow_methods_to_config_loader():
         # Get the workflow
         workflow = self._get_workflow(workflow_id)
         
-        # Execute workflow steps
+        # Execute workflow steps - start with first step, output routing handles the rest
         if workflow and workflow.get('steps'):
-            for step in workflow['steps']:
-                # Execute each step
-                self._execute_step(step)
+            # Store workflow reference for sequential continuation
+            self.context['_current_workflow'] = workflow
+            
+            # Execute only the first step - output routing and sequential continuation handle the rest
+            if len(workflow['steps']) > 0:
+                self._execute_step(workflow['steps'][0])
             
             # Return the final output
             return self.context.get('previous_output', "Workflow completed")
@@ -4706,11 +4727,14 @@ def _add_workflow_methods_to_config_loader():
         # Get the workflow
         workflow = self._get_workflow(workflow_id)
         
-        # Execute workflow steps asynchronously
+        # Execute workflow steps asynchronously - start with first step, output routing handles the rest
         if workflow and workflow.get('steps'):
-            for step in workflow['steps']:
-                # Execute each step asynchronously
-                await self._execute_step_async(step)
+            # Store workflow reference for sequential continuation
+            self.context['_current_workflow'] = workflow
+            
+            # Execute only the first step - output routing and sequential continuation handle the rest
+            if len(workflow['steps']) > 0:
+                await self._execute_step_async(workflow['steps'][0])
             
             # Return the final output
             return self.context.get('previous_output', "Workflow completed")
