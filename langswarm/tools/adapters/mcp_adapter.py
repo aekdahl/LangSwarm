@@ -141,7 +141,7 @@ class MCPToolAdapter(IToolInterface):
             # Create V2 execution interface
             self._execution = ToolExecution(self._mcp_tool)
             
-            self._logger.info(f"✅ Adapted MCP tool '{name}' with {len(methods)} methods and {len(capabilities)} capabilities")
+            self._logger.info(f"✅ Adapted MCP tool '{name}' with {len(discovered_methods)} discovered, {len(method_schemas)} registered methods and {len(capabilities)} capabilities")
             
         except Exception as e:
             self._logger.error(f"❌ Failed to discover tool properties: {e}")

@@ -2033,6 +2033,20 @@ Adapt your approach based on the user's needs, drawing from your combined expert
         return secret_constructor
 
     def _load_config_files(self):
+        # Handle case where config_path is a single file containing all config sections
+        if os.path.isfile(self.config_path):
+            # Load the single file and extract all sections
+            data = self._load_yaml_file(self.config_path)
+            # Populate config_data with all sections from the file
+            for key in ['workflows', 'agents', 'tools', 'brokers', 'retrievers', 'plugins', 'registries', 'secrets']:
+                if key in data:
+                    self.config_data[key] = data[key]
+                    # Validate each section if it exists
+                    if self.config_data[key]:
+                        self._validate_yaml_section(key, self.config_data[key])
+            return
+        
+        # Original: Handle directory-based multi-file configs
         for filename in LS_DEFAULT_CONFIG_FILES:
             full_path = os.path.join(self.config_path, filename)
             if os.path.exists(full_path):
