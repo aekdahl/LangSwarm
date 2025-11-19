@@ -597,15 +597,37 @@ class BaseAgent(AutoInstrumentedMixin):
                         })
                         continue
                     
-                    # Execute tool - handle V2 IToolInterface
-                    if hasattr(tool, 'call_tool'):
-                        # V2 tool with call_tool method (MCP standard)
+                    # Execute tool - handle V2 IToolInterface structure
+                    if hasattr(tool, 'execution') and hasattr(tool.execution, 'execute'):
+                        # V2 IToolInterface - proper structure
+                        # Extract method from tool_name if using flattened calling (tool.method)
+                        method = ''
+                        if '.' in tool_name:
+                            # Flattened method calling: "bigquery_vector_search.similarity_search"
+                            _, method = tool_name.split('.', 1)
+                            self._logger.info(f"Using flattened method calling: {method}")
+                        elif 'method' in tool_args:
+                            # Explicit method in parameters
+                            method = tool_args.pop('method')
+                            self._logger.info(f"Using explicit method from parameters: {method}")
+                        else:
+                            self._logger.warning(f"No method specified for tool {tool_name}, will try empty method")
+                        
+                        self._logger.info(f"Calling tool.execution.execute(method='{method}', parameters={tool_args})")
+                        
+                        result = await tool.execution.execute(
+                            method=method,
+                            parameters=tool_args,
+                            context=None
+                        )
+                    elif hasattr(tool, 'call_tool'):
+                        # MCP standard call_tool method
                         result = await tool.call_tool(tool_name, tool_args)
                     elif hasattr(tool, 'execute'):
-                        # Tool with execute method
+                        # Direct execute method
                         result = await tool.execute(**tool_args)
                     elif hasattr(tool, 'call'):
-                        # Tool with call method
+                        # Call method
                         result = await tool.call(**tool_args)
                     elif callable(tool):
                         # Callable tool

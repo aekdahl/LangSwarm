@@ -324,7 +324,7 @@ class OpenAIProvider(IAgentProvider):
         return params
     
     def _build_tool_definitions(self, tool_names: List[str]) -> List[Dict[str, Any]]:
-        """Build OpenAI tool definitions from V2 tool registry using MCP standard"""
+        """Build OpenAI tool definitions from V2 tool registry using MCP standard with flattened methods"""
         try:
             from langswarm.tools.registry import ToolRegistry
             
@@ -334,16 +334,50 @@ class OpenAIProvider(IAgentProvider):
             tools = []
             for tool_name in tool_names:
                 tool = registry.get_tool(tool_name)
-                if tool:
-                    # Get standard MCP schema from tool
-                    mcp_schema = self._get_tool_mcp_schema(tool)
-                    # Convert MCP schema to OpenAI format (use registry key as name)
-                    openai_tool = self._convert_mcp_to_openai_format(mcp_schema, tool_name)
-                    tools.append(openai_tool)
-                else:
+                if not tool:
                     # FAIL FAST - no fallback to mock tools
                     raise ValueError(f"Tool '{tool_name}' not found in V2 registry. "
                                    f"Ensure tool is properly registered before use.")
+                
+                # Check if tool has methods to expose as flattened names
+                if hasattr(tool, 'metadata') and hasattr(tool.metadata, 'methods'):
+                    methods = tool.metadata.methods  # Dict[str, ToolSchema]
+                    
+                    if methods and len(methods) > 0:
+                        # Tool supports multiple methods - register each as separate function
+                        logger.info(f"Tool '{tool_name}' has {len(methods)} methods, creating flattened definitions")
+                        
+                        for method_name, method_schema in methods.items():
+                            # Create flattened name: tool.method
+                            flattened_name = f"{tool_name}.{method_name}"
+                            
+                            # Convert ToolSchema to OpenAI format
+                            openai_tool = {
+                                "type": "function",
+                                "function": {
+                                    "name": flattened_name,
+                                    "description": method_schema.description,
+                                    "parameters": {
+                                        "type": "object",
+                                        "properties": method_schema.parameters,
+                                        "required": method_schema.required
+                                    }
+                                }
+                            }
+                            tools.append(openai_tool)
+                            logger.debug(f"Registered flattened method: {flattened_name}")
+                    else:
+                        # Tool has metadata but no methods, register as single tool
+                        logger.info(f"Tool '{tool_name}' has no methods, registering as single function")
+                        mcp_schema = self._get_tool_mcp_schema(tool)
+                        openai_tool = self._convert_mcp_to_openai_format(mcp_schema, tool_name)
+                        tools.append(openai_tool)
+                else:
+                    # Tool doesn't expose methods, register as single tool
+                    logger.info(f"Tool '{tool_name}' doesn't expose methods, registering as single function")
+                    mcp_schema = self._get_tool_mcp_schema(tool)
+                    openai_tool = self._convert_mcp_to_openai_format(mcp_schema, tool_name)
+                    tools.append(openai_tool)
             
             return tools
             
