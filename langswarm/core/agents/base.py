@@ -642,9 +642,24 @@ class BaseAgent(AutoInstrumentedMixin):
                         self._logger.error(error_msg)
                         result = {"error": error_msg}
                     
-                    # Format result
-                    if not isinstance(result, str):
-                        result = json.dumps(result)
+                    # Format result - handle different result types
+                    if isinstance(result, str):
+                        # Already a string, use as-is
+                        pass
+                    elif hasattr(result, 'to_dict'):
+                        # ToolResult object with to_dict() method
+                        result = json.dumps(result.to_dict())
+                    elif hasattr(result, 'dict'):
+                        # Pydantic model with dict() method  
+                        result = json.dumps(result.dict())
+                    else:
+                        # Try direct JSON serialization
+                        try:
+                            result = json.dumps(result)
+                        except (TypeError, ValueError) as e:
+                            # If serialization fails, convert to string
+                            self._logger.warning(f"Could not JSON serialize tool result, converting to string: {e}")
+                            result = str(result)
                     
                     tool_results.append({
                         "tool_call_id": tool_call_id,

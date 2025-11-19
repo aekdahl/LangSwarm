@@ -56,7 +56,69 @@ class MCPToolAdapter(IToolInterface):
                 description = self._load_description_from_template()
             
             # Auto-discover methods
-            methods = self._discover_methods()
+            discovered_methods = self._discover_methods()
+            
+            # Create ToolSchema for each discovered method
+            from ..base import ToolSchema
+            method_schemas = {}
+            
+            # Standard MCP protocol methods to skip
+            mcp_protocol_methods = [
+                'call_tool', 'list_tools', 'list_prompts', 'get_prompt',
+                'list_resources', 'read_resource', 'run_async', 'run', 
+                'initialize', 'cleanup', 'health_check'
+            ]
+            
+            for method_name in discovered_methods:
+                if method_name in mcp_protocol_methods:
+                    # Skip MCP protocol methods and infrastructure methods
+                    continue
+                
+                # Try to get method for signature inspection
+                method = getattr(self._mcp_tool, method_name, None)
+                if method and callable(method):
+                    # Try to inspect method signature for parameters
+                    import inspect
+                    try:
+                        sig = inspect.signature(method)
+                        parameters = {}
+                        required = []
+                        
+                        for param_name, param in sig.parameters.items():
+                            if param_name in ['self', 'cls']:
+                                continue
+                            
+                            param_info = {
+                                "type": "string",  # Default to string
+                                "description": f"Parameter: {param_name}"
+                            }
+                            
+                            if param.default == param.empty:
+                                required.append(param_name)
+                            else:
+                                param_info["default"] = str(param.default)
+                            
+                            parameters[param_name] = param_info
+                        
+                        # Create schema for the method
+                        method_schemas[method_name] = ToolSchema(
+                            name=method_name,
+                            description=f"Execute {method_name} on {name}",
+                            parameters=parameters,
+                            returns={"type": "any", "description": "Method result"},
+                            required=required
+                        )
+                        
+                    except Exception as e:
+                        self._logger.debug(f"Could not inspect method {method_name}: {e}")
+                        # Create basic schema without parameters
+                        method_schemas[method_name] = ToolSchema(
+                            name=method_name,
+                            description=f"Execute {method_name} on {name}",
+                            parameters={},
+                            returns={"type": "any"},
+                            required=[]
+                        )
             
             # Auto-discover capabilities
             capabilities = self._discover_capabilities()
@@ -64,7 +126,7 @@ class MCPToolAdapter(IToolInterface):
             # Determine tool type
             tool_type = self._determine_tool_type()
             
-            # Create V2 metadata
+            # Create V2 metadata with populated methods
             self._metadata = ToolMetadata(
                 id=self._tool_id,
                 name=name,
@@ -72,7 +134,7 @@ class MCPToolAdapter(IToolInterface):
                 version="1.0.0",
                 tool_type=tool_type,
                 capabilities=capabilities,
-                methods={},  # Will be populated from discovered methods
+                methods=method_schemas,  # Now properly populated!
                 tags=["mcp", "adapted"]
             )
             
