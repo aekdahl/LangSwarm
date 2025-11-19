@@ -305,7 +305,7 @@ class ToolRegistry(IToolRegistry):
         """Auto-populate registry with adapted MCP tools"""
         if mcp_tools_directory is None:
             # Default to V2 MCP tools directory
-            mcp_tools_directory = "/Users/alexanderekdahl/Docker/LangSwarm/langswarm/v2/tools/mcp"
+            mcp_tools_directory = "langswarm/tools/mcp"
         
         try:
             adapted_tools = auto_adapt_mcp_tools(mcp_tools_directory)
