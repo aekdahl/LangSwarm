@@ -399,6 +399,7 @@ class GeminiProvider(IAgentProvider):
             
             return AgentResponse.success_response(
                 content=content,
+                message=agent_message,  # Pass the detailed message object
                 usage=usage,
                 execution_time=execution_time,
                 model=config.model,

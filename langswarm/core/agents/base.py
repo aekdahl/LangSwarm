@@ -158,10 +158,13 @@ class AgentResponse:
         content: str,
         role: str = "assistant",
         usage: Optional[AgentUsage] = None,
+        message: Optional[AgentMessage] = None,
         **metadata
     ) -> 'AgentResponse':
         """Create a successful response"""
-        message = AgentMessage(role=role, content=content)
+        # Use provided message or create a new one
+        if message is None:
+            message = AgentMessage(role=role, content=content)
         return cls(
             content=content,
             message=message,

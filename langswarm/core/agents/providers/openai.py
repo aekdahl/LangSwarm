@@ -464,6 +464,7 @@ class OpenAIProvider(IAgentProvider):
         
         return AgentResponse.success_response(
             content=message.content or "",
+            message=agent_message,  # Pass the detailed message object
             usage=usage,
             execution_time=execution_time,
             model=config.model,
@@ -505,6 +506,7 @@ class OpenAIProvider(IAgentProvider):
                 
                 yield AgentResponse.success_response(
                     content=delta.content,
+                    message=chunk_message,  # Pass the chunk message
                     streaming=True,
                     chunk_index=len(collected_content),
                     execution_time=time.time() - start_time
@@ -531,6 +533,7 @@ class OpenAIProvider(IAgentProvider):
                 
                 yield AgentResponse.success_response(
                     content=collected_content,
+                    message=final_message,  # Pass the final complete message
                     streaming=False,
                     stream_complete=True,
                     execution_time=time.time() - start_time,
