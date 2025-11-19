@@ -337,8 +337,8 @@ class OpenAIProvider(IAgentProvider):
                 if tool:
                     # Get standard MCP schema from tool
                     mcp_schema = self._get_tool_mcp_schema(tool)
-                    # Convert MCP schema to OpenAI format
-                    openai_tool = self._convert_mcp_to_openai_format(mcp_schema)
+                    # Convert MCP schema to OpenAI format (use registry key as name)
+                    openai_tool = self._convert_mcp_to_openai_format(mcp_schema, tool_name)
                     tools.append(openai_tool)
                 else:
                     # FAIL FAST - no fallback to mock tools
@@ -394,12 +394,16 @@ class OpenAIProvider(IAgentProvider):
         except Exception as e:
             raise RuntimeError(f"Failed to get MCP schema for tool: {e}")
     
-    def _convert_mcp_to_openai_format(self, mcp_schema: Dict[str, Any]) -> Dict[str, Any]:
+    def _convert_mcp_to_openai_format(self, mcp_schema: Dict[str, Any], tool_name: str = None) -> Dict[str, Any]:
         """Convert standard MCP schema to OpenAI function calling format"""
+        # Use the registry key (tool_name) as the function name to ensure OpenAI compatibility
+        # Registry keys are guaranteed to match pattern ^[a-zA-Z0-9_-]+$
+        function_name = tool_name if tool_name else mcp_schema.get("name", "unknown_tool")
+        
         return {
             "type": "function",
             "function": {
-                "name": mcp_schema.get("name", "unknown_tool"),
+                "name": function_name,
                 "description": mcp_schema.get("description", ""),
                 "parameters": mcp_schema.get("input_schema", {
                     "type": "object",

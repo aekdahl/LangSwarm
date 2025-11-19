@@ -178,7 +178,7 @@ class MistralProvider(IAgentProvider):
                 tool_info = registry.get_tool(tool_name)
                 if tool_info:
                     mcp_schema = self._get_tool_mcp_schema(tool_info)
-                    mistral_tool = self._convert_mcp_to_mistral_format(mcp_schema)
+                    mistral_tool = self._convert_mcp_to_mistral_format(mcp_schema, tool_name)
                     tools.append(mistral_tool)
             
             return tools
@@ -206,12 +206,15 @@ class MistralProvider(IAgentProvider):
             "input_schema": {"type": "object", "properties": {}}
         }
     
-    def _convert_mcp_to_mistral_format(self, mcp_schema: Dict[str, Any]) -> Dict[str, Any]:
+    def _convert_mcp_to_mistral_format(self, mcp_schema: Dict[str, Any], tool_name: str = None) -> Dict[str, Any]:
         """Convert MCP to Mistral format"""
+        # Use the registry key (tool_name) to ensure valid tool name
+        function_name = tool_name if tool_name else mcp_schema.get("name", "unknown_tool")
+        
         return {
             "type": "function",
             "function": {
-                "name": mcp_schema.get("name", "unknown_tool"),
+                "name": function_name,
                 "description": mcp_schema.get("description", ""),
                 "parameters": mcp_schema.get("input_schema", {
                     "type": "object",

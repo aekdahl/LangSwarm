@@ -244,8 +244,8 @@ class CohereProvider(IAgentProvider):
                 if tool_info:
                     # Get standard MCP schema from tool
                     mcp_schema = self._get_tool_mcp_schema(tool_info)
-                    # Convert MCP schema to Cohere format
-                    cohere_tool = self._convert_mcp_to_cohere_format(mcp_schema)
+                    # Convert MCP schema to Cohere format (use registry key as name)
+                    cohere_tool = self._convert_mcp_to_cohere_format(mcp_schema, tool_name)
                     tools.append(cohere_tool)
                 else:
                     # FAIL FAST - no fallback to mock tools
@@ -301,10 +301,13 @@ class CohereProvider(IAgentProvider):
         except Exception as e:
             raise RuntimeError(f"Failed to get MCP schema for tool: {e}")
     
-    def _convert_mcp_to_cohere_format(self, mcp_schema: Dict[str, Any]) -> Dict[str, Any]:
+    def _convert_mcp_to_cohere_format(self, mcp_schema: Dict[str, Any], tool_name: str = None) -> Dict[str, Any]:
         """Convert standard MCP schema to Cohere tool calling format"""
+        # Use the registry key (tool_name) to ensure valid tool name
+        function_name = tool_name if tool_name else mcp_schema.get("name", "unknown_tool")
+        
         return {
-            "name": mcp_schema.get("name", "unknown_tool"),
+            "name": function_name,
             "description": mcp_schema.get("description", ""),
             "parameter_definitions": self._convert_json_schema_to_cohere_params(
                 mcp_schema.get("input_schema", {})

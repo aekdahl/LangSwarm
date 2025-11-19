@@ -259,8 +259,8 @@ class GeminiProvider(IAgentProvider):
                 if tool_info:
                     # Get standard MCP schema from tool
                     mcp_schema = self._get_tool_mcp_schema(tool_info)
-                    # Convert MCP schema to Gemini format
-                    gemini_tool = self._convert_mcp_to_gemini_format(mcp_schema)
+                    # Convert MCP schema to Gemini format (use registry key as name)
+                    gemini_tool = self._convert_mcp_to_gemini_format(mcp_schema, tool_name)
                     tools.append(gemini_tool)
                 else:
                     # FAIL FAST - no fallback to mock tools
@@ -316,11 +316,14 @@ class GeminiProvider(IAgentProvider):
         except Exception as e:
             raise RuntimeError(f"Failed to get MCP schema for tool: {e}")
     
-    def _convert_mcp_to_gemini_format(self, mcp_schema: Dict[str, Any]) -> Dict[str, Any]:
+    def _convert_mcp_to_gemini_format(self, mcp_schema: Dict[str, Any], tool_name: str = None) -> Dict[str, Any]:
         """Convert standard MCP schema to Gemini function calling format"""
+        # Use the registry key (tool_name) to ensure valid tool name
+        function_name = tool_name if tool_name else mcp_schema.get("name", "unknown_tool")
+        
         return {
             "function_declarations": [{
-                "name": mcp_schema.get("name", "unknown_tool"),
+                "name": function_name,
                 "description": mcp_schema.get("description", ""),
                 "parameters": mcp_schema.get("input_schema", {
                     "type": "object",
