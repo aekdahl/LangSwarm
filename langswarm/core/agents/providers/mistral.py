@@ -185,18 +185,24 @@ class MistralProvider(IAgentProvider):
         except Exception as e:
             raise RuntimeError(f"Failed to build tool definitions: {e}")
     
-    def _get_tool_mcp_schema(self, tool_info: Dict[str, Any]) -> Dict[str, Any]:
-        """Get MCP schema from tool"""
-        tool_instance = tool_info.get('tool_instance')
-        if hasattr(tool_instance, 'list_tools'):
-            tools_list = tool_instance.list_tools()
+    def _get_tool_mcp_schema(self, tool: Any) -> Dict[str, Any]:
+        """Get MCP schema from tool (IToolInterface object)"""
+        if hasattr(tool, 'list_tools'):
+            tools_list = tool.list_tools()
             if tools_list:
                 return tools_list[0]
         
-        metadata = tool_info.get('metadata', {})
+        if hasattr(tool, 'metadata'):
+            metadata = tool.metadata
+            return {
+                "name": getattr(metadata, 'name', 'unknown'),
+                "description": getattr(metadata, 'description', ''),
+                "input_schema": getattr(metadata, 'input_schema', {"type": "object", "properties": {}})
+            }
+        
         return {
-            "name": metadata.get('name', 'unknown'),
-            "description": metadata.get('description', ''),
+            "name": str(tool),
+            "description": "",
             "input_schema": {"type": "object", "properties": {}}
         }
     

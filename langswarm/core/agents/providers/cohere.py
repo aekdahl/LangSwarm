@@ -260,31 +260,42 @@ class CohereProvider(IAgentProvider):
         except Exception as e:
             raise RuntimeError(f"Failed to build tool definitions: {e}")
     
-    def _get_tool_mcp_schema(self, tool_info: Dict[str, Any]) -> Dict[str, Any]:
-        """Get standard MCP schema from V2 tool"""
-        tool_instance = tool_info.get('tool_instance')
-        if not tool_instance:
+    def _get_tool_mcp_schema(self, tool: Any) -> Dict[str, Any]:
+        """Get standard MCP schema from V2 tool (IToolInterface object)"""
+        if not tool:
             raise ValueError("Tool instance not found in registry")
         
         # Get MCP schema using standard MCP protocol
         try:
             # Use list_tools to get standard MCP format
-            if hasattr(tool_instance, 'list_tools'):
-                tools_list = tool_instance.list_tools()
+            if hasattr(tool, 'list_tools'):
+                tools_list = tool.list_tools()
                 if tools_list and len(tools_list) > 0:
                     # Return the first tool's schema (most tools have one main schema)
                     return tools_list[0]
             
-            # Fallback: construct from metadata
-            metadata = tool_info.get('metadata', {})
+            # Fallback: construct from tool metadata
+            if hasattr(tool, 'metadata'):
+                metadata = tool.metadata
+                return {
+                    "name": getattr(metadata, 'name', 'unknown'),
+                    "description": getattr(metadata, 'description', ''),
+                    "input_schema": getattr(metadata, 'input_schema', {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": True
+                    })
+                }
+            
+            # Last resort: basic schema
             return {
-                "name": metadata.get('name', tool_info.get('name', 'unknown')),
-                "description": metadata.get('description', ''),
-                "input_schema": metadata.get('input_schema', {
+                "name": str(tool),
+                "description": "",
+                "input_schema": {
                     "type": "object",
                     "properties": {},
                     "additionalProperties": True
-                })
+                }
             }
             
         except Exception as e:
