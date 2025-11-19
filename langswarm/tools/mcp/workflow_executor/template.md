@@ -1,74 +1,74 @@
-# Workflow Executor MCP Tool
+# Workflow Executor Tool
 
 ## Description
 
-Workflow automation and orchestration tool with natural language process management using standard MCP protocol.
+Workflow automation and orchestration tool with natural language process management for running business logic, pipelines, and automated procedures.
 
 ## Instructions
 
-🎯 **LangSwarm's Intelligent Intent Processing (Standard MCP)**
+This tool provides workflow execution with two calling approaches:
 
-This tool supports both intelligent intent-based calling and direct method execution using the standard MCP protocol with simplified syntax.
+### Intent-Based Calling (Smart Workflow Management)
 
-**Preferred: Intent-Based Calling (LangSwarm USP)**
-```json
-{
-  "method": "call_tool",
-  "params": {
-    "name": "workflow_executor",
-    "arguments": {
-      "intent": "Run the data processing pipeline for today's customer analytics",
-      "context": "daily batch processing, analytics workflow"
-    }
-  }
-}
-```
+Use **`workflow_executor`** with natural language intent for intelligent workflow operations:
 
-**Alternative: Direct Method Calling (Simplified)**
-```json
-{
-  "method": "call_tool",
-  "params": {
-    "name": "workflow_executor.execute_workflow",
-    "arguments": {"workflow_id": "data-processing-pipeline", "inputs": {"source": "database"}}
-  }
-}
-```
+**Parameters:**
+- `intent`: What workflow or process you want to run
+- `context`: Relevant details (data sources, schedules, conditions)
 
-**When to use:** Workflow automation, process orchestration, business logic execution, pipeline management
+**When to use:**
+- Running workflows by description: "Start the data processing pipeline"
+- Scheduled operations: "Run monthly report generation"
+- Conditional execution: "Process pending customer onboarding"
+- Complex orchestration: "Execute the backup and cleanup procedures"
 
-**Intent examples:**
-- "Start the monthly report generation workflow"
-- "Process all pending customer onboarding tasks"
-- "Run the backup and cleanup procedures for the weekend"
+**Examples:**
+- "Run data processing pipeline" → intent="execute the data processing pipeline for today's customer analytics", context="daily batch processing, analytics workflow"
+- "Start monthly reports" → intent="start the monthly report generation workflow", context="end of month, financial reports"
 
-**Available methods:** execute_workflow, schedule_workflow, monitor_execution, manage_pipelines, get_status
+### Direct Method Calling (Specific Workflows)
 
-### Standard MCP Protocol Methods
+**`workflow_executor.execute_workflow`** - Run a specific workflow
+- **Parameters:** workflow_id, inputs (dict), wait_for_completion (boolean)
+- **Use when:** Running known workflow with exact ID
 
-This tool supports standard MCP protocol for discovery and introspection:
+**`workflow_executor.schedule_workflow`** - Schedule future execution
+- **Parameters:** workflow_id, schedule_time, recurring (optional)
+- **Use when:** Setting up automated runs
 
-**Discovery Methods:**
-- `list_tools()` - Discover all available tools in the system
-- `call_tool(name, arguments)` - Execute with flattened name format or intent
-- `list_prompts()` - Find available agent prompts for workflows  
-- `list_resources()` - See available files (template.md, agents.yaml, etc.)
+**`workflow_executor.monitor_execution`** - Check workflow status
+- **Parameters:** execution_id
+- **Use when:** Tracking running workflows
 
-**Execution Methods:**
-- `call_tool(name, arguments)` - Supports both `tool.method` and intent formats
-- `get_prompt(name, arguments)` - Get formatted prompts with variables
-- `read_resource(uri)` - Access specific resource content
+**`workflow_executor.manage_pipelines`** - Pipeline operations
+- **Parameters:** action (start/stop/restart), pipeline_name
+- **Use when:** Managing data pipelines
 
-**Example Protocol Discovery:**
-```json
-{
-  "method": "list_tools",
-  "params": {}
-}
-```
+**`workflow_executor.get_status`** - Get execution details
+- **Parameters:** workflow_id or execution_id
+- **Use when:** Checking workflow health or results
 
-**Pro tip:** Use intent-based calls for intelligent processing, or flattened direct calls (`tool.method`) for precise control.
+### Decision Guide
+
+**Use intent-based** when:
+- User describes what needs to happen
+- Workflow selection needed
+- Complex conditions
+- Multi-step processes
+
+**Use direct methods** when:
+- Known workflow ID
+- Monitoring specific execution
+- Scheduled operations
+- Pipeline management
+
+### Safety Features
+
+- Workflows run in isolated environments
+- Automatic rollback on failure
+- Execution history and audit logs
+- Resource limits and timeouts
 
 ## Brief
 
-Workflow automation with intelligent intent processing via flattened MCP protocol.
+Workflow automation with intelligent intent processing for business process orchestration.

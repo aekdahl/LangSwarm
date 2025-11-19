@@ -1,74 +1,40 @@
-# Message Queue Consumer MCP Tool
+# Message Queue Consumer Tool
 
 ## Description
 
-Message queue consumer with natural language event processing using standard MCP protocol.
+Consume and process messages from message queues for event handling and asynchronous task processing.
 
 ## Instructions
 
-🎯 **LangSwarm's Intelligent Intent Processing (Standard MCP)**
+This tool provides message consumption with two calling approaches:
 
-This tool supports both intelligent intent-based calling and direct method execution using the standard MCP protocol with simplified syntax.
+### Intent-Based Calling (Smart Message Consumption)
 
-**Preferred: Intent-Based Calling (LangSwarm USP)**
-```json
-{
-  "method": "call_tool",
-  "params": {
-    "name": "message_queue_consumer",
-    "arguments": {
-      "intent": "Process all pending notification messages and send them to users",
-      "context": "notification system, message processing"
-    }
-  }
-}
-```
+Use **`message_queue_consumer`** with intent for intelligent message processing:
 
-**Alternative: Direct Method Calling (Simplified)**
-```json
-{
-  "method": "call_tool",
-  "params": {
-    "name": "message_queue_consumer.consume_messages",
-    "arguments": {"queue": "notifications", "batch_size": 10}
-  }
-}
-```
+**Parameters:**
+- `intent`: What messages you want to consume or check
+- `context`: Relevant details (queue name, filters, processing needs)
 
-**When to use:** Message processing, event handling, queue management, system integration
+**When to use:**
+- Checking for messages: "See if there are pending orders"
+- Processing events: "Handle all payment notifications"
+- Queue monitoring: "Show unprocessed messages in error queue"
 
-**Intent examples:**
-- "Handle all urgent alerts from the monitoring system"
-- "Process customer feedback messages from the support queue"
-- "Consume and route messages from the payment processing system"
+**Examples:**
+- "Check pending orders" → intent="check for pending order messages in the queue", context="order processing"
+- "Process notifications" → intent="consume and handle all pending notification messages", context="user notifications"
 
-**Available methods:** consume_messages, process_events, handle_queue, manage_subscriptions, get_metrics
+### Direct Method Calling
 
-### Standard MCP Protocol Methods
+**`message_queue_consumer.consume`** - Read messages from queue
+- **Parameters:** queue_name, max_messages, acknowledge (boolean)
+- **Use when:** Consuming from specific queue
 
-This tool supports standard MCP protocol for discovery and introspection:
-
-**Discovery Methods:**
-- `list_tools()` - Discover all available tools in the system
-- `call_tool(name, arguments)` - Execute with flattened name format or intent
-- `list_prompts()` - Find available agent prompts for workflows  
-- `list_resources()` - See available files (template.md, agents.yaml, etc.)
-
-**Execution Methods:**
-- `call_tool(name, arguments)` - Supports both `tool.method` and intent formats
-- `get_prompt(name, arguments)` - Get formatted prompts with variables
-- `read_resource(uri)` - Access specific resource content
-
-**Example Protocol Discovery:**
-```json
-{
-  "method": "list_tools",
-  "params": {}
-}
-```
-
-**Pro tip:** Use intent-based calls for intelligent processing, or flattened direct calls (`tool.method`) for precise control.
+**`message_queue_consumer.peek`** - View messages without consuming
+- **Parameters:** queue_name, count
+- **Use when:** Monitoring queue contents
 
 ## Brief
 
-Message queue consumer with intelligent intent processing via flattened MCP protocol.
+Message queue consumption for event handling and asynchronous processing.

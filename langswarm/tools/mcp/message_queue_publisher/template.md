@@ -1,74 +1,40 @@
-# Message Queue Publisher MCP Tool
+# Message Queue Publisher Tool
 
 ## Description
 
-Smart message publishing with natural language event specification using standard MCP protocol.
+Publish messages to message queues and event streams for asynchronous communication and event-driven architectures.
 
 ## Instructions
 
-🎯 **LangSwarm's Intelligent Intent Processing (Standard MCP)**
+This tool provides message publishing with two calling approaches:
 
-This tool supports both intelligent intent-based calling and direct method execution using the standard MCP protocol with simplified syntax.
+### Intent-Based Calling (Smart Message Publishing)
 
-**Preferred: Intent-Based Calling (LangSwarm USP)**
-```json
-{
-  "method": "call_tool",
-  "params": {
-    "name": "message_queue_publisher",
-    "arguments": {
-      "intent": "Send urgent notification to all admin users about system maintenance tonight",
-      "context": "system alerts, maintenance window, admin communication"
-    }
-  }
-}
-```
+Use **`message_queue_publisher`** with intent for intelligent message operations:
 
-**Alternative: Direct Method Calling (Simplified)**
-```json
-{
-  "method": "call_tool",
-  "params": {
-    "name": "message_queue_publisher.publish_message",
-    "arguments": {"queue": "admin-alerts", "message": "System maintenance scheduled", "priority": "urgent"}
-  }
-}
-```
+**Parameters:**
+- `intent`: What message or event you want to publish
+- `context`: Relevant details (queue/topic, priority, routing)
 
-**When to use:** Message publishing, event broadcasting, notification delivery, system communication
+**When to use:**
+- Publishing business events: "Send order confirmed notification"
+- Broadcasting updates: "Notify all services of config change"
+- Event sourcing: "Record customer registration event"
 
-**Intent examples:**
-- "Notify all users about the new feature release"
-- "Send payment confirmation to customer after successful transaction"
-- "Broadcast system status update to all monitoring dashboards"
+**Examples:**
+- "Send order confirmation" → intent="publish order confirmation event for order #12345", context="order processing, customer notifications"
+- "Broadcast system update" → intent="notify all services that maintenance will start", context="system-wide announcement"
 
-**Available methods:** publish_message, broadcast_event, send_notification, manage_topics, get_delivery_status
+### Direct Method Calling
 
-### Standard MCP Protocol Methods
+**`message_queue_publisher.publish`** - Send message to queue
+- **Parameters:** queue_name, message_body, priority (optional)
+- **Use when:** Publishing to specific known queue
 
-This tool supports standard MCP protocol for discovery and introspection:
-
-**Discovery Methods:**
-- `list_tools()` - Discover all available tools in the system
-- `call_tool(name, arguments)` - Execute with flattened name format or intent
-- `list_prompts()` - Find available agent prompts for workflows  
-- `list_resources()` - See available files (template.md, agents.yaml, etc.)
-
-**Execution Methods:**
-- `call_tool(name, arguments)` - Supports both `tool.method` and intent formats
-- `get_prompt(name, arguments)` - Get formatted prompts with variables
-- `read_resource(uri)` - Access specific resource content
-
-**Example Protocol Discovery:**
-```json
-{
-  "method": "list_tools",
-  "params": {}
-}
-```
-
-**Pro tip:** Use intent-based calls for intelligent processing, or flattened direct calls (`tool.method`) for precise control.
+**`message_queue_publisher.publish_event`** - Publish domain event
+- **Parameters:** event_type, event_data, routing_key
+- **Use when:** Event sourcing or domain events
 
 ## Brief
 
-Message publishing with intelligent intent processing via flattened MCP protocol.
+Message queue publishing for asynchronous communication and event-driven systems.

@@ -1,74 +1,74 @@
-# Tasklist MCP Tool
+# Tasklist Tool
 
 ## Description
 
-Smart task management with natural language task creation using standard MCP protocol.
+Smart task management with natural language task creation for project management, productivity tracking, and team coordination.
 
 ## Instructions
 
-🎯 **LangSwarm's Intelligent Intent Processing (Standard MCP)**
+This tool provides task management with two calling approaches:
 
-This tool supports both intelligent intent-based calling and direct method execution using the standard MCP protocol with simplified syntax.
+### Intent-Based Calling (Natural Task Management)
 
-**Preferred: Intent-Based Calling (LangSwarm USP)**
-```json
-{
-  "method": "call_tool",
-  "params": {
-    "name": "tasklist",
-    "arguments": {
-      "intent": "Add a high-priority task to review and update our security documentation by Friday",
-      "context": "security audit, compliance deadline"
-    }
-  }
-}
-```
+Use **`tasklist`** with natural language intent for intelligent task operations:
 
-**Alternative: Direct Method Calling (Simplified)**
-```json
-{
-  "method": "call_tool",
-  "params": {
-    "name": "tasklist.add_task",
-    "arguments": {"title": "Task name", "priority": "high"}
-  }
-}
-```
+**Parameters:**
+- `intent`: What task operation you want to perform
+- `context`: Relevant details (deadlines, priorities, team members)
 
-**When to use:** Project management, productivity tracking, deadline management, team coordination
+**When to use:**
+- Creating tasks from descriptions: "Add task to update security docs by Friday"
+- Finding tasks: "Show overdue tasks for development team"
+- Bulk operations: "Mark all testing tasks as completed"
+- Complex queries: "What's left to do before the release?"
 
-**Intent examples:**
-- "Show me overdue tasks for the development team"
-- "Create a checklist for onboarding new employees"
-- "Mark the API documentation task as completed"
+**Examples:**
+- "Add high-priority security review task" → intent="create task to review and update security documentation by Friday", context="security audit, compliance deadline, high priority"
+- "Show overdue tasks" → intent="list all overdue tasks for the development team", context="sprint review, task tracking"
 
-**Available methods:** add_task, update_task, list_tasks, complete_task, set_priorities
+### Direct Method Calling (Specific Operations)
 
-### Standard MCP Protocol Methods
+**`tasklist.add_task`** - Create a new task
+- **Parameters:** title, description (optional), priority, due_date (optional)
+- **Use when:** Adding a single well-defined task
 
-This tool supports standard MCP protocol for discovery and introspection:
+**`tasklist.update_task`** - Modify existing task
+- **Parameters:** task_id, updates (dict of fields to change)
+- **Use when:** Updating specific task with known ID
 
-**Discovery Methods:**
-- `list_tools()` - Discover all available tools in the system
-- `call_tool(name, arguments)` - Execute with flattened name format or intent
-- `list_prompts()` - Find available agent prompts for workflows  
-- `list_resources()` - See available files (template.md, agents.yaml, etc.)
+**`tasklist.list_tasks`** - Query tasks
+- **Parameters:** filters (status/priority/assignee), sort_by
+- **Use when:** Getting tasks with specific criteria
 
-**Execution Methods:**
-- `call_tool(name, arguments)` - Supports both `tool.method` and intent formats
-- `get_prompt(name, arguments)` - Get formatted prompts with variables
-- `read_resource(uri)` - Access specific resource content
+**`tasklist.complete_task`** - Mark task as done
+- **Parameters:** task_id, completion_notes (optional)
+- **Use when:** Marking specific task complete
 
-**Example Protocol Discovery:**
-```json
-{
-  "method": "list_tools",
-  "params": {}
-}
-```
+**`tasklist.set_priorities`** - Reorder task priorities
+- **Parameters:** task_ids (list), priority_order
+- **Use when:** Bulk priority adjustments
 
-**Pro tip:** Use intent-based calls for intelligent processing, or flattened direct calls (`tool.method`) for precise control.
+### Decision Guide
+
+**Use intent-based** when:
+- User describes tasks naturally
+- Creating from conversation
+- Complex filtering needed
+- Exploring what needs to be done
+
+**Use direct methods** when:
+- You have task IDs
+- Simple CRUD operations
+- Programmatic task management
+- Known exact parameters
+
+### Common Scenarios
+
+1. **Task creation from chat**: Intent-based
+2. **Mark specific task done**: complete_task with ID
+3. **Sprint planning**: Intent-based for filtering and analysis
+4. **Status updates**: update_task with known ID
 
 ## Brief
 
-Task management with intelligent intent processing via flattened MCP protocol.
+Task management with intelligent intent processing for productivity and project coordination.

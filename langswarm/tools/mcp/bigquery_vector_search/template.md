@@ -1,74 +1,69 @@
-# Bigquery Vector Search MCP Tool
+# BigQuery Vector Search Tool
 
 ## Description
 
-Advanced semantic search tool with natural language intent processing for knowledge base exploration.
+Advanced semantic search tool for exploring knowledge bases using AI-powered vector similarity. Searches through company documentation, policies, and content stored in BigQuery.
 
 ## Instructions
 
-🎯 **LangSwarm's Intelligent Intent Processing (Standard MCP)**
+This tool provides semantic search capabilities for your knowledge base with two calling approaches:
 
-This tool supports both intelligent intent-based calling and direct method execution using the standard MCP protocol with simplified syntax.
+### Direct Method Calling (Precise Control)
 
-**Preferred: Direct Method Calling (Simplified)**
-```json
-{
-  "method": "call_tool",
-  "params": {
-    "name": "bigquery_vector_search.similarity_search",
-    "arguments": {"query": "search terms", "limit": 5}
-  }
-}
-```
+Use **`bigquery_vector_search.similarity_search`** when you have specific search terms:
 
-**Alternative: Intent-Based Calling (LangSwarm USP)**
-```json
-{
-  "method": "call_tool",
-  "params": {
-    "name": "bigquery_vector_search",
-    "arguments": {
-      "intent": "Find information about our refund policy for enterprise customers",
-      "context": "customer support, policy documentation"
-    }
-  }
-}
-```
+**Parameters:**
+- `query` (required): The search terms or question
+- `limit` (optional): Number of results to return (default: 10)
+- `similarity_threshold` (optional): Minimum relevance score 0-1 (default: 0.3)
 
-**When to use:** Knowledge base search, document retrieval, policy lookup, information discovery
+**When to use:**
+- User asks with clear keywords: "Find refund policy"
+- Specific document lookups: "Show pricing documentation"
+- Direct factual queries: "What are our API rate limits?"
 
-**Intent examples:**
-- "What's our stance on data privacy?"
-- "Find documentation about API rate limits" 
-- "Show me onboarding procedures for new employees"
+**Examples:**
+- "Find documents about employee benefits" → query="employee benefits", limit=5
+- "Show me refund policies" → query="refund policy", limit=10
 
-**Available methods:** similarity_search, get_content, list_datasets, get_embedding
+### Intent-Based Calling (Smart Interpretation)
 
-### Standard MCP Protocol Methods
+Use **`bigquery_vector_search`** with natural language intent when the user's question is vague or exploratory:
 
-This tool supports standard MCP protocol for discovery and introspection:
+**Parameters:**
+- `query`: General search terms
+- `intent`: What the user is trying to find or understand
+- `context`: The domain or topic area
 
-**Discovery Methods:**
-- `list_tools()` - Discover all available tools in the system
-- `call_tool(name, arguments)` - Execute with flattened name format or intent
-- `list_prompts()` - Find available agent prompts for workflows  
-- `list_resources()` - See available files (template.md, agents.yaml, etc.)
+**When to use:**
+- Vague questions: "What does Jacy'z offer?"
+- Exploratory queries: "Tell me about our company policies"
+- Contextual searches: "How do we handle customer complaints?"
 
-**Execution Methods:**
-- `call_tool(name, arguments)` - Supports both `tool.method` and intent formats
-- `get_prompt(name, arguments)` - Get formatted prompts with variables
-- `read_resource(uri)` - Access specific resource content
+**Examples:**
+- "What's our stance on data privacy?" → intent="understand company data privacy policy", context="compliance, customer data"
+- "Tell me about Jacy'z" → intent="get general company information", context="company overview"
 
-**Example Protocol Discovery:**
-```json
-{
-  "method": "list_tools",
-  "params": {}
-}
-```
+### Other Available Methods
 
-**Pro tip:** Use intent-based calls for intelligent processing, or flattened direct calls (`tool.method`) for precise control.
+**`bigquery_vector_search.get_content`** - Retrieve specific document by ID
+- Use when: You know the exact document ID from a previous search
+
+**`bigquery_vector_search.list_datasets`** - Show available knowledge base datasets
+- Use when: User asks "what can you search?" or "what information do you have?"
+
+**`bigquery_vector_search.get_embedding`** - Get vector embedding for text
+- Use when: Technical operations requiring embeddings (rare in normal use)
+
+### Decision Guide
+
+Choose your approach based on the user's question:
+
+**Direct calling** = User knows what they want  
+**Intent-based** = User is exploring or asking vaguely
+
+When in doubt, start with intent-based calling for better user experience.
 
 ## Brief
 
-Semantic search with intelligent intent processing using flattened MCP protocol.
+Semantic search with intelligent intent processing for knowledge base exploration.

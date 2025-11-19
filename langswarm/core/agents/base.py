@@ -621,6 +621,10 @@ class BaseAgent(AutoInstrumentedMixin):
                             parameters=tool_args,
                             context=None
                         )
+                    elif hasattr(tool, 'run'):
+                        # MCP tools with run() method (including MCPToolAdapter wrapped tools)
+                        self._logger.info(f"Calling MCP tool.run() with parameters: {list(tool_args.keys())}")
+                        result = await tool.run(tool_args)
                     elif hasattr(tool, 'call_tool'):
                         # MCP standard call_tool method
                         result = await tool.call_tool(tool_name, tool_args)

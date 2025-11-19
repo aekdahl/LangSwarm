@@ -1,74 +1,75 @@
-# Mcpgithubtool MCP Tool
+# GitHub Integration Tool
 
 ## Description
 
-Intelligent GitHub integration with natural language repository management using standard MCP protocol.
+Intelligent GitHub integration for repository management, issue tracking, pull requests, and code collaboration with natural language intent processing.
 
 ## Instructions
 
-🎯 **LangSwarm's Intelligent Intent Processing (Standard MCP)**
+This tool provides comprehensive GitHub operations with two calling approaches:
 
-This tool supports both intelligent intent-based calling and direct method execution using the standard MCP protocol with simplified syntax.
+### Intent-Based Calling (Recommended for Complex Operations)
 
-**Preferred: Intent-Based Calling (LangSwarm USP)**
-```json
-{
-  "method": "call_tool",
-  "params": {
-    "name": "mcpgithubtool",
-    "arguments": {
-      "intent": "Create a bug report issue for the login problem with authentication errors",
-      "context": "user reports, authentication system, priority bug"
-    }
-  }
-}
-```
+Use **`mcpgithubtool`** with natural language intent for complex or multi-step GitHub operations:
 
-**Alternative: Direct Method Calling (Simplified)**
-```json
-{
-  "method": "call_tool",
-  "params": {
-    "name": "mcpgithubtool.create_issue",
-    "arguments": {"title": "Login authentication error", "body": "Users unable to login", "labels": ["bug", "priority"]}
-  }
-}
-```
+**Parameters:**
+- `intent`: What you want to accomplish on GitHub
+- `context`: Relevant details (repo, labels, priorities, etc.)
 
-**When to use:** GitHub repository management, issue tracking, pull request automation, code collaboration
+**When to use:**
+- Complex multi-step tasks: "Review and merge all approved PRs"
+- Report generation: "Summarize all bugs closed this sprint"
+- Intelligent automation: "Create release notes from recent commits"
+- Contextual operations: "Handle the urgent production issue"
 
-**Intent examples:**
-- "Review and merge all approved pull requests for the release"
-- "Create a milestone for the next sprint with all planned features"
-- "Generate a release summary from all closed issues this month"
+**Examples:**
+- "Create a bug report for login issues" → intent="create bug issue for login authentication errors", context="authentication system, high priority"
+- "Merge ready pull requests" → intent="merge all approved pull requests", context="release branch, passing tests"
 
-**Available methods:** create_issue, manage_pr, handle_repository, track_milestones, generate_reports
+### Direct Method Calling (For Specific Operations)
 
-### Standard MCP Protocol Methods
+Use specific methods when you know exactly what to do:
 
-This tool supports standard MCP protocol for discovery and introspection:
+**`mcpgithubtool.create_issue`** - Create a new GitHub issue
+- **Parameters:** title, body, labels (array), assignees (optional)
+- **Use when:** Creating a single, well-defined issue
 
-**Discovery Methods:**
-- `list_tools()` - Discover all available tools in the system
-- `call_tool(name, arguments)` - Execute with flattened name format or intent
-- `list_prompts()` - Find available agent prompts for workflows  
-- `list_resources()` - See available files (template.md, agents.yaml, etc.)
+**`mcpgithubtool.manage_pr`** - Manage pull requests
+- **Parameters:** action (create/merge/review), pr_number, comments
+- **Use when:** Specific PR operations with known PR numbers
 
-**Execution Methods:**
-- `call_tool(name, arguments)` - Supports both `tool.method` and intent formats
-- `get_prompt(name, arguments)` - Get formatted prompts with variables
-- `read_resource(uri)` - Access specific resource content
+**`mcpgithubtool.handle_repository`** - Repository operations
+- **Parameters:** repo_name, action (create/update/archive)
+- **Use when:** Managing repository settings or structure
 
-**Example Protocol Discovery:**
-```json
-{
-  "method": "list_tools",
-  "params": {}
-}
-```
+**`mcpgithubtool.track_milestones`** - Milestone management
+- **Parameters:** milestone_name, due_date, issues_list
+- **Use when:** Creating or updating project milestones
 
-**Pro tip:** Use intent-based calls for intelligent processing, or flattened direct calls (`tool.method`) for precise control.
+**`mcpgithubtool.generate_reports`** - Generate activity reports
+- **Parameters:** report_type, date_range, filters
+- **Use when:** Extracting metrics or generating summaries
+
+### Decision Guide
+
+**Use intent-based** when:
+- User request is vague or exploratory
+- Operation requires interpretation
+- Multiple steps might be needed
+- Context matters more than exact parameters
+
+**Use direct methods** when:
+- User provides specific details (exact issue title, PR number)
+- Single, atomic operation
+- You have all required parameters
+
+### Common Scenarios
+
+1. **Bug reporting**: Intent-based → interprets severity, assigns labels
+2. **PR management**: Direct method → you have PR number
+3. **Release planning**: Intent-based → analyzes what needs to be done
+4. **Specific issue creation**: Direct method → you have exact title/body
 
 ## Brief
 
-GitHub integration with intelligent intent processing via flattened MCP protocol.
+GitHub integration with intelligent intent processing for repository management and automation.

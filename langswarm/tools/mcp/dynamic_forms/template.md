@@ -1,74 +1,81 @@
-# Dynamic Forms MCP Tool
+# Dynamic Forms Tool
 
 ## Description
 
-Intelligent form generation with natural language specification using standard MCP protocol.
+Intelligent form generation with natural language specification for creating user input interfaces, surveys, and data collection forms.
 
 ## Instructions
 
-🎯 **LangSwarm's Intelligent Intent Processing (Standard MCP)**
+This tool provides form creation with two calling approaches:
 
-This tool supports both intelligent intent-based calling and direct method execution using the standard MCP protocol with simplified syntax.
+### Intent-Based Calling (Smart Form Generation)
 
-**Preferred: Intent-Based Calling (LangSwarm USP)**
-```json
-{
-  "method": "call_tool",
-  "params": {
-    "name": "dynamic_forms",
-    "arguments": {
-      "intent": "Create a customer feedback form for our mobile app with rating and comments",
-      "context": "user experience, app improvement"
-    }
-  }
-}
-```
+Use **`dynamic_forms`** with natural language intent to generate forms from descriptions:
 
-**Alternative: Direct Method Calling (Simplified)**
-```json
-{
-  "method": "call_tool",
-  "params": {
-    "name": "dynamic_forms.create_form",
-    "arguments": {"fields": [{"name": "rating", "type": "number"}]}
-  }
-}
-```
+**Parameters:**
+- `intent`: What kind of form you need
+- `context`: Relevant details (use case, required fields, validation rules)
 
-**When to use:** User input collection, surveys, registration forms, data gathering interfaces
+**When to use:**
+- Creating forms from description: "Build a customer feedback form"
+- Complex forms: "Multi-step registration with validation"
+- Survey generation: "Employee satisfaction survey"
+- Rapid prototyping: "Simple contact form"
 
-**Intent examples:**
-- "Build a sign-up form for enterprise customers"
-- "Create a bug report form with file upload"
-- "Make a simple contact form with validation"
+**Examples:**
+- "Create customer feedback form" → intent="create a customer feedback form for our mobile app with rating and comments", context="user experience, app improvement"
+- "Build signup form" → intent="create enterprise customer sign-up form with company details", context="B2B registration, validation required"
 
-**Available methods:** create_form, validate_form, process_submission, generate_fields
+### Direct Method Calling (Specific Form Operations)
 
-### Standard MCP Protocol Methods
+**`dynamic_forms.create_form`** - Generate form structure
+- **Parameters:** fields (array of field definitions), validation_rules
+- **Use when:** You have exact field specifications
 
-This tool supports standard MCP protocol for discovery and introspection:
+**`dynamic_forms.validate_form`** - Validate form data
+- **Parameters:** form_id, data (submitted values)
+- **Use when:** Processing form submissions
 
-**Discovery Methods:**
-- `list_tools()` - Discover all available tools in the system
-- `call_tool(name, arguments)` - Execute with flattened name format or intent
-- `list_prompts()` - Find available agent prompts for workflows  
-- `list_resources()` - See available files (template.md, agents.yaml, etc.)
+**`dynamic_forms.process_submission`** - Handle form submission
+- **Parameters:** form_id, submission_data, actions (what to do with data)
+- **Use when:** Processing completed forms
 
-**Execution Methods:**
-- `call_tool(name, arguments)` - Supports both `tool.method` and intent formats
-- `get_prompt(name, arguments)` - Get formatted prompts with variables
-- `read_resource(uri)` - Access specific resource content
+**`dynamic_forms.generate_fields`** - Create field definitions
+- **Parameters:** field_types (list), requirements
+- **Use when:** Building forms programmatically
 
-**Example Protocol Discovery:**
-```json
-{
-  "method": "list_tools",
-  "params": {}
-}
-```
+### Decision Guide
 
-**Pro tip:** Use intent-based calls for intelligent processing, or flattened direct calls (`tool.method`) for precise control.
+**Use intent-based** when:
+- User describes form requirements
+- Quick form generation needed
+- Complex validation logic
+- Form type familiar (signup, feedback, contact)
+
+**Use direct methods** when:
+- Exact field specifications available
+- Processing existing forms
+- Validating submissions
+- Programmatic form building
+
+### Supported Field Types
+
+- Text inputs (short/long)
+- Number inputs (integers/decimals)
+- Email and URL validation
+- Date and time pickers
+- Dropdowns and checkboxes
+- File uploads
+- Multi-select options
+- Rating scales
+
+### Common Use Cases
+
+1. **User feedback**: Intent-based → generates rating, comments, satisfaction
+2. **Registration forms**: Intent-based → creates appropriate fields
+3. **Data validation**: validate_form with submission data
+4. **Custom forms**: create_form with exact field specs
 
 ## Brief
 
-Dynamic form generation with intelligent intent processing via flattened MCP protocol.
+Dynamic form generation with intelligent intent processing for user input and data collection.

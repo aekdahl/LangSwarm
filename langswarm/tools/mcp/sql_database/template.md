@@ -1,74 +1,77 @@
-# Sql Database MCP Tool
+# SQL Database Tool
 
 ## Description
 
-Intelligent SQL interface with natural language query understanding using standard MCP protocol.
+Intelligent SQL interface with natural language query understanding for data analysis, reporting, and business intelligence.
 
 ## Instructions
 
-🎯 **LangSwarm's Intelligent Intent Processing (Standard MCP)**
+This tool provides SQL database operations with two calling approaches:
 
-This tool supports both intelligent intent-based calling and direct method execution using the standard MCP protocol with simplified syntax.
+### Intent-Based Calling (Natural Language Queries)
 
-**Preferred: Intent-Based Calling (LangSwarm USP)**
-```json
-{
-  "method": "call_tool",
-  "params": {
-    "name": "sql_database",
-    "arguments": {
-      "intent": "Show me customers from Stockholm who signed up in the last quarter",
-      "context": "customer analysis, geographic segmentation"
-    }
-  }
-}
-```
+Use **`sql_database`** with natural language intent to translate business questions into SQL:
 
-**Alternative: Direct Method Calling (Simplified)**
-```json
-{
-  "method": "call_tool",
-  "params": {
-    "name": "sql_database.execute_query",
-    "arguments": {"query": "SELECT * FROM table WHERE condition"}
-  }
-}
-```
+**Parameters:**
+- `intent`: The business question or data need
+- `context`: Relevant details (tables, metrics, time periods)
 
-**When to use:** Data analysis, reporting, customer insights, business intelligence queries
+**When to use:**
+- Business questions: "Show top customers by revenue"
+- Analytics queries: "Compare sales month over month"
+- Exploratory analysis: "Find inactive users"
+- Complex aggregations: "Revenue breakdown by product category and region"
 
-**Intent examples:**
-- "Find our top performing products this month"
-- "Show users who haven't logged in recently"
-- "Get revenue breakdown by region"
+**Examples:**
+- "Show customers from Stockholm in last quarter" → intent="get customers from Stockholm who signed up in last 90 days", context="customer analysis, geographic segmentation"
+- "Find top products this month" → intent="show best selling products this month", context="sales analysis, product performance"
 
-**Available methods:** execute_query, list_tables, describe_table, analyze_data
+### Direct Method Calling (SQL Queries)
 
-### Standard MCP Protocol Methods
+**`sql_database.execute_query`** - Execute SQL query
+- **Parameters:** query (SQL string), params (optional bind parameters)
+- **Use when:** You have the exact SQL query to run
 
-This tool supports standard MCP protocol for discovery and introspection:
+**`sql_database.list_tables`** - Show available tables
+- **Parameters:** schema (optional)
+- **Use when:** Discovering database structure
 
-**Discovery Methods:**
-- `list_tools()` - Discover all available tools in the system
-- `call_tool(name, arguments)` - Execute with flattened name format or intent
-- `list_prompts()` - Find available agent prompts for workflows  
-- `list_resources()` - See available files (template.md, agents.yaml, etc.)
+**`sql_database.describe_table`** - Get table schema
+- **Parameters:** table_name
+- **Use when:** Understanding table columns and types
 
-**Execution Methods:**
-- `call_tool(name, arguments)` - Supports both `tool.method` and intent formats
-- `get_prompt(name, arguments)` - Get formatted prompts with variables
-- `read_resource(uri)` - Access specific resource content
+**`sql_database.analyze_data`** - Run data analysis
+- **Parameters:** table_name, analysis_type (summary/trends/distribution)
+- **Use when:** Getting statistical summaries
 
-**Example Protocol Discovery:**
-```json
-{
-  "method": "list_tools",
-  "params": {}
-}
-```
+### Decision Guide
 
-**Pro tip:** Use intent-based calls for intelligent processing, or flattened direct calls (`tool.method`) for precise control.
+**Use intent-based** when:
+- User asks in business terms
+- Query requires interpretation
+- Complex joins or aggregations needed
+- Time-based or comparative analysis
+
+**Use direct methods** when:
+- You have the exact SQL
+- Simple table operations
+- Schema exploration
+- Known query patterns
+
+### Safety Features
+
+- Automatic SQL injection prevention
+- Read-only mode by default
+- Query timeout limits
+- Result size caps
+
+### Common Patterns
+
+1. **Customer analysis**: "customers who..." → Intent-based
+2. **Simple lookups**: "SELECT * FROM users WHERE id=123" → Direct execute_query
+3. **Schema exploration**: "what tables exist?" → list_tables
+4. **Revenue reporting**: "revenue by region" → Intent-based
 
 ## Brief
 
-SQL database interface with intelligent natural language query processing via flattened MCP.
+SQL database interface with intelligent natural language query processing for business intelligence.

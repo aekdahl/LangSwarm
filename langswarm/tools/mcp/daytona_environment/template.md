@@ -1,74 +1,48 @@
-# Daytona Environment MCP Tool
+# Daytona Environment Tool
 
 ## Description
 
-Intelligent development environment management with natural language workspace configuration using standard MCP protocol.
+Daytona development environment management for creating, configuring, and managing cloud development environments.
 
 ## Instructions
 
-🎯 **LangSwarm's Intelligent Intent Processing (Standard MCP)**
+This tool provides Daytona operations with two calling approaches:
 
-This tool supports both intelligent intent-based calling and direct method execution using the standard MCP protocol with simplified syntax.
+### Intent-Based Calling (Smart Environment Management)
 
-**Preferred: Intent-Based Calling (LangSwarm USP)**
-```json
-{
-  "method": "call_tool",
-  "params": {
-    "name": "daytona_environment",
-    "arguments": {
-      "intent": "Set up a Python development environment for a machine learning project with GPU support",
-      "context": "data science, model training, cloud resources"
-    }
-  }
-}
-```
+Use **`daytona_environment`** with intent for intelligent environment operations:
 
-**Alternative: Direct Method Calling (Simplified)**
-```json
-{
-  "method": "call_tool",
-  "params": {
-    "name": "daytona_environment.create_workspace",
-    "arguments": {"name": "ml-project", "template": "python-gpu", "resources": {"gpu": true}}
-  }
-}
-```
+**Parameters:**
+- `intent`: What environment operation you need
+- `context`: Relevant details (project, configuration, resources)
 
-**When to use:** Development environment setup, workspace management, resource provisioning, team collaboration
+**When to use:**
+- Creating environments: "Set up a Python development environment"
+- Managing instances: "Start my Node.js workspace"
+- Configuration: "Configure environment for React development"
 
-**Intent examples:**
-- "Create a Node.js environment for our React frontend team"
-- "Set up a secure workspace for the security audit project"
-- "Provision a high-memory environment for data processing"
+**Examples:**
+- "Create Python dev environment" → intent="create a Python development environment with Django", context="web development, database needed"
+- "Start workspace" → intent="start my existing Node.js development workspace", context="project xyz, continue work"
 
-**Available methods:** create_workspace, manage_resources, configure_environment, share_workspace, monitor_usage
+### Direct Method Calling
 
-### Standard MCP Protocol Methods
+**`daytona_environment.create`** - Create new environment
+- **Parameters:** template, name, resources
+- **Use when:** Creating with specific configuration
 
-This tool supports standard MCP protocol for discovery and introspection:
+**`daytona_environment.start`** - Start environment
+- **Parameters:** environment_id
+- **Use when:** Starting known environment
 
-**Discovery Methods:**
-- `list_tools()` - Discover all available tools in the system
-- `call_tool(name, arguments)` - Execute with flattened name format or intent
-- `list_prompts()` - Find available agent prompts for workflows  
-- `list_resources()` - See available files (template.md, agents.yaml, etc.)
+**`daytona_environment.stop`** - Stop environment
+- **Parameters:** environment_id
+- **Use when:** Stopping specific environment
 
-**Execution Methods:**
-- `call_tool(name, arguments)` - Supports both `tool.method` and intent formats
-- `get_prompt(name, arguments)` - Get formatted prompts with variables
-- `read_resource(uri)` - Access specific resource content
-
-**Example Protocol Discovery:**
-```json
-{
-  "method": "list_tools",
-  "params": {}
-}
-```
-
-**Pro tip:** Use intent-based calls for intelligent processing, or flattened direct calls (`tool.method`) for precise control.
+**`daytona_environment.configure`** - Update configuration
+- **Parameters:** environment_id, config_updates
+- **Use when:** Modifying environment settings
 
 ## Brief
 
-Development environment management with intelligent intent processing via flattened MCP protocol.
+Daytona development environment management for cloud-based coding workspaces.

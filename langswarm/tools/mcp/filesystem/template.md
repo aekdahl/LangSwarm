@@ -1,74 +1,72 @@
-# Filesystem MCP Tool
+# Filesystem Tool
 
 ## Description
 
-Smart file system operations with natural language intent understanding using standard MCP protocol.
+Smart file system operations with natural language intent understanding for reading, writing, searching, and managing files and directories.
 
 ## Instructions
 
-🎯 **LangSwarm's Intelligent Intent Processing (Standard MCP)**
+This tool provides file system operations with two calling approaches:
 
-This tool supports both intelligent intent-based calling and direct method execution using the standard MCP protocol with simplified syntax.
+### Intent-Based Calling (Smart File Operations)
 
-**Preferred: Intent-Based Calling (LangSwarm USP)**
-```json
-{
-  "method": "call_tool",
-  "params": {
-    "name": "filesystem",
-    "arguments": {
-      "intent": "Find all Python files in the project that were modified today",
-      "context": "code review, recent changes"
-    }
-  }
-}
-```
+Use **`filesystem`** with natural language intent for exploratory or complex file operations:
 
-**Alternative: Direct Method Calling (Simplified)**
-```json
-{
-  "method": "call_tool",
-  "params": {
-    "name": "filesystem.list_directory",
-    "arguments": {"path": "/project", "pattern": "*.py"}
-  }
-}
-```
+**Parameters:**
+- `intent`: What file operation you want to perform
+- `context`: Relevant details (file types, time ranges, purposes)
 
-**When to use:** File management, code exploration, content search, directory operations
+**When to use:**
+- Finding files: "Show me recent log files"
+- Searching content: "Find config files that mention API keys"
+- Exploring structure: "What Python files changed today?"
+- Complex operations: "Clean up temporary files older than 7 days"
 
-**Intent examples:**
-- "Show me the latest log files from the server"
-- "Find configuration files that need updating"
-- "List all documents created this week"
+**Examples:**
+- "Find all Python files modified today" → intent="list Python files modified today", context="code review, recent changes"
+- "Show latest server logs" → intent="get most recent log files", context="debugging, server logs directory"
 
-**Available methods:** read_file, write_file, list_directory, search_files, manage_permissions
+### Direct Method Calling (Specific Operations)
 
-### Standard MCP Protocol Methods
+**`filesystem.read_file`** - Read file contents
+- **Parameters:** path (required), encoding (optional)
+- **Use when:** Reading a specific known file
 
-This tool supports standard MCP protocol for discovery and introspection:
+**`filesystem.write_file`** - Write or update file
+- **Parameters:** path, content, mode (write/append)
+- **Use when:** Creating or modifying a specific file
 
-**Discovery Methods:**
-- `list_tools()` - Discover all available tools in the system
-- `call_tool(name, arguments)` - Execute with flattened name format or intent
-- `list_prompts()` - Find available agent prompts for workflows  
-- `list_resources()` - See available files (template.md, agents.yaml, etc.)
+**`filesystem.list_directory`** - List directory contents
+- **Parameters:** path, pattern (optional), recursive (optional)
+- **Use when:** Listing files in a known directory
 
-**Execution Methods:**
-- `call_tool(name, arguments)` - Supports both `tool.method` and intent formats
-- `get_prompt(name, arguments)` - Get formatted prompts with variables
-- `read_resource(uri)` - Access specific resource content
+**`filesystem.search_files`** - Search for files
+- **Parameters:** pattern, directory, content_search (optional)
+- **Use when:** Finding files matching specific criteria
 
-**Example Protocol Discovery:**
-```json
-{
-  "method": "list_tools",
-  "params": {}
-}
-```
+**`filesystem.manage_permissions`** - File permission operations
+- **Parameters:** path, permissions, recursive (optional)
+- **Use when:** Changing file access rights
 
-**Pro tip:** Use intent-based calls for intelligent processing, or flattened direct calls (`tool.method`) for precise control.
+### Decision Guide
+
+**Use intent-based** when:
+- User asks vaguely: "show me logs"
+- Need to interpret: "find config files"
+- Multiple steps: "find and read error logs"
+- Time-based: "recent files", "modified today"
+
+**Use direct methods** when:
+- Exact path known: `/var/log/app.log`
+- Single specific operation: read this file
+- Programmatic use: iterating over known paths
+
+### Safety Notes
+
+- Tool respects file system permissions
+- Write operations require explicit confirmation
+- Sensitive paths may be restricted
 
 ## Brief
 
-File system operations with intelligent intent processing via flattened MCP protocol.
+File system operations with intelligent intent processing for file management and content search.

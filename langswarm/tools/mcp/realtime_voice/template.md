@@ -1,74 +1,44 @@
-# Realtime Voice MCP Tool
+# Realtime Voice Tool
 
 ## Description
 
-Real-time voice processing tool with natural language intent understanding using standard MCP protocol.
+Real-time voice interaction capabilities for voice-enabled applications, transcription, and speech synthesis.
 
 ## Instructions
 
-🎯 **LangSwarm's Intelligent Intent Processing (Standard MCP)**
+This tool provides voice operations with two calling approaches:
 
-This tool supports both intelligent intent-based calling and direct method execution using the standard MCP protocol with simplified syntax.
+### Intent-Based Calling (Smart Voice Operations)
 
-**Preferred: Intent-Based Calling (LangSwarm USP)**
-```json
-{
-  "method": "call_tool",
-  "params": {
-    "name": "realtime_voice",
-    "arguments": {
-      "intent": "Convert this audio message to text and respond with a friendly voice",
-      "context": "customer service, voice interaction"
-    }
-  }
-}
-```
+Use **`realtime_voice`** with intent for intelligent voice handling:
 
-**Alternative: Direct Method Calling (Simplified)**
-```json
-{
-  "method": "call_tool",
-  "params": {
-    "name": "realtime_voice.process_speech",
-    "arguments": {"audio_data": "base64_encoded_audio", "language": "en-US"}
-  }
-}
-```
+**Parameters:**
+- `intent`: What voice operation you need
+- `context`: Relevant details (language, voice type, use case)
 
-**When to use:** Speech-to-text conversion, voice responses, voice-based user interactions
+**When to use:**
+- Voice responses: "Read this message aloud"
+- Transcription needs: "Convert the recording to text"
+- Voice interaction: "Start voice conversation mode"
 
-**Intent examples:**
-- "Listen to this customer voicemail and summarize it"
-- "Generate a voice response for this support ticket"
-- "Convert this meeting audio to searchable text"
+**Examples:**
+- "Read message aloud" → intent="convert this message to speech and play it", context="user notification, clear voice"
+- "Transcribe recording" → intent="convert voice recording to text", context="meeting notes"
 
-**Available methods:** process_speech, text_to_speech, get_supported_languages, configure_voice
+### Direct Method Calling
 
-### Standard MCP Protocol Methods
+**`realtime_voice.synthesize`** - Text to speech
+- **Parameters:** text, voice_type, language
+- **Use when:** Converting specific text to audio
 
-This tool supports standard MCP protocol for discovery and introspection:
+**`realtime_voice.transcribe`** - Speech to text
+- **Parameters:** audio_source, language
+- **Use when:** Converting audio to text
 
-**Discovery Methods:**
-- `list_tools()` - Discover all available tools in the system
-- `call_tool(name, arguments)` - Execute with flattened name format or intent
-- `list_prompts()` - Find available agent prompts for workflows  
-- `list_resources()` - See available files (template.md, agents.yaml, etc.)
-
-**Execution Methods:**
-- `call_tool(name, arguments)` - Supports both `tool.method` and intent formats
-- `get_prompt(name, arguments)` - Get formatted prompts with variables
-- `read_resource(uri)` - Access specific resource content
-
-**Example Protocol Discovery:**
-```json
-{
-  "method": "list_tools",
-  "params": {}
-}
-```
-
-**Pro tip:** Use intent-based calls for intelligent processing, or flattened direct calls (`tool.method`) for precise control.
+**`realtime_voice.start_conversation`** - Interactive voice session
+- **Parameters:** mode, language, context
+- **Use when:** Starting voice interaction session
 
 ## Brief
 
-Real-time voice processing with intelligent intent processing via flattened MCP protocol.
+Real-time voice interaction for speech synthesis, transcription, and voice-enabled applications.
