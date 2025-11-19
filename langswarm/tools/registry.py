@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 class ToolRegistry(IToolRegistry):
     """
-    Modern tool registry with auto-discovery and service management.
+    Modern tool registry with auto-discovery and service management (Singleton).
     
     Provides:
     - Tool registration and management
@@ -39,9 +39,25 @@ class ToolRegistry(IToolRegistry):
     - Filtering and search capabilities
     - Schema generation for LLM consumption
     - Health monitoring and statistics
+    
+    Note: This is a singleton to ensure all parts of the application share the same registry.
     """
     
+    _instance = None
+    _initialized = False
+    
+    def __new__(cls, name: str = "default"):
+        """Singleton pattern - always return the same instance"""
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+    
     def __init__(self, name: str = "default"):
+        """Initialize only once, even if called multiple times"""
+        # Skip initialization if already done
+        if self._initialized:
+            return
+            
         self.name = name
         self._tools: Dict[str, IToolInterface] = {}
         self._tool_types: Dict[ToolType, Set[str]] = {tool_type: set() for tool_type in ToolType}
@@ -53,6 +69,9 @@ class ToolRegistry(IToolRegistry):
         self._registration_count = 0
         self._successful_registrations = 0
         self._failed_registrations = 0
+        
+        # Mark as initialized
+        self._initialized = True
     
     def register(self, tool: IToolInterface) -> bool:
         """Register a tool"""
@@ -304,8 +323,9 @@ class ToolRegistry(IToolRegistry):
     def auto_populate_with_mcp_tools(self, mcp_tools_directory: str = None) -> int:
         """Auto-populate registry with adapted MCP tools"""
         if mcp_tools_directory is None:
-            # Default to V2 MCP tools directory
-            mcp_tools_directory = "langswarm/tools/mcp"
+            # Use package-relative path that works in both dev and production
+            import langswarm.tools.mcp
+            mcp_tools_directory = str(Path(langswarm.tools.mcp.__file__).parent)
         
         try:
             adapted_tools = auto_adapt_mcp_tools(mcp_tools_directory)
