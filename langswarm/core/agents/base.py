@@ -141,7 +141,22 @@ class AgentConfiguration:
 
 @dataclass
 class AgentResponse:
-    """Concrete implementation of agent response"""
+    """
+    Concrete implementation of agent response.
+    
+    IMPORTANT: response.content and response.message.content are ALWAYS kept in sync.
+    Users can access either one and get the same value:
+    
+    ```python
+    result = await agent.chat("Hello")
+    
+    # Both access methods return the same content:
+    print(result.content)          # "Hi there!"
+    print(result.message.content)  # "Hi there!"
+    ```
+    
+    The __post_init__ validator ensures consistency is maintained.
+    """
     
     content: str
     message: AgentMessage
@@ -151,6 +166,18 @@ class AgentResponse:
     error: Optional[Exception] = None
     response_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: datetime = field(default_factory=datetime.now)
+    
+    def __post_init__(self):
+        """Ensure response.content and response.message.content are always in sync"""
+        if self.message and self.message.content != self.content:
+            # Log warning but auto-correct to maintain consistency
+            logger.warning(
+                f"AgentResponse content mismatch detected and auto-corrected: "
+                f"response.content='{self.content[:50]}...' != "
+                f"response.message.content='{self.message.content[:50]}...'"
+            )
+            # Use message.content as source of truth
+            object.__setattr__(self, 'content', self.message.content)
     
     @classmethod
     def success_response(
@@ -165,8 +192,13 @@ class AgentResponse:
         # Use provided message or create a new one
         if message is None:
             message = AgentMessage(role=role, content=content)
+        
+        # CRITICAL: Ensure response.content and response.message.content are ALWAYS in sync
+        # Use message.content as the source of truth if a message is provided
+        final_content = message.content if message else content
+        
         return cls(
-            content=content,
+            content=final_content,
             message=message,
             usage=usage,
             metadata=metadata,
@@ -509,6 +541,129 @@ class BaseAgent(AutoInstrumentedMixin):
         """List all session IDs"""
         return list(self._sessions.keys())
     
+    async def _handle_tool_calls(
+        self,
+        response: IAgentResponse,
+        session: IAgentSession
+    ) -> IAgentResponse:
+        """
+        Handle tool calls in the response by executing them and getting final response.
+        
+        This implements the automatic tool execution loop:
+        1. Add assistant message with tool calls to session
+        2. Execute each tool and create tool result messages
+        3. Send tool results back to LLM
+        4. Return final text response
+        """
+        try:
+            # Add the assistant's message with tool calls to session
+            await session.add_message(response.message)
+            
+            # Get tool registry
+            from langswarm.tools.registry import ToolRegistry
+            registry = ToolRegistry()
+            
+            # Execute each tool call
+            tool_results = []
+            for tool_call in response.message.tool_calls:
+                try:
+                    # Extract tool information
+                    if hasattr(tool_call, 'function'):
+                        # OpenAI format
+                        tool_name = tool_call.function.name
+                        tool_args = json.loads(tool_call.function.arguments)
+                        tool_call_id = tool_call.id
+                    elif isinstance(tool_call, dict):
+                        # Dictionary format
+                        tool_name = tool_call.get('name') or tool_call.get('function', {}).get('name')
+                        args_str = tool_call.get('arguments') or tool_call.get('function', {}).get('arguments', '{}')
+                        tool_args = json.loads(args_str) if isinstance(args_str, str) else args_str
+                        tool_call_id = tool_call.get('id', f"call_{int(time.time())}")
+                    else:
+                        self._logger.error(f"Unknown tool_call format: {type(tool_call)}")
+                        continue
+                    
+                    self._logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
+                    
+                    # Get tool from registry
+                    tool = registry.get_tool(tool_name)
+                    if not tool:
+                        error_msg = f"Tool '{tool_name}' not found in registry"
+                        self._logger.error(error_msg)
+                        tool_results.append({
+                            "tool_call_id": tool_call_id,
+                            "role": "tool",
+                            "content": json.dumps({"error": error_msg})
+                        })
+                        continue
+                    
+                    # Execute tool - handle V2 IToolInterface
+                    if hasattr(tool, 'call_tool'):
+                        # V2 tool with call_tool method (MCP standard)
+                        result = await tool.call_tool(tool_name, tool_args)
+                    elif hasattr(tool, 'execute'):
+                        # Tool with execute method
+                        result = await tool.execute(**tool_args)
+                    elif hasattr(tool, 'call'):
+                        # Tool with call method
+                        result = await tool.call(**tool_args)
+                    elif callable(tool):
+                        # Callable tool
+                        result = await tool(**tool_args)
+                    else:
+                        error_msg = f"Tool '{tool_name}' is not callable"
+                        self._logger.error(error_msg)
+                        result = {"error": error_msg}
+                    
+                    # Format result
+                    if not isinstance(result, str):
+                        result = json.dumps(result)
+                    
+                    tool_results.append({
+                        "tool_call_id": tool_call_id,
+                        "role": "tool",
+                        "name": tool_name,
+                        "content": result
+                    })
+                    
+                    self._logger.info(f"Tool {tool_name} executed successfully")
+                    
+                except Exception as tool_error:
+                    self._logger.error(f"Error executing tool {tool_name}: {tool_error}")
+                    tool_results.append({
+                        "tool_call_id": tool_call_id if 'tool_call_id' in locals() else f"call_error_{int(time.time())}",
+                        "role": "tool",
+                        "content": json.dumps({"error": str(tool_error)})
+                    })
+            
+            # Add tool result messages to session
+            for tool_result in tool_results:
+                tool_message = AgentMessage(
+                    role="tool",
+                    content=tool_result["content"],
+                    tool_call_id=tool_result["tool_call_id"],
+                    metadata={"tool_name": tool_result.get("name", "unknown")}
+                )
+                await session.add_message(tool_message)
+            
+            # Send tool results back to provider to get final response
+            self._logger.info("Sending tool results back to LLM for final response")
+            
+            # Create a continuation message (empty user message to trigger response with tool results)
+            continuation_message = AgentMessage(role="user", content="")
+            final_response = await self._provider.send_message(
+                continuation_message, session, self._configuration
+            )
+            
+            return final_response
+            
+        except Exception as e:
+            self._logger.error(f"Error in tool call handling: {e}")
+            return AgentResponse.error_response(
+                error=e,
+                content=f"Tool execution failed: {str(e)}"
+            )
+    
     # Conversation
     async def chat(
         self,
@@ -573,7 +728,12 @@ class BaseAgent(AutoInstrumentedMixin):
                             provider_span.add_tag("output_tokens", response.usage.completion_tokens)
                             provider_span.add_tag("total_tokens", response.usage.total_tokens)
                 
-                # Add response to session
+                # Handle tool calls if present - this will execute tools and get final response
+                if response.success and response.message and response.message.tool_calls:
+                    self._logger.info(f"Tool calls detected: {len(response.message.tool_calls)} tool(s)")
+                    response = await self._handle_tool_calls(response, session)
+                
+                # Add final response to session
                 if response.success and response.message:
                     await session.add_message(response.message)
                 
