@@ -204,6 +204,33 @@ class ToolExecution(IToolExecution, AutoInstrumentedMixin):
         # Initialize auto-instrumentation mixin
         super().__init__()
     
+    def _get_tool_name(self) -> str:
+        """Safely get tool name with fallbacks for different tool types"""
+        # Try V2 metadata (for V2 tools)
+        if hasattr(self._tool, 'metadata') and hasattr(self._tool.metadata, 'id'):
+            return self._tool.metadata.id
+        
+        # Try MCP tool identifier (this is the canonical MCP tool ID)
+        if hasattr(self._tool, 'identifier'):
+            return self._tool.identifier
+        
+        # Try legacy name attribute
+        if hasattr(self._tool, 'name') and isinstance(self._tool.name, str):
+            return self._tool.name.lower().replace(' ', '_')
+        
+        # Last resort: derive from class name (should rarely happen for built-in tools)
+        class_name = type(self._tool).__name__
+        # Handle common MCP tool class naming patterns
+        if class_name.endswith('MCPTool'):
+            # BigQueryVectorSearchMCPTool -> bigquery_vector_search
+            tool_name = class_name[:-7]  # Remove 'MCPTool'
+            # Convert CamelCase to snake_case
+            import re
+            tool_name = re.sub('([a-z0-9])([A-Z])', r'\1_\2', tool_name).lower()
+            return f"mcp{tool_name}"
+        
+        return class_name.lower()
+    
     async def execute(
         self, 
         method: str, 
@@ -214,7 +241,7 @@ class ToolExecution(IToolExecution, AutoInstrumentedMixin):
         start_time = time.time()
         self._execution_stats["total_calls"] += 1
         
-        tool_name = getattr(self._tool.metadata, 'id', 'unknown_tool')
+        tool_name = self._get_tool_name()
         
         with self._auto_trace("execute",
                              tool_name=tool_name,
@@ -381,7 +408,7 @@ class ToolExecution(IToolExecution, AutoInstrumentedMixin):
             async for item in stream_handler(**parameters):
                 yield item
         except Exception as e:
-            handle_error(e, f"tool_{self._tool.metadata.id}_stream")
+            handle_error(e, f"tool_{self._get_tool_name()}_stream")
             yield ToolResult.error_result(str(e), method=f"{method}_stream")
     
     def validate_method(self, method: str, parameters: Dict[str, Any]) -> bool:
