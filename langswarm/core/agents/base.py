@@ -538,7 +538,8 @@ class BaseAgent(AutoInstrumentedMixin):
                 if session_id:
                     session = await self.get_session(session_id)
                     if not session:
-                        raise ValueError(f"Session {session_id} not found")
+                        # Auto-create session with the provided ID
+                        session = await self.create_session(session_id=session_id)
                 else:
                     session = self._current_session
                     if not session:
