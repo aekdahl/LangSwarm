@@ -565,8 +565,8 @@ class BaseAgent(AutoInstrumentedMixin):
                     if provider_span and response:
                         provider_span.add_tag("response_success", response.success)
                         if response.usage:
-                            provider_span.add_tag("input_tokens", response.usage.input_tokens)
-                            provider_span.add_tag("output_tokens", response.usage.output_tokens)
+                            provider_span.add_tag("input_tokens", response.usage.prompt_tokens)
+                            provider_span.add_tag("output_tokens", response.usage.completion_tokens)
                             provider_span.add_tag("total_tokens", response.usage.total_tokens)
                 
                 # Add response to session
@@ -595,9 +595,9 @@ class BaseAgent(AutoInstrumentedMixin):
                                        agent_name=self._name)
                 
                 if response.usage:
-                    self._auto_record_metric("chat_input_tokens", response.usage.input_tokens, "histogram",
+                    self._auto_record_metric("chat_input_tokens", response.usage.prompt_tokens, "histogram",
                                            agent_name=self._name, provider=str(self._configuration.provider))
-                    self._auto_record_metric("chat_output_tokens", response.usage.output_tokens, "histogram",
+                    self._auto_record_metric("chat_output_tokens", response.usage.completion_tokens, "histogram",
                                            agent_name=self._name, provider=str(self._configuration.provider))
                     self._auto_record_metric("chat_total_tokens", response.usage.total_tokens, "histogram",
                                            agent_name=self._name, provider=str(self._configuration.provider))
