@@ -228,12 +228,19 @@ class GeminiProvider(IAgentProvider):
             if config.tools_enabled and config.available_tools:
                 tools = self._build_tool_definitions(config.available_tools)
             
+            # Build system instruction with tool instructions
+            system_instruction = config.system_prompt or ""
+            if config.tools_enabled and config.available_tools:
+                tool_instructions = self._get_tool_instructions(config.available_tools)
+                if tool_instructions:
+                    system_instruction += f"\n\n# Available Tools\n{tool_instructions}"
+            
             # Create model
             model = genai.GenerativeModel(
                 model_name=config.model,
                 generation_config=generation_config,
                 safety_settings=safety_settings,
-                system_instruction=config.system_prompt,
+                system_instruction=system_instruction if system_instruction else None,
                 tools=tools
             )
             
@@ -332,6 +339,27 @@ class GeminiProvider(IAgentProvider):
                 })
             }]
         }
+    
+    def _get_tool_instructions(self, tool_names: List[str]) -> str:
+        """Get formatted tool instructions from template.md files"""
+        try:
+            from langswarm.tools.registry import ToolRegistry
+            
+            registry = ToolRegistry()
+            instructions = []
+            
+            for tool_name in tool_names:
+                tool = registry.get_tool(tool_name)
+                if tool and hasattr(tool, 'metadata'):
+                    instruction = getattr(tool.metadata, 'instruction', None)
+                    if instruction:
+                        instructions.append(f"\n## {tool_name}\n{instruction}")
+            
+            return "\n".join(instructions) if instructions else ""
+            
+        except Exception as e:
+            logger.warning(f"Failed to load tool instructions: {e}")
+            return ""
     
     async def _build_gemini_prompt(
         self, 

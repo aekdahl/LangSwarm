@@ -67,6 +67,7 @@ class AgentBuilder:
         self._tools_enabled: bool = False
         self._available_tools: List[str] = []
         self._tool_choice: Optional[str] = None
+        self._max_tool_iterations: int = 3
         self._memory_enabled: bool = False
         self._max_memory_messages: int = 50
         self._streaming_enabled: bool = False
@@ -270,6 +271,13 @@ class AgentBuilder:
         self._tools_enabled = enabled
         return self
     
+    def max_tool_iterations(self, iterations: int) -> 'AgentBuilder':
+        """Set maximum tool call iterations for self-correction loop (default: 3)"""
+        if iterations < 1:
+            raise ValueError("max_tool_iterations must be at least 1")
+        self._max_tool_iterations = iterations
+        return self
+    
     def memory_enabled(self, enabled: bool = True, max_messages: int = 50) -> 'AgentBuilder':
         """Enable conversation memory"""
         self._memory_enabled = enabled
@@ -381,6 +389,7 @@ class AgentBuilder:
             tools_enabled=self._tools_enabled,
             available_tools=self._available_tools,
             tool_choice=self._tool_choice,
+            max_tool_iterations=self._max_tool_iterations,
             memory_enabled=self._memory_enabled,
             max_memory_messages=self._max_memory_messages,
             streaming_enabled=self._streaming_enabled,

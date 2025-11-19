@@ -115,13 +115,20 @@ class CohereProvider(IAgentProvider):
             if config.tools_enabled and config.available_tools:
                 tools = self._build_tool_definitions(config.available_tools)
             
+            # Build preamble with tool instructions
+            preamble = config.system_prompt or ""
+            if config.tools_enabled and config.available_tools:
+                tool_instructions = self._get_tool_instructions(config.available_tools)
+                if tool_instructions:
+                    preamble += f"\n\n# Available Tools\n{tool_instructions}"
+            
             # Make API call
             start_time = time.time()
             response = await client.chat(
                 model=config.model,
                 message=message.content,
                 chat_history=chat_history,
-                preamble=config.system_prompt,
+                preamble=preamble if preamble else None,
                 tools=tools,
                 temperature=config.temperature or 0.7,
                 max_tokens=config.max_tokens or 4096,
@@ -155,13 +162,20 @@ class CohereProvider(IAgentProvider):
             if config.tools_enabled and config.available_tools:
                 tools = self._build_tool_definitions(config.available_tools)
             
+            # Build preamble with tool instructions
+            preamble = config.system_prompt or ""
+            if config.tools_enabled and config.available_tools:
+                tool_instructions = self._get_tool_instructions(config.available_tools)
+                if tool_instructions:
+                    preamble += f"\n\n# Available Tools\n{tool_instructions}"
+            
             # Make streaming API call
             start_time = time.time()
             stream = await client.chat_stream(
                 model=config.model,
                 message=message.content,
                 chat_history=chat_history,
-                preamble=config.system_prompt,
+                preamble=preamble if preamble else None,
                 tools=tools,
                 temperature=config.temperature or 0.7,
                 max_tokens=config.max_tokens or 4096,
@@ -335,6 +349,27 @@ class CohereProvider(IAgentProvider):
             parameter_definitions[param_name] = param_def
         
         return parameter_definitions
+    
+    def _get_tool_instructions(self, tool_names: List[str]) -> str:
+        """Get formatted tool instructions from template.md files"""
+        try:
+            from langswarm.tools.registry import ToolRegistry
+            
+            registry = ToolRegistry()
+            instructions = []
+            
+            for tool_name in tool_names:
+                tool = registry.get_tool(tool_name)
+                if tool and hasattr(tool, 'metadata'):
+                    instruction = getattr(tool.metadata, 'instruction', None)
+                    if instruction:
+                        instructions.append(f"\n## {tool_name}\n{instruction}")
+            
+            return "\n".join(instructions) if instructions else ""
+            
+        except Exception as e:
+            logger.warning(f"Failed to load tool instructions: {e}")
+            return ""
     
     async def _build_cohere_history(
         self, 

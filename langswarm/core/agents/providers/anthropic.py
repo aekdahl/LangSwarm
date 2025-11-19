@@ -286,9 +286,18 @@ class AnthropicProvider(IAgentProvider):
             "stream": stream
         }
         
-        # Add system prompt if provided
-        if config.system_prompt:
-            params["system"] = config.system_prompt
+        # Build system prompt with tool instructions
+        system_content = config.system_prompt or ""
+        
+        # Inject tool instructions if tools enabled
+        if config.tools_enabled and config.available_tools:
+            tool_instructions = self._get_tool_instructions(config.available_tools)
+            if tool_instructions:
+                system_content += f"\n\n# Available Tools\n{tool_instructions}"
+        
+        # Add system prompt if we have content
+        if system_content:
+            params["system"] = system_content
         
         # Add optional parameters
         if config.temperature is not None:
@@ -395,6 +404,27 @@ class AnthropicProvider(IAgentProvider):
                 "additionalProperties": True
             })
         }
+    
+    def _get_tool_instructions(self, tool_names: List[str]) -> str:
+        """Get formatted tool instructions from template.md files"""
+        try:
+            from langswarm.tools.registry import ToolRegistry
+            
+            registry = ToolRegistry()
+            instructions = []
+            
+            for tool_name in tool_names:
+                tool = registry.get_tool(tool_name)
+                if tool and hasattr(tool, 'metadata'):
+                    instruction = getattr(tool.metadata, 'instruction', None)
+                    if instruction:
+                        instructions.append(f"\n## {tool_name}\n{instruction}")
+            
+            return "\n".join(instructions) if instructions else ""
+            
+        except Exception as e:
+            logger.warning(f"Failed to load tool instructions: {e}")
+            return ""
     
     def _process_anthropic_response(
         self, 

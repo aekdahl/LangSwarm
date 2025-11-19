@@ -293,6 +293,27 @@ class HuggingFaceProvider(IAgentProvider):
         
         return response
     
+    def _get_tool_instructions(self, tool_names: List[str]) -> str:
+        """Get formatted tool instructions from template.md files"""
+        try:
+            from langswarm.tools.registry import ToolRegistry
+            
+            registry = ToolRegistry()
+            instructions = []
+            
+            for tool_name in tool_names:
+                tool = registry.get_tool(tool_name)
+                if tool and hasattr(tool, 'metadata'):
+                    instruction = getattr(tool.metadata, 'instruction', None)
+                    if instruction:
+                        instructions.append(f"\n## {tool_name}\n{instruction}")
+            
+            return "\n".join(instructions) if instructions else ""
+            
+        except Exception as e:
+            logger.warning(f"Failed to load tool instructions: {e}")
+            return ""
+    
     def _build_conversation_prompt(
         self, 
         session: IAgentSession, 
@@ -302,9 +323,16 @@ class HuggingFaceProvider(IAgentProvider):
         """Build conversation prompt"""
         prompt_parts = []
         
+        # Build system prompt with tool instructions
+        system_content = config.system_prompt or ""
+        if config.tools_enabled and config.available_tools:
+            tool_instructions = self._get_tool_instructions(config.available_tools)
+            if tool_instructions:
+                system_content += f"\n\n# Available Tools\n{tool_instructions}"
+        
         # System prompt
-        if config.system_prompt:
-            prompt_parts.append(f"System: {config.system_prompt}")
+        if system_content:
+            prompt_parts.append(f"System: {system_content}")
         
         # Conversation history
         for msg in session.messages[-10:]:  # Last 10 messages

@@ -223,6 +223,27 @@ class MistralProvider(IAgentProvider):
             }
         }
     
+    def _get_tool_instructions(self, tool_names: List[str]) -> str:
+        """Get formatted tool instructions from template.md files"""
+        try:
+            from langswarm.tools.registry import ToolRegistry
+            
+            registry = ToolRegistry()
+            instructions = []
+            
+            for tool_name in tool_names:
+                tool = registry.get_tool(tool_name)
+                if tool and hasattr(tool, 'metadata'):
+                    instruction = getattr(tool.metadata, 'instruction', None)
+                    if instruction:
+                        instructions.append(f"\n## {tool_name}\n{instruction}")
+            
+            return "\n".join(instructions) if instructions else ""
+            
+        except Exception as e:
+            logger.warning(f"Failed to load tool instructions: {e}")
+            return ""
+    
     def _build_messages(
         self, 
         session: IAgentSession, 
@@ -232,8 +253,15 @@ class MistralProvider(IAgentProvider):
         """Build messages for Mistral"""
         messages = []
         
-        if config.system_prompt:
-            messages.append(ChatMessage(role="system", content=config.system_prompt))
+        # Build system prompt with tool instructions
+        system_content = config.system_prompt or ""
+        if config.tools_enabled and config.available_tools:
+            tool_instructions = self._get_tool_instructions(config.available_tools)
+            if tool_instructions:
+                system_content += f"\n\n# Available Tools\n{tool_instructions}"
+        
+        if system_content:
+            messages.append(ChatMessage(role="system", content=system_content))
         
         for msg in session.messages:
             if msg.role in ["user", "assistant"]:

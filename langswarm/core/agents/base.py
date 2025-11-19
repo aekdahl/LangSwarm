@@ -50,6 +50,7 @@ class AgentConfiguration:
     tools_enabled: bool = False
     available_tools: List[str] = field(default_factory=list)
     tool_choice: Optional[str] = None  # "auto", "none", or specific tool name
+    max_tool_iterations: int = 3  # Maximum iterations for tool call refinement
     
     # Memory configuration
     memory_enabled: bool = False
@@ -750,10 +751,28 @@ class BaseAgent(AutoInstrumentedMixin):
                             provider_span.add_tag("output_tokens", response.usage.completion_tokens)
                             provider_span.add_tag("total_tokens", response.usage.total_tokens)
                 
-                # Handle tool calls if present - this will execute tools and get final response
-                if response.success and response.message and response.message.tool_calls:
-                    self._logger.info(f"Tool calls detected: {len(response.message.tool_calls)} tool(s)")
+                # Handle tool calls with self-correction loop
+                max_iterations = self._configuration.max_tool_iterations
+                iteration = 0
+                
+                while (response.success and 
+                       response.message and 
+                       response.message.tool_calls and 
+                       iteration < max_iterations):
+                    
+                    self._logger.info(
+                        f"Tool iteration {iteration+1}/{max_iterations}: "
+                        f"{len(response.message.tool_calls)} tool call(s)"
+                    )
                     response = await self._handle_tool_calls(response, session)
+                    iteration += 1
+                
+                # Warn if max iterations reached with pending tool calls
+                if iteration >= max_iterations and response.message and response.message.tool_calls:
+                    self._logger.warning(
+                        f"Max tool iterations ({max_iterations}) reached. "
+                        f"Returning current response to user."
+                    )
                 
                 # Add final response to session
                 if response.success and response.message:

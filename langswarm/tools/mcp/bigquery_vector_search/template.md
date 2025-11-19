@@ -10,7 +10,18 @@ Advanced semantic search tool with natural language intent processing for knowle
 
 This tool supports both intelligent intent-based calling and direct method execution using the standard MCP protocol with simplified syntax.
 
-**Preferred: Intent-Based Calling (LangSwarm USP)**
+**Preferred: Direct Method Calling (Simplified)**
+```json
+{
+  "method": "call_tool",
+  "params": {
+    "name": "bigquery_vector_search.similarity_search",
+    "arguments": {"query": "search terms", "limit": 5}
+  }
+}
+```
+
+**Alternative: Intent-Based Calling (LangSwarm USP)**
 ```json
 {
   "method": "call_tool",
@@ -20,17 +31,6 @@ This tool supports both intelligent intent-based calling and direct method execu
       "intent": "Find information about our refund policy for enterprise customers",
       "context": "customer support, policy documentation"
     }
-  }
-}
-```
-
-**Alternative: Direct Method Calling (Simplified)**
-```json
-{
-  "method": "call_tool",
-  "params": {
-    "name": "bigquery_vector_search.similarity_search",
-    "arguments": {"query": "search terms", "limit": 5}
   }
 }
 ```

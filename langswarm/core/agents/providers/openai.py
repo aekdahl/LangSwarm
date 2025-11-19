@@ -252,6 +252,22 @@ class OpenAIProvider(IAgentProvider):
         """Convert session messages to OpenAI format"""
         messages = []
         
+        # Build system message with tool instructions
+        system_content = config.system_prompt or ""
+        
+        # Inject tool instructions if tools enabled
+        if config.tools_enabled and config.available_tools:
+            tool_instructions = self._get_tool_instructions(config.available_tools)
+            if tool_instructions:
+                system_content += f"\n\n# Available Tools\n{tool_instructions}"
+        
+        # Add system message at the beginning if we have content
+        if system_content:
+            messages.append({
+                "role": "system",
+                "content": system_content
+            })
+        
         # Get conversation context
         context_messages = await session.get_context(
             max_tokens=config.max_tokens - 1000 if config.max_tokens else None
@@ -259,6 +275,10 @@ class OpenAIProvider(IAgentProvider):
         
         # Convert to OpenAI format
         for msg in context_messages:
+            # Skip system messages from context (we already added our own)
+            if msg.role == "system":
+                continue
+                
             openai_msg = {
                 "role": msg.role,
                 "content": msg.content
@@ -446,6 +466,27 @@ class OpenAIProvider(IAgentProvider):
                 })
             }
         }
+    
+    def _get_tool_instructions(self, tool_names: List[str]) -> str:
+        """Get formatted tool instructions from template.md files"""
+        try:
+            from langswarm.tools.registry import ToolRegistry
+            
+            registry = ToolRegistry()
+            instructions = []
+            
+            for tool_name in tool_names:
+                tool = registry.get_tool(tool_name)
+                if tool and hasattr(tool, 'metadata'):
+                    instruction = getattr(tool.metadata, 'instruction', None)
+                    if instruction:
+                        instructions.append(f"\n## {tool_name}\n{instruction}")
+            
+            return "\n".join(instructions) if instructions else ""
+            
+        except Exception as e:
+            logger.warning(f"Failed to load tool instructions: {e}")
+            return ""
     
     def _process_openai_response(
         self, 
