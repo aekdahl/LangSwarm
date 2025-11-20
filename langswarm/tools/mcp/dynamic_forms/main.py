@@ -385,6 +385,11 @@ class DynamicFormsMCPTool(MCPProtocolMixin, BaseTool):
         
         # Load form definitions from config
     
+    # V2 Direct Method Calls - Expose operations as class methods
+    def generate_form_schema(self, form_type: str, **kwargs):
+        """Generate a JSON schema for a specific form type"""
+        return generate_form_schema(form_type=form_type)
+    
     def run(self, input_data=None):
         """Execute form generation method"""
         method_handlers = {

@@ -788,6 +788,39 @@ class DaytonaEnvironmentMCPTool(MCPProtocolMixin, BaseTool):
             **kwargs
         )
     
+    # V2 Direct Method Calls - Expose operations as class methods
+    def create_sandbox(self, name: str, image: str = "python:3.11", **kwargs):
+        """Create a new Daytona sandbox environment"""
+        return create_sandbox(name=name, image=image, **kwargs)
+    
+    def execute_code(self, sandbox_id: str, code: str, language: str = "python", **kwargs):
+        """Execute code in a sandbox environment"""
+        return execute_code(sandbox_id=sandbox_id, code=code, language=language, **kwargs)
+    
+    def execute_shell(self, sandbox_id: str, command: str, **kwargs):
+        """Execute shell command in a sandbox"""
+        return execute_shell(sandbox_id=sandbox_id, command=command, **kwargs)
+    
+    def file_operation(self, sandbox_id: str, operation: str, path: str, content: str = None, **kwargs):
+        """Perform file operations in sandbox (read/write/delete)"""
+        return file_operation(sandbox_id=sandbox_id, operation=operation, path=path, content=content, **kwargs)
+    
+    def git_operation(self, sandbox_id: str, operation: str, repo_url: str = None, **kwargs):
+        """Perform git operations in sandbox (clone/pull/push)"""
+        return git_operation(sandbox_id=sandbox_id, operation=operation, repo_url=repo_url, **kwargs)
+    
+    def list_sandboxes(self, **kwargs):
+        """List all available sandboxes"""
+        return list_sandboxes()
+    
+    def delete_sandbox(self, sandbox_id: str, **kwargs):
+        """Delete a sandbox environment"""
+        return delete_sandbox(sandbox_id=sandbox_id)
+    
+    def get_sandbox_info(self, sandbox_id: str, **kwargs):
+        """Get detailed information about a sandbox"""
+        return get_sandbox_info(sandbox_id=sandbox_id)
+    
     def run(self, input_data=None):
         """Execute Daytona environment MCP methods locally"""
         if not input_data:

@@ -1084,15 +1084,28 @@ class BaseAgent(AutoInstrumentedMixin):
     # Tool management methods
     async def add_tools(self, tool_names: List[str]) -> None:
         """Add tools to the agent - provider handles integration"""
-        self._configuration.available_tools.extend(tool_names)
-        self._configuration.tools_enabled = True
-        self._logger.info(f"Added tools to agent {self.name}: {tool_names}")
+        # CRITICAL FIX: Deduplicate before adding to prevent OpenAI 128 tool limit errors
+        current_tools = set(self._configuration.available_tools)
+        new_tools = [t for t in tool_names if t not in current_tools]
+        
+        if new_tools:
+            self._configuration.available_tools.extend(new_tools)
+            self._configuration.tools_enabled = True
+            self._logger.info(f"Added {len(new_tools)} new tools to agent {self.name}: {new_tools}")
+        else:
+            self._logger.debug(f"No new tools to add (all already present): {tool_names}")
     
     async def set_tools(self, tool_names: List[str]) -> None:
         """Set tools for the agent - provider handles integration"""
-        self._configuration.available_tools = tool_names
-        self._configuration.tools_enabled = len(tool_names) > 0
-        self._logger.info(f"Set tools for agent {self.name}: {tool_names}")
+        # CRITICAL FIX: Deduplicate the input list to prevent OpenAI 128 tool limit errors
+        unique_tools = list(dict.fromkeys(tool_names))  # Preserves order, removes duplicates
+        
+        if len(unique_tools) != len(tool_names):
+            self._logger.warning(f"Removed {len(tool_names) - len(unique_tools)} duplicate tools from input")
+        
+        self._configuration.available_tools = unique_tools
+        self._configuration.tools_enabled = len(unique_tools) > 0
+        self._logger.info(f"Set {len(unique_tools)} unique tools for agent {self.name}: {unique_tools}")
     
     def get_available_tools(self) -> List[str]:
         """Get list of available tools"""

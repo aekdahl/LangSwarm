@@ -1053,6 +1053,31 @@ class MessageQueueConsumerMCPTool(MCPProtocolMixin, BaseTool):
         if mcp_url:
             object.__setattr__(self, 'mcp_url', mcp_url)
     
+    # V2 Direct Method Calls - Expose operations as class methods
+    async def start_consumer(self, consumer_id: str, broker_type: str, queue_name: str, **kwargs):
+        """Start a message queue consumer"""
+        return await start_consumer(consumer_id=consumer_id, broker_type=broker_type, queue_name=queue_name, **kwargs)
+    
+    async def stop_consumer(self, consumer_id: str, **kwargs):
+        """Stop a running consumer"""
+        return await stop_consumer(consumer_id=consumer_id)
+    
+    def list_consumers(self, **kwargs):
+        """List all active consumers"""
+        return list_consumers()
+    
+    async def get_consumer_stats(self, consumer_id: str, **kwargs):
+        """Get statistics for a specific consumer"""
+        return await get_consumer_stats(consumer_id=consumer_id)
+    
+    async def pause_consumer(self, consumer_id: str, **kwargs):
+        """Pause a running consumer"""
+        return await pause_consumer(consumer_id=consumer_id)
+    
+    async def resume_consumer(self, consumer_id: str, **kwargs):
+        """Resume a paused consumer"""
+        return await resume_consumer(consumer_id=consumer_id)
+    
     def run(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Handle MCP tool execution"""
         

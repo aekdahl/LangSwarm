@@ -844,6 +844,31 @@ class WorkflowExecutorMCPTool(MCPProtocolMixin, BaseTool):
         if mcp_url:
             object.__setattr__(self, 'mcp_url', mcp_url)
     
+    # V2 Direct Method Calls - Expose operations as class methods
+    def execute_workflow(self, workflow_yaml: str, **kwargs):
+        """Execute a workflow from YAML definition"""
+        return execute_workflow(workflow_yaml=workflow_yaml, **kwargs)
+    
+    def generate_workflow(self, description: str, **kwargs):
+        """Generate a workflow from natural language description"""
+        return generate_workflow(description=description, **kwargs)
+    
+    def execute_generated_workflow(self, description: str, **kwargs):
+        """Generate and execute a workflow in one step"""
+        return execute_generated_workflow(description=description, **kwargs)
+    
+    def check_execution_status(self, execution_id: str, **kwargs):
+        """Check the status of a running workflow execution"""
+        return check_execution_status(execution_id=execution_id)
+    
+    def cancel_execution(self, execution_id: str, **kwargs):
+        """Cancel a running workflow execution"""
+        return cancel_execution(execution_id=execution_id)
+    
+    def list_workflows(self, **kwargs):
+        """List all workflow executions"""
+        return list_workflows()
+    
     def run(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Handle MCP tool execution"""
         

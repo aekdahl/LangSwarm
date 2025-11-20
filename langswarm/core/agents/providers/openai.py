@@ -52,6 +52,8 @@ class OpenAIProvider(IAgentProvider):
             raise ImportError("OpenAI package not installed. Run: pip install openai")
         
         self._client_cache: Dict[str, AsyncOpenAI] = {}
+        # Cache tool definitions to avoid rebuilding on every message (critical for performance)
+        self._tool_definitions_cache: Dict[str, List[Dict[str, Any]]] = {}
     
     @property
     def provider_type(self) -> ProviderType:
@@ -336,7 +338,16 @@ class OpenAIProvider(IAgentProvider):
         
         # Add tool configuration if enabled
         if config.tools_enabled and config.available_tools:
-            params["tools"] = self._build_tool_definitions(config.available_tools)
+            # CRITICAL FIX: Use cache to avoid rebuilding tool definitions on every message
+            cache_key = ",".join(sorted(config.available_tools))  # Stable cache key
+            
+            if cache_key not in self._tool_definitions_cache:
+                logger.debug(f"Building tool definitions for {len(config.available_tools)} tools (cache miss)")
+                self._tool_definitions_cache[cache_key] = self._build_tool_definitions(config.available_tools)
+            else:
+                logger.debug(f"Using cached tool definitions for {len(config.available_tools)} tools")
+            
+            params["tools"] = self._tool_definitions_cache[cache_key]
             
             if config.tool_choice:
                 params["tool_choice"] = config.tool_choice
@@ -351,8 +362,16 @@ class OpenAIProvider(IAgentProvider):
             # Get real tool definitions from V2 registry
             registry = ToolRegistry()
             
+            # CRITICAL FIX: Deduplicate tool_names to prevent building same tool multiple times
+            unique_tool_names = list(dict.fromkeys(tool_names))  # Preserves order, removes duplicates
+            
+            if len(unique_tool_names) != len(tool_names):
+                logger.warning(f"Deduplicated {len(tool_names) - len(unique_tool_names)} duplicate tool names in input")
+            
             tools = []
-            for tool_name in tool_names:
+            seen_function_names = set()  # Track flattened names to prevent OpenAI duplicates
+            
+            for tool_name in unique_tool_names:
                 tool = registry.get_tool(tool_name)
                 if not tool:
                     # FAIL FAST - no fallback to mock tools
@@ -367,38 +386,64 @@ class OpenAIProvider(IAgentProvider):
                         # Tool supports multiple methods - register each as separate function
                         logger.info(f"Tool '{tool_name}' has {len(methods)} methods, creating flattened definitions")
                         
-                        for method_name, method_schema in methods.items():
-                            # Create flattened name: tool__method (double underscore, dots not allowed by OpenAI)
-                            flattened_name = f"{tool_name}__{method_name}"
-                            
-                            # Convert ToolSchema to OpenAI format
-                            openai_tool = {
-                                "type": "function",
-                                "function": {
-                                    "name": flattened_name,
-                                    "description": method_schema.description,
-                                    "parameters": {
-                                        "type": "object",
-                                        "properties": method_schema.parameters,
-                                        "required": method_schema.required
-                                    }
+                    for method_name, method_schema in methods.items():
+                        # Create flattened name: tool__method (double underscore, dots not allowed by OpenAI)
+                        flattened_name = f"{tool_name}__{method_name}"
+                        
+                        # CRITICAL FIX: Skip if already registered
+                        if flattened_name in seen_function_names:
+                            logger.debug(f"Skipping duplicate flattened method: {flattened_name}")
+                            continue
+                        
+                        seen_function_names.add(flattened_name)
+                        
+                        # Convert ToolSchema to OpenAI format
+                        openai_tool = {
+                            "type": "function",
+                            "function": {
+                                "name": flattened_name,
+                                "description": method_schema.description,
+                                "parameters": {
+                                    "type": "object",
+                                    "properties": method_schema.parameters,
+                                    "required": method_schema.required
                                 }
                             }
-                            tools.append(openai_tool)
-                            logger.debug(f"Registered flattened method: {flattened_name}")
-                    else:
-                        # Tool has metadata but no methods, register as single tool
+                        }
+                        tools.append(openai_tool)
+                        logger.debug(f"Registered flattened method: {flattened_name}")
+                else:
+                    # Tool has metadata but no methods, register as single tool
+                    if tool_name not in seen_function_names:
                         logger.info(f"Tool '{tool_name}' has no methods, registering as single function")
                         mcp_schema = self._get_tool_mcp_schema(tool)
                         openai_tool = self._convert_mcp_to_openai_format(mcp_schema, tool_name)
                         tools.append(openai_tool)
-                else:
-                    # Tool doesn't expose methods, register as single tool
+                        seen_function_names.add(tool_name)
+                    else:
+                        logger.debug(f"Skipping duplicate tool: {tool_name}")
+            else:
+                # Tool doesn't expose methods, register as single tool
+                if tool_name not in seen_function_names:
                     logger.info(f"Tool '{tool_name}' doesn't expose methods, registering as single function")
                     mcp_schema = self._get_tool_mcp_schema(tool)
                     openai_tool = self._convert_mcp_to_openai_format(mcp_schema, tool_name)
                     tools.append(openai_tool)
+                    seen_function_names.add(tool_name)
+                else:
+                    logger.debug(f"Skipping duplicate tool: {tool_name}")
             
+            # CRITICAL FIX: Check OpenAI's 128 tool limit
+            if len(tools) > 128:
+                error_msg = (
+                    f"OpenAI API has a maximum of 128 tools, but {len(tools)} were generated "
+                    f"from {len(unique_tool_names)} unique tool(s). "
+                    f"Reduce the number of tools/methods or use tool filtering."
+                )
+                logger.error(f"❌ {error_msg}")
+                raise ValueError(error_msg)
+            
+            logger.info(f"✅ Built {len(tools)} tool definitions for OpenAI from {len(unique_tool_names)} unique tool(s)")
             return tools
             
         except ImportError as e:

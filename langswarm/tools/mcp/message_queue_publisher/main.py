@@ -441,6 +441,19 @@ class MessageQueuePublisherMCPTool(MCPProtocolMixin, BaseTool):
             **kwargs
         )
     
+    # V2 Direct Method Calls - Expose operations as class methods
+    def publish_message(self, channel: str, message: dict, broker_id: str = None, metadata: dict = None, **kwargs):
+        """Publish a message to the specified channel"""
+        return publish_message(channel=channel, message=message, broker_id=broker_id, metadata=metadata)
+    
+    def list_channels(self, **kwargs):
+        """List all available message channels"""
+        return list_channels()
+    
+    def get_broker_stats(self, broker_id: str = None, **kwargs):
+        """Get statistics for message brokers"""
+        return get_broker_stats(broker_id=broker_id)
+    
     def run(self, input_data=None):
         """Execute message queue publisher MCP methods locally"""
         # Define method handlers for this tool

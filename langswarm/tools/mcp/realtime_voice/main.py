@@ -511,6 +511,23 @@ class RealtimeVoiceMCPTool(MCPProtocolMixin, BaseTool):
             **kwargs
         )
     
+    # V2 Direct Method Calls - Expose operations as class methods
+    async def text_to_speech(self, text: str, voice: str = "alloy", format: str = "mp3", **kwargs):
+        """Convert text to speech audio"""
+        return await text_to_speech(text=text, voice=voice, format=format, **kwargs)
+    
+    async def transcribe_audio(self, audio_data: str, language: str = None, **kwargs):
+        """Transcribe audio to text"""
+        return await transcribe_audio(audio_data=audio_data, language=language, **kwargs)
+    
+    async def optimize_voice_response(self, text: str, context: str = None, **kwargs):
+        """Optimize text for voice delivery"""
+        return await optimize_voice_response(text=text, context=context, **kwargs)
+    
+    async def configure_voice(self, settings: dict, **kwargs):
+        """Configure voice settings"""
+        return await configure_voice(settings=settings, **kwargs)
+    
     def run(self, input_data=None):
         """Execute realtime voice MCP methods locally"""
         

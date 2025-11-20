@@ -36,6 +36,32 @@ class MCPGitHubTool(MCPProtocolMixin, BaseTool):
             brief=brief,
             **kwargs
         )
+    
+    # V2 Direct Method Calls - Expose operations as class methods
+    def create_issue(self, title: str, body: str, labels: list = None, assignees: list = None, **kwargs):
+        """Create a new GitHub issue"""
+        return {"method": "create_issue", "title": title, "body": body, "labels": labels, "assignees": assignees, 
+                "note": "Requires GitHub MCP server connection"}
+    
+    def manage_pr(self, action: str, pr_number: int = None, comments: str = None, **kwargs):
+        """Manage pull requests (create/merge/review)"""
+        return {"method": "manage_pr", "action": action, "pr_number": pr_number, "comments": comments,
+                "note": "Requires GitHub MCP server connection"}
+    
+    def handle_repository(self, repo_name: str, action: str, **kwargs):
+        """Repository operations (create/update/archive)"""
+        return {"method": "handle_repository", "repo_name": repo_name, "action": action,
+                "note": "Requires GitHub MCP server connection"}
+    
+    def track_milestones(self, milestone_name: str, due_date: str = None, issues_list: list = None, **kwargs):
+        """Milestone management"""
+        return {"method": "track_milestones", "milestone_name": milestone_name, "due_date": due_date, "issues_list": issues_list,
+                "note": "Requires GitHub MCP server connection"}
+    
+    def generate_reports(self, report_type: str, date_range: str = None, filters: dict = None, **kwargs):
+        """Generate activity reports"""
+        return {"method": "generate_reports", "report_type": report_type, "date_range": date_range, "filters": filters,
+                "note": "Requires GitHub MCP server connection"}
 
     def run(self, input_data=None):
         """

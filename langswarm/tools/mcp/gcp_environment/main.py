@@ -876,6 +876,31 @@ class GCPEnvironmentMCPTool(MCPProtocolMixin, BaseTool):
             logger.error(f"Error detecting platform: {e}")
             return {'error': str(e)}
     
+    # V2 Direct Method Calls - Expose operations as class methods
+    async def analyze_environment(self, include_costs: bool = True, include_security: bool = True, 
+                                 include_performance: bool = True, include_recommendations: bool = True, **kwargs):
+        """Comprehensive GCP environment analysis"""
+        return await self._analyze_environment(
+            include_costs=include_costs, include_security=include_security,
+            include_performance=include_performance, include_recommendations=include_recommendations
+        )
+    
+    async def get_environment_summary(self, **kwargs):
+        """Get high-level summary of GCP environment"""
+        return await self._get_environment_summary()
+    
+    async def get_optimization_recommendations(self, focus_areas: list = None, **kwargs):
+        """Get optimization recommendations for GCP resources"""
+        return await self._get_optimization_recommendations(focus_areas=focus_areas)
+    
+    async def get_cost_analysis(self, time_period: str = "7d", **kwargs):
+        """Get cost analysis for GCP resources"""
+        return await self._get_cost_analysis(time_period=time_period)
+    
+    async def get_security_assessment(self, include_compliance: bool = True, **kwargs):
+        """Get security assessment of GCP environment"""
+        return await self._get_security_assessment(include_compliance=include_compliance)
+    
     def run(self, input_data) -> Dict[str, Any]:
         """Handle MCP tool execution"""
         try:

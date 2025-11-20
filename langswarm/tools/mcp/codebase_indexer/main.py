@@ -1067,6 +1067,32 @@ class CodebaseIndexerMCPTool(MCPProtocolMixin, BaseTool):
         object.__setattr__(self, '_is_mcp_tool', True)
         object.__setattr__(self, 'local_mode', local_mode)
     
+    # V2 Direct Method Calls - Expose operations as class methods
+    def get_codebase_overview(self, include_metrics: bool = True, **kwargs):
+        """Get high-level overview of codebase structure and organization"""
+        root_path = getattr(self, 'root_path', ".")
+        return get_codebase_overview(root_path=root_path, include_metrics=include_metrics)
+    
+    def semantic_search(self, query: str, limit: int = 10, **kwargs):
+        """Perform semantic search across codebase"""
+        root_path = getattr(self, 'root_path', ".")
+        return semantic_search(root_path=root_path, query=query, limit=limit)
+    
+    def analyze_patterns(self, pattern_type: str = "all", **kwargs):
+        """Analyze code patterns (design patterns, anti-patterns, etc.)"""
+        root_path = getattr(self, 'root_path', ".")
+        return analyze_patterns(root_path=root_path, pattern_type=pattern_type)
+    
+    def get_dependencies(self, include_external: bool = True, **kwargs):
+        """Get project dependencies and their relationships"""
+        root_path = getattr(self, 'root_path', ".")
+        return get_dependencies(root_path=root_path, include_external=include_external)
+    
+    def get_code_metrics(self, metric_type: str = "complexity", **kwargs):
+        """Get code quality metrics and statistics"""
+        root_path = getattr(self, 'root_path', ".")
+        return get_code_metrics(root_path=root_path, metric_type=metric_type)
+    
     def run(self, input_data=None):
         """Execute enhanced codebase indexer MCP methods locally"""
         # Get configuration from instance
