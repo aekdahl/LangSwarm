@@ -368,8 +368,8 @@ class OpenAIProvider(IAgentProvider):
                         logger.info(f"Tool '{tool_name}' has {len(methods)} methods, creating flattened definitions")
                         
                         for method_name, method_schema in methods.items():
-                            # Create flattened name: tool.method
-                            flattened_name = f"{tool_name}.{method_name}"
+                            # Create flattened name: tool__method (double underscore, dots not allowed by OpenAI)
+                            flattened_name = f"{tool_name}__{method_name}"
                             
                             # Convert ToolSchema to OpenAI format
                             openai_tool = {

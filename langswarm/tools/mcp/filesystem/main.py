@@ -892,6 +892,52 @@ class FilesystemMCPTool(MCPProtocolMixin, BaseTool):
         """Update permission configuration"""
         object.__setattr__(self, 'permissions', new_permissions)
     
+    # V2 Direct Method Calls - Expose operations as class methods
+    def list_directory(self, path: str, show_hidden: bool = False, recursive: bool = False, **kwargs):
+        """List directory contents with metadata"""
+        permissions = getattr(self, 'permissions', DEFAULT_PERMISSIONS)
+        gcs_project_id = getattr(self, 'gcs_project_id', None)
+        return list_directory(path=path, show_hidden=show_hidden, recursive=recursive, 
+                            permissions=permissions, gcs_project_id=gcs_project_id)
+    
+    def read_file(self, path: str, encoding: str = "utf-8", **kwargs):
+        """Read file content"""
+        permissions = getattr(self, 'permissions', DEFAULT_PERMISSIONS)
+        gcs_project_id = getattr(self, 'gcs_project_id', None)
+        return read_file(path=path, encoding=encoding, permissions=permissions, gcs_project_id=gcs_project_id)
+    
+    def get_file_info(self, path: str, **kwargs):
+        """Get file metadata and information"""
+        permissions = getattr(self, 'permissions', DEFAULT_PERMISSIONS)
+        gcs_project_id = getattr(self, 'gcs_project_id', None)
+        return get_file_info(path=path, permissions=permissions, gcs_project_id=gcs_project_id)
+    
+    def write_file(self, path: str, content: str, encoding: str = "utf-8", **kwargs):
+        """Write content to file"""
+        permissions = getattr(self, 'permissions', DEFAULT_PERMISSIONS)
+        gcs_project_id = getattr(self, 'gcs_project_id', None)
+        return write_file(path=path, content=content, encoding=encoding,
+                         permissions=permissions, gcs_project_id=gcs_project_id)
+    
+    def update_file(self, path: str, content: str, encoding: str = "utf-8", **kwargs):
+        """Update existing file content"""
+        permissions = getattr(self, 'permissions', DEFAULT_PERMISSIONS)
+        gcs_project_id = getattr(self, 'gcs_project_id', None)
+        return update_file(path=path, content=content, encoding=encoding,
+                          permissions=permissions, gcs_project_id=gcs_project_id)
+    
+    def delete_file(self, path: str, **kwargs):
+        """Delete a file"""
+        permissions = getattr(self, 'permissions', DEFAULT_PERMISSIONS)
+        gcs_project_id = getattr(self, 'gcs_project_id', None)
+        return delete_file(path=path, permissions=permissions, gcs_project_id=gcs_project_id)
+    
+    def create_directory(self, path: str, **kwargs):
+        """Create a new directory"""
+        permissions = getattr(self, 'permissions', DEFAULT_PERMISSIONS)
+        gcs_project_id = getattr(self, 'gcs_project_id', None)
+        return create_directory(path=path, permissions=permissions, gcs_project_id=gcs_project_id)
+    
     def get_allowed_paths_info(self) -> Dict[str, any]:
         """Get comprehensive information about allowed paths and permissions for the agent"""
         permissions = getattr(self, 'permissions', DEFAULT_PERMISSIONS)

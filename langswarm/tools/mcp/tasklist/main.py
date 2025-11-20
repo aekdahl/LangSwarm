@@ -453,6 +453,25 @@ class TasklistMCPTool(MCPProtocolMixin, BaseTool):
             **kwargs
         )
     
+    # V2 Direct Method Calls - Expose operations as class methods
+    def create_task(self, description: str, priority: int = 1, notes: str = "", **kwargs):
+        """Create a new task"""
+        return create_task(description=description, priority=priority, notes=notes)
+    
+    def update_task(self, task_id: str, description: str = None, completed: bool = None, 
+                   priority: int = None, notes: str = None, **kwargs):
+        """Update an existing task"""
+        return update_task(task_id=task_id, description=description, completed=completed,
+                          priority=priority, notes=notes)
+    
+    def delete_task(self, task_id: str, **kwargs):
+        """Delete a task"""
+        return delete_task(task_id=task_id)
+    
+    def list_tasks(self, **kwargs):
+        """List all tasks"""
+        return list_tasks()
+    
     def run(self, input_data=None):
         """Execute tasklist MCP methods locally"""
         # Define method handlers for this tool

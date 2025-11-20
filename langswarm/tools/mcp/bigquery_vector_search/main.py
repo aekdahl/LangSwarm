@@ -889,6 +889,73 @@ try:
                 # Return the workflow result
                 return result
         
+        # V2 Direct Method Calls - Expose operations as class methods
+        async def similarity_search(self, query: str, limit: int = 10, similarity_threshold: float = 0.3, **kwargs):
+            """
+            Perform vector similarity search in BigQuery.
+            
+            Args:
+                query: Search query text
+                limit: Maximum number of results to return
+                similarity_threshold: Minimum similarity score (0-1)
+                
+            Returns:
+                Search results with similar documents
+            """
+            input_data = SimilaritySearchInput(
+                query=query,
+                limit=limit,
+                similarity_threshold=similarity_threshold
+            )
+            result = await similarity_search(input_data, self.default_config)
+            return result.dict() if hasattr(result, 'dict') else result
+        
+        async def get_content(self, document_id: str, **kwargs):
+            """
+            Retrieve full content by document ID.
+            
+            Args:
+                document_id: Unique document identifier
+                
+            Returns:
+                Document content and metadata
+            """
+            input_data = GetContentInput(document_id=document_id)
+            result = await get_content(input_data)
+            return result.dict() if hasattr(result, 'dict') else result
+        
+        async def list_datasets(self, pattern: str = None, **kwargs):
+            """
+            List available vector search datasets.
+            
+            Args:
+                pattern: Optional pattern to filter datasets
+                
+            Returns:
+                List of available datasets
+            """
+            input_data = ListDatasetsInput(pattern=pattern)
+            result = await list_datasets(input_data)
+            return result.dict() if hasattr(result, 'dict') else result
+        
+        async def dataset_info(self, dataset_id: str, table_name: str, **kwargs):
+            """
+            Get detailed information about a dataset/table.
+            
+            Args:
+                dataset_id: BigQuery dataset ID
+                table_name: Table name within the dataset
+                
+            Returns:
+                Dataset schema and statistics
+            """
+            input_data = DatasetInfoInput(
+                dataset_id=dataset_id,
+                table_name=table_name
+            )
+            result = await dataset_info(input_data)
+            return result.dict() if hasattr(result, 'dict') else result
+        
         def run(self, input_data=None):
             """Synchronous wrapper for async execution"""
             import asyncio

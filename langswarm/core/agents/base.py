@@ -603,9 +603,9 @@ class BaseAgent(AutoInstrumentedMixin):
                         # V2 IToolInterface - proper structure
                         # Extract method from tool_name if using flattened calling (tool.method)
                         method = ''
-                        if '.' in tool_name:
-                            # Flattened method calling: "bigquery_vector_search.similarity_search"
-                            _, method = tool_name.split('.', 1)
+                        if '__' in tool_name:
+                            # Flattened method calling: "bigquery_vector_search__similarity_search"
+                            _, method = tool_name.split('__', 1)
                             self._logger.info(f"Using flattened method calling: {method}")
                         elif 'method' in tool_args:
                             # Explicit method in parameters

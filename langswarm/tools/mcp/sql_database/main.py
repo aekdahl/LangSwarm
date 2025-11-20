@@ -1201,6 +1201,28 @@ try:
                     str(e), ErrorTypes.GENERAL, "sql_database"
                 )
         
+        # V2 Direct Method Calls - Expose operations as class methods
+        async def execute_query(self, query: str, parameters: Optional[Dict[str, Any]] = None, **kwargs):
+            """Execute SQL query with security validation"""
+            config = getattr(self, 'config', {})
+            input_data = QueryInput(query=query, parameters=parameters)
+            result = await execute_query(input_data, config)
+            return result.dict() if hasattr(result, 'dict') else result
+        
+        async def get_database_info(self, **kwargs):
+            """Get information about database structure (tables, schemas)"""
+            config = getattr(self, 'config', {})
+            input_data = DatabaseInfoInput()
+            result = await get_database_info(input_data, config)
+            return result.dict() if hasattr(result, 'dict') else result
+        
+        async def intent_query(self, intent: str, context: Optional[str] = None, **kwargs):
+            """Execute query based on natural language intent"""
+            config = getattr(self, 'config', {})
+            input_data = IntentQueryInput(intent=intent, context=context)
+            result = await intent_query(input_data, config)
+            return result.dict() if hasattr(result, 'dict') else result
+        
         def run(self, input_data=None):
             """Synchronous wrapper for async execution"""
             import asyncio
