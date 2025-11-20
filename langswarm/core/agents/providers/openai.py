@@ -638,26 +638,29 @@ class OpenAIProvider(IAgentProvider):
             
             # Handle stream completion
             if choice.finish_reason:
-                # Final chunk with complete response
+                # Final chunk signals completion - EMPTY content since all content already sent
+                # This prevents duplication when applications concatenate all chunks
                 final_message = AgentMessage(
                     role="assistant",
-                    content=collected_content,
+                    content="",  # Empty - all content already sent in incremental chunks
                     tool_calls=collected_tool_calls if collected_tool_calls else None,
                     metadata={
                         "model": config.model,
                         "finish_reason": choice.finish_reason,
                         "provider": "openai",
-                        "stream_complete": True
+                        "stream_complete": True,
+                        "total_content": collected_content  # Full text in metadata for reference
                     }
                 )
                 
                 yield AgentResponse.success_response(
-                    content=collected_content,
-                    message=final_message,  # Pass the final complete message
+                    content="",  # Empty - prevents duplication
+                    message=final_message,
                     streaming=False,
                     stream_complete=True,
                     execution_time=time.time() - start_time,
-                    finish_reason=choice.finish_reason
+                    finish_reason=choice.finish_reason,
+                    total_collected_content=collected_content  # Available in metadata if needed
                 )
     
     def _estimate_cost(self, usage: Any, model: str) -> float:

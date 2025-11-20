@@ -464,14 +464,16 @@ class GeminiProvider(IAgentProvider):
                         provider="gemini"
                     )
             
-            # Final chunk with complete response
+            # Final chunk signals completion - EMPTY content since all content already sent
+            # This prevents duplication when applications concatenate all chunks
             yield AgentResponse.success_response(
-                content=collected_content,
+                content="",  # Empty - all content already sent in incremental chunks
                 streaming=False,
                 stream_complete=True,
                 execution_time=time.time() - start_time,
                 model=config.model,
-                provider="gemini"
+                provider="gemini",
+                total_collected_content=collected_content  # Available in metadata if needed
             )
             
         except Exception as e:

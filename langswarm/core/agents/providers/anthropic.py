@@ -513,14 +513,16 @@ class AnthropicProvider(IAgentProvider):
                     })
             
             elif event.type == "message_stop":
-                # Final chunk with complete response
+                # Final chunk signals completion - EMPTY content since all content already sent
+                # This prevents duplication when applications concatenate all chunks
                 yield AgentResponse.success_response(
-                    content=collected_content,
+                    content="",  # Empty - all content already sent in incremental chunks
                     streaming=False,
                     stream_complete=True,
                     execution_time=time.time() - start_time,
                     stop_reason="end_turn",
-                    tool_uses=collected_tool_uses
+                    tool_uses=collected_tool_uses,
+                    total_collected_content=collected_content  # Available in metadata if needed
                 )
     
     def _estimate_cost(self, usage: Any, model: str) -> float:
