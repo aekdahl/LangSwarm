@@ -586,10 +586,18 @@ class BaseAgent(AutoInstrumentedMixin):
                     
                     self._logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
                     
-                    # Get tool from registry
-                    tool = registry.get_tool(tool_name)
+                    # Extract base tool name and method if using flattened calling
+                    base_tool_name = tool_name
+                    extracted_method = None
+                    if '__' in tool_name:
+                        # Flattened method calling: "bigquery_vector_search__similarity_search"
+                        base_tool_name, extracted_method = tool_name.split('__', 1)
+                        self._logger.info(f"Detected flattened call: tool={base_tool_name}, method={extracted_method}")
+                    
+                    # Get tool from registry using base name
+                    tool = registry.get_tool(base_tool_name)
                     if not tool:
-                        error_msg = f"Tool '{tool_name}' not found in registry"
+                        error_msg = f"Tool '{base_tool_name}' not found in registry"
                         self._logger.error(error_msg)
                         tool_results.append({
                             "tool_call_id": tool_call_id,
@@ -601,11 +609,11 @@ class BaseAgent(AutoInstrumentedMixin):
                     # Execute tool - handle V2 IToolInterface structure
                     if hasattr(tool, 'execution') and hasattr(tool.execution, 'execute'):
                         # V2 IToolInterface - proper structure
-                        # Extract method from tool_name if using flattened calling (tool.method)
+                        # Determine method to call
                         method = ''
-                        if '__' in tool_name:
-                            # Flattened method calling: "bigquery_vector_search__similarity_search"
-                            _, method = tool_name.split('__', 1)
+                        if extracted_method:
+                            # Use extracted method from flattened name
+                            method = extracted_method
                             self._logger.info(f"Using flattened method calling: {method}")
                         elif 'method' in tool_args:
                             # Explicit method in parameters
@@ -627,7 +635,7 @@ class BaseAgent(AutoInstrumentedMixin):
                         result = await tool.run(tool_args)
                     elif hasattr(tool, 'call_tool'):
                         # MCP standard call_tool method
-                        result = await tool.call_tool(tool_name, tool_args)
+                        result = await tool.call_tool(base_tool_name, tool_args)
                     elif hasattr(tool, 'execute'):
                         # Direct execute method
                         result = await tool.execute(**tool_args)
@@ -638,7 +646,7 @@ class BaseAgent(AutoInstrumentedMixin):
                         # Callable tool
                         result = await tool(**tool_args)
                     else:
-                        error_msg = f"Tool '{tool_name}' is not callable"
+                        error_msg = f"Tool '{base_tool_name}' is not callable"
                         self._logger.error(error_msg)
                         result = {"error": error_msg}
                     
