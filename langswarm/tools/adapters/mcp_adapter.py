@@ -213,9 +213,12 @@ class MCPToolAdapter(IToolInterface):
             if hasattr(self._mcp_tool, method_name):
                 methods.append(method_name)
         
-        # Tool-specific methods (exclude private and standard Python methods)
-        for attr_name in dir(self._mcp_tool):
+        # Tool-specific methods - ONLY from the tool's own class, not inherited
+        # This prevents discovering dozens of inherited methods from BaseTool/object
+        tool_class = self._mcp_tool.__class__
+        for attr_name in dir(tool_class):
             if (not attr_name.startswith('_') and 
+                attr_name in tool_class.__dict__ and  # Only methods defined on this class
                 callable(getattr(self._mcp_tool, attr_name, None)) and
                 attr_name not in standard_methods and
                 attr_name not in ['initialize', 'cleanup', 'health_check']):
