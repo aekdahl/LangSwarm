@@ -662,35 +662,24 @@ class OpenAIProvider(IAgentProvider):
             
             # Handle stream completion
             if choice.finish_reason:
-                # Convert aggregated tool calls to list of objects
+                # Convert aggregated tool calls to list of dicts (AgentMessage expects dicts)
                 final_tool_calls = []
                 if tool_calls_buffer:
                     # Sort by index to maintain order
                     for index in sorted(tool_calls_buffer.keys()):
                         tc_data = tool_calls_buffer[index]
                         
-                        # Create a proper object structure similar to what OpenAI client returns
-                        # This ensures compatibility with _handle_tool_calls which expects objects
-                        class ToolCallObj:
-                            def __init__(self, data):
-                                self.id = data["id"]
-                                self.type = data["type"]
-                                self.function = type('FunctionObj', (), {
-                                    'name': data["function"]["name"],
-                                    'arguments': data["function"]["arguments"]
-                                })()
-                            
-                            def to_dict(self):
-                                return {
-                                    "id": self.id,
-                                    "type": self.type,
-                                    "function": {
-                                        "name": self.function.name,
-                                        "arguments": self.function.arguments
-                                    }
-                                }
+                        # Create proper dictionary structure matching OpenAI format
+                        tool_call_dict = {
+                            "id": tc_data["id"],
+                            "type": tc_data["type"],
+                            "function": {
+                                "name": tc_data["function"]["name"],
+                                "arguments": tc_data["function"]["arguments"]
+                            }
+                        }
                         
-                        final_tool_calls.append(ToolCallObj(tc_data))
+                        final_tool_calls.append(tool_call_dict)
                 
                 # Final chunk signals completion - EMPTY content since all content already sent
                 # This prevents duplication when applications concatenate all chunks

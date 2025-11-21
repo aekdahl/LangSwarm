@@ -448,9 +448,11 @@ class GeminiProvider(IAgentProvider):
     ) -> AsyncIterator[AgentResponse]:
         """Process Gemini streaming response"""
         collected_content = ""
+        collected_tool_calls = []
         
         try:
             for chunk in stream:
+                # Handle text content
                 if hasattr(chunk, 'text') and chunk.text:
                     collected_content += chunk.text
                     
@@ -463,11 +465,42 @@ class GeminiProvider(IAgentProvider):
                         model=config.model,
                         provider="gemini"
                     )
+                
+                # Handle function calls in parts
+                if hasattr(chunk, 'parts'):
+                    for part in chunk.parts:
+                        if hasattr(part, 'function_call') and part.function_call:
+                            # Gemini provides complete function calls in parts, not deltas
+                            fc = part.function_call
+                            
+                            # Convert to standard tool call format
+                            tool_call = {
+                                "id": f"call_{int(time.time())}_{len(collected_tool_calls)}",
+                                "name": fc.name,
+                                "arguments": dict(fc.args),
+                                "type": "function"
+                            }
+                            collected_tool_calls.append(tool_call)
             
             # Final chunk signals completion - EMPTY content since all content already sent
             # This prevents duplication when applications concatenate all chunks
+            
+            # Create final message with tool calls
+            final_message = AgentMessage(
+                role="assistant",
+                content="",
+                tool_calls=collected_tool_calls if collected_tool_calls else None,
+                metadata={
+                    "model": config.model,
+                    "provider": "gemini",
+                    "stream_complete": True,
+                    "total_content": collected_content
+                }
+            )
+            
             yield AgentResponse.success_response(
-                content="",  # Empty - all content already sent in incremental chunks
+                content="",  # Empty - prevents duplication
+                message=final_message,
                 streaming=False,
                 stream_complete=True,
                 execution_time=time.time() - start_time,

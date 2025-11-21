@@ -81,17 +81,18 @@ async def run_reproduction():
         print(f"  Tool calls found: {len(last_response.message.tool_calls)}")
         for i, tc in enumerate(last_response.message.tool_calls):
             print(f"  Tool Call #{i+1}: {tc}")
-            # Check if it's a valid object or a delta
-            if hasattr(tc, 'function') and hasattr(tc.function, 'arguments'):
-                print(f"    Name: {tc.function.name}")
-                print(f"    Arguments: {tc.function.arguments}")
+            # Check if it's a valid dict
+            if isinstance(tc, dict) and "function" in tc:
+                func = tc["function"]
+                print(f"    Name: {func['name']}")
+                print(f"    Arguments: {func['arguments']}")
                 try:
-                    args = json.loads(tc.function.arguments)
+                    args = json.loads(func['arguments'])
                     print(f"    ✅ Arguments are valid JSON: {args}")
                 except:
                     print(f"    ❌ Arguments are NOT valid JSON")
             else:
-                print(f"    ❌ Tool call object structure is unexpected: {type(tc)}")
+                print(f"    ❌ Tool call structure is unexpected: {type(tc)}")
     else:
         print("❌ No tool calls found in final response!")
 

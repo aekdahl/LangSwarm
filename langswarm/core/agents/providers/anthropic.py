@@ -489,6 +489,8 @@ class AnthropicProvider(IAgentProvider):
     ) -> AsyncIterator[AgentResponse]:
         """Process Anthropic streaming response"""
         collected_content = ""
+        # Track tool uses by index
+        current_tool_use = None
         collected_tool_uses = []
         
         async for event in stream:
@@ -503,25 +505,72 @@ class AnthropicProvider(IAgentProvider):
                         chunk_index=len(collected_content),
                         execution_time=time.time() - start_time
                     )
+                elif event.delta.type == "input_json_delta":
+                    # Aggregate JSON delta for the current tool use
+                    if current_tool_use:
+                        current_tool_use["input_json"] += event.delta.partial_json
                     
             elif event.type == "content_block_start":
                 if event.content_block.type == "tool_use":
-                    collected_tool_uses.append({
+                    # Initialize new tool use
+                    current_tool_use = {
                         "id": event.content_block.id,
                         "name": event.content_block.name,
-                        "input": event.content_block.input
-                    })
+                        "input_json": ""  # Start with empty JSON string
+                    }
+                    collected_tool_uses.append(current_tool_use)
+            
+            elif event.type == "content_block_stop":
+                # Block finished - if it was a tool use, we might want to parse it now or wait for end
+                pass
             
             elif event.type == "message_stop":
+                # Parse collected tool inputs
+                final_tool_uses = []
+                for tool_use in collected_tool_uses:
+                    try:
+                        # Parse the accumulated JSON string
+                        if tool_use["input_json"]:
+                            tool_use["input"] = json.loads(tool_use["input_json"])
+                        else:
+                            tool_use["input"] = {}
+                        
+                        # Map input to arguments for BaseAgent compatibility
+                        tool_use["arguments"] = tool_use["input"]
+                        
+                        # Remove the temporary json string
+                        del tool_use["input_json"]
+                        final_tool_uses.append(tool_use)
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Failed to parse tool input JSON: {e}")
+                        # Keep it but maybe mark as error? For now just pass raw
+                        tool_use["error"] = str(e)
+                        final_tool_uses.append(tool_use)
+
                 # Final chunk signals completion - EMPTY content since all content already sent
                 # This prevents duplication when applications concatenate all chunks
+                
+                # Create final message with tool calls
+                final_message = AgentMessage(
+                    role="assistant",
+                    content="",
+                    tool_calls=final_tool_uses if final_tool_uses else None,
+                    metadata={
+                        "model": config.model,
+                        "stop_reason": "end_turn",
+                        "provider": "anthropic",
+                        "stream_complete": True,
+                        "total_content": collected_content
+                    }
+                )
+                
                 yield AgentResponse.success_response(
-                    content="",  # Empty - all content already sent in incremental chunks
+                    content="",  # Empty - prevents duplication
+                    message=final_message,
                     streaming=False,
                     stream_complete=True,
                     execution_time=time.time() - start_time,
                     stop_reason="end_turn",
-                    tool_uses=collected_tool_uses,
                     total_collected_content=collected_content  # Available in metadata if needed
                 )
     
