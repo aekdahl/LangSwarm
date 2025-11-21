@@ -600,7 +600,9 @@ class OpenAIProvider(IAgentProvider):
     ) -> AsyncIterator[AgentResponse]:
         """Process OpenAI streaming response"""
         collected_content = ""
-        collected_tool_calls = []
+        # CRITICAL FIX: Use a dictionary to aggregate tool call deltas by index
+        # OpenAI sends tool calls in parts (deltas) which must be stitched together
+        tool_calls_buffer = {}
         
         async for chunk in stream:
             if not chunk.choices:
@@ -632,18 +634,70 @@ class OpenAIProvider(IAgentProvider):
                     execution_time=time.time() - start_time
                 )
             
-            # Handle tool calls
+            # Handle tool calls - Aggregate deltas
             if delta.tool_calls:
-                collected_tool_calls.extend(delta.tool_calls)
+                for tool_call_chunk in delta.tool_calls:
+                    index = tool_call_chunk.index
+                    
+                    if index not in tool_calls_buffer:
+                        tool_calls_buffer[index] = {
+                            "id": "",
+                            "type": "function",
+                            "function": {
+                                "name": "",
+                                "arguments": ""
+                            }
+                        }
+                    
+                    # Aggregate parts
+                    if tool_call_chunk.id:
+                        tool_calls_buffer[index]["id"] += tool_call_chunk.id
+                    
+                    if hasattr(tool_call_chunk, "function") and tool_call_chunk.function:
+                        if tool_call_chunk.function.name:
+                            tool_calls_buffer[index]["function"]["name"] += tool_call_chunk.function.name
+                        
+                        if tool_call_chunk.function.arguments:
+                            tool_calls_buffer[index]["function"]["arguments"] += tool_call_chunk.function.arguments
             
             # Handle stream completion
             if choice.finish_reason:
+                # Convert aggregated tool calls to list of objects
+                final_tool_calls = []
+                if tool_calls_buffer:
+                    # Sort by index to maintain order
+                    for index in sorted(tool_calls_buffer.keys()):
+                        tc_data = tool_calls_buffer[index]
+                        
+                        # Create a proper object structure similar to what OpenAI client returns
+                        # This ensures compatibility with _handle_tool_calls which expects objects
+                        class ToolCallObj:
+                            def __init__(self, data):
+                                self.id = data["id"]
+                                self.type = data["type"]
+                                self.function = type('FunctionObj', (), {
+                                    'name': data["function"]["name"],
+                                    'arguments': data["function"]["arguments"]
+                                })()
+                            
+                            def to_dict(self):
+                                return {
+                                    "id": self.id,
+                                    "type": self.type,
+                                    "function": {
+                                        "name": self.function.name,
+                                        "arguments": self.function.arguments
+                                    }
+                                }
+                        
+                        final_tool_calls.append(ToolCallObj(tc_data))
+                
                 # Final chunk signals completion - EMPTY content since all content already sent
                 # This prevents duplication when applications concatenate all chunks
                 final_message = AgentMessage(
                     role="assistant",
                     content="",  # Empty - all content already sent in incremental chunks
-                    tool_calls=collected_tool_calls if collected_tool_calls else None,
+                    tool_calls=final_tool_calls if final_tool_calls else None,
                     metadata={
                         "model": config.model,
                         "finish_reason": choice.finish_reason,
