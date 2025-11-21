@@ -927,10 +927,11 @@ class BaseAgent(AutoInstrumentedMixin):
             
             # CRITICAL FIX: Check if the final chunk has tool calls that need execution
             # This was missing and causing tool calls to be ignored in streaming mode!
+            # Match chat() behavior - check only for tool_calls presence, not tools_enabled
             if (last_chunk and 
                 last_chunk.message and 
                 last_chunk.message.tool_calls and 
-                self._configuration.tools_enabled):
+                len(last_chunk.message.tool_calls) > 0):
                 
                 self._logger.info(
                     f"Stream complete with {len(last_chunk.message.tool_calls)} tool call(s). "
@@ -966,6 +967,7 @@ class BaseAgent(AutoInstrumentedMixin):
                     )
             else:
                 # No tool calls - add complete response to session
+                self._logger.debug("No tool calls to execute in stream")
                 if full_content:
                     complete_message = AgentMessage(role="assistant", content=full_content)
                     await session.add_message(complete_message)
