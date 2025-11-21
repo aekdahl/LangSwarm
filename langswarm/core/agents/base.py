@@ -887,7 +887,7 @@ class BaseAgent(AutoInstrumentedMixin):
         session_id: Optional[str] = None,
         **kwargs
     ) -> AsyncIterator[IAgentResponse]:
-        """Stream a chat response"""
+        """Stream a chat response with tool call support"""
         if not self._configuration.streaming_enabled:
             # Fallback to regular chat
             response = await self.chat(message, session_id, **kwargs)
@@ -916,17 +916,59 @@ class BaseAgent(AutoInstrumentedMixin):
             
             # Stream response from provider
             full_content = ""
+            last_chunk = None
             async for chunk in self._provider.stream_message(
                 user_message, session, self._configuration
             ):
                 if chunk.success:
                     full_content += chunk.content
+                last_chunk = chunk  # Keep reference to final chunk for tool call detection
                 yield chunk
             
-            # Add complete response to session
-            if full_content:
-                complete_message = AgentMessage(role="assistant", content=full_content)
-                await session.add_message(complete_message)
+            # CRITICAL FIX: Check if the final chunk has tool calls that need execution
+            # This was missing and causing tool calls to be ignored in streaming mode!
+            if (last_chunk and 
+                last_chunk.message and 
+                last_chunk.message.tool_calls and 
+                self._configuration.tools_enabled):
+                
+                self._logger.info(
+                    f"Stream complete with {len(last_chunk.message.tool_calls)} tool call(s). "
+                    f"Executing tools and continuing..."
+                )
+                
+                # Execute tool calls and get final response (same logic as chat())
+                max_iterations = self._configuration.max_tool_iterations
+                iteration = 0
+                response = last_chunk
+                
+                while (response.success and 
+                       response.message and 
+                       response.message.tool_calls and 
+                       iteration < max_iterations):
+                    
+                    self._logger.info(
+                        f"Tool iteration {iteration+1}/{max_iterations}: "
+                        f"{len(response.message.tool_calls)} tool call(s)"
+                    )
+                    response = await self._handle_tool_calls(response, session)
+                    iteration += 1
+                    
+                    # Yield the tool execution result as additional stream content
+                    if response.success and response.content:
+                        yield response
+                
+                # Warn if max iterations reached with pending tool calls
+                if iteration >= max_iterations and response.message and response.message.tool_calls:
+                    self._logger.warning(
+                        f"Max tool iterations ({max_iterations}) reached in streaming mode. "
+                        f"Returning current response to user."
+                    )
+            else:
+                # No tool calls - add complete response to session
+                if full_content:
+                    complete_message = AgentMessage(role="assistant", content=full_content)
+                    await session.add_message(complete_message)
             
             # Update statistics
             self._update_statistics(time.time() - start_time, True)
