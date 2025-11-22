@@ -542,19 +542,15 @@ class BaseAgent(AutoInstrumentedMixin):
         """List all session IDs"""
         return list(self._sessions.keys())
     
-    async def _handle_tool_calls(
+    async def _execute_tool_calls(
         self,
         response: IAgentResponse,
         session: IAgentSession
-    ) -> IAgentResponse:
+    ) -> Optional[List[Dict[str, Any]]]:
         """
-        Handle tool calls in the response by executing them and getting final response.
-        
-        This implements the automatic tool execution loop:
-        1. Add assistant message with tool calls to session
-        2. Execute each tool and create tool result messages
-        3. Send tool results back to LLM
-        4. Return final text response
+        Execute tool calls from response and add results to session.
+        Returns list of tool results if tools were executed, None otherwise.
+        Does NOT call back to LLM - this must be done by caller.
         """
         try:
             # Add the assistant's message with tool calls to session
@@ -696,6 +692,30 @@ class BaseAgent(AutoInstrumentedMixin):
                 )
                 await session.add_message(tool_message)
             
+            return tool_results
+            
+        except Exception as e:
+            self._logger.error(f"Error in tool execution: {e}")
+            # We don't return error response here, just raise or return None
+            # The caller should handle exceptions
+            raise e
+
+    async def _handle_tool_calls(
+        self,
+        response: IAgentResponse,
+        session: IAgentSession
+    ) -> IAgentResponse:
+        """
+        Legacy method for backward compatibility.
+        Executes tools and gets final response (blocking).
+        """
+        try:
+            # Execute tools
+            tool_results = await self._execute_tool_calls(response, session)
+            
+            if not tool_results:
+                return response
+            
             # Send tool results back to provider to get final response
             self._logger.info("Sending tool results back to LLM for final response")
             
@@ -791,7 +811,16 @@ class BaseAgent(AutoInstrumentedMixin):
                         f"Tool iteration {iteration+1}/{max_iterations}: "
                         f"{len(response.message.tool_calls)} tool call(s)"
                     )
-                    response = await self._handle_tool_calls(response, session)
+                    
+                    # Execute tools (updates session)
+                    await self._execute_tool_calls(response, session)
+                    
+                    # Get next response from provider
+                    continuation_message = AgentMessage(role="user", content="")
+                    response = await self._provider.send_message(
+                        continuation_message, session, self._configuration
+                    )
+                    
                     iteration += 1
                 
                 # Warn if max iterations reached with pending tool calls
@@ -952,12 +981,31 @@ class BaseAgent(AutoInstrumentedMixin):
                         f"Tool iteration {iteration+1}/{max_iterations}: "
                         f"{len(response.message.tool_calls)} tool call(s)"
                     )
-                    response = await self._handle_tool_calls(response, session)
-                    iteration += 1
                     
-                    # Yield the tool execution result as additional stream content
-                    if response.success and response.content:
-                        yield response
+                    # Execute tools (updates session)
+                    await self._execute_tool_calls(response, session)
+                    
+                    # Stream next response from provider
+                    continuation_message = AgentMessage(role="user", content="")
+                    
+                    # CRITICAL FIX: Stream the response after tool execution!
+                    last_chunk = None
+                    async for chunk in self._provider.stream_message(
+                        continuation_message, session, self._configuration
+                    ):
+                        if chunk.success:
+                            full_content += chunk.content
+                        last_chunk = chunk
+                        yield chunk
+                    
+                    # Update response for next iteration check
+                    if last_chunk:
+                        response = last_chunk
+                    else:
+                        # Should not happen if stream worked
+                        break
+                        
+                    iteration += 1
                 
                 # Warn if max iterations reached with pending tool calls
                 if iteration >= max_iterations and response.message and response.message.tool_calls:

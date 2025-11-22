@@ -612,13 +612,19 @@ class OpenAIProvider(IAgentProvider):
             delta = choice.delta
             
             # Handle content chunks
-            if delta.content:
-                collected_content += delta.content
+            content = delta.content
+            
+            # Handle refusal (OpenAI safety refusals)
+            if hasattr(delta, 'refusal') and delta.refusal:
+                content = delta.refusal
+            
+            if content:
+                collected_content += content
                 
                 # Yield content chunk
                 chunk_message = AgentMessage(
                     role="assistant",
-                    content=delta.content,
+                    content=content,
                     metadata={
                         "chunk": True,
                         "model": config.model,
@@ -627,7 +633,7 @@ class OpenAIProvider(IAgentProvider):
                 )
                 
                 yield AgentResponse.success_response(
-                    content=delta.content,
+                    content=content,
                     message=chunk_message,  # Pass the chunk message
                     streaming=True,
                     chunk_index=len(collected_content),
