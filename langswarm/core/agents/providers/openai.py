@@ -365,6 +365,8 @@ class OpenAIProvider(IAgentProvider):
             # CRITICAL FIX: Deduplicate tool_names to prevent building same tool multiple times
             unique_tool_names = list(dict.fromkeys(tool_names))  # Preserves order, removes duplicates
             
+            logger.info(f"Building definitions for tools: {unique_tool_names}")
+            
             if len(unique_tool_names) != len(tool_names):
                 logger.warning(f"Deduplicated {len(tool_names) - len(unique_tool_names)} duplicate tool names in input")
             
@@ -422,16 +424,6 @@ class OpenAIProvider(IAgentProvider):
                         seen_function_names.add(tool_name)
                     else:
                         logger.debug(f"Skipping duplicate tool: {tool_name}")
-            else:
-                # Tool doesn't expose methods, register as single tool
-                if tool_name not in seen_function_names:
-                    logger.info(f"Tool '{tool_name}' doesn't expose methods, registering as single function")
-                    mcp_schema = self._get_tool_mcp_schema(tool)
-                    openai_tool = self._convert_mcp_to_openai_format(mcp_schema, tool_name)
-                    tools.append(openai_tool)
-                    seen_function_names.add(tool_name)
-                else:
-                    logger.debug(f"Skipping duplicate tool: {tool_name}")
             
             # CRITICAL FIX: Check OpenAI's 128 tool limit
             if len(tools) > 128:
@@ -443,7 +435,8 @@ class OpenAIProvider(IAgentProvider):
                 logger.error(f"❌ {error_msg}")
                 raise ValueError(error_msg)
             
-            logger.info(f"✅ Built {len(tools)} tool definitions for OpenAI from {len(unique_tool_names)} unique tool(s)")
+            final_tool_names = [t["function"]["name"] for t in tools]
+            logger.info(f"✅ Built {len(tools)} tool definitions for OpenAI: {final_tool_names}")
             return tools
             
         except ImportError as e:
