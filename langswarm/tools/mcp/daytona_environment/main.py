@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional, Union
 import uvicorn
 
 from langswarm.mcp.server_base import BaseMCPToolServer
-from langswarm.synapse.tools.base import BaseTool
+from langswarm.tools.base import BaseTool
 from langswarm.tools.mcp.protocol_interface import MCPProtocolMixin
 
 # === Pydantic Schemas ===
@@ -770,7 +770,6 @@ class DaytonaEnvironmentMCPTool(MCPProtocolMixin, BaseTool):
         brief = kwargs.pop('brief', "Daytona Environment MCP tool")
         
         # Add MCP server reference
-        kwargs['mcp_server'] = server
         
         # Set MCP tool attributes to bypass Pydantic validation issues
         object.__setattr__(self, '_is_mcp_tool', True)
@@ -782,9 +781,7 @@ class DaytonaEnvironmentMCPTool(MCPProtocolMixin, BaseTool):
         super().__init__(
             name=name or "DaytonaEnvironmentMCPTool",
             description=description,
-            instruction=instruction,
-            identifier=identifier,
-            brief=brief,
+            tool_id=identifier,
             **kwargs
         )
     

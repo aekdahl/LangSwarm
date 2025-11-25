@@ -11,7 +11,7 @@ import re
 import io
 
 from langswarm.mcp.server_base import BaseMCPToolServer
-from langswarm.synapse.tools.base import BaseTool
+from langswarm.tools.base import BaseTool
 from langswarm.tools.mcp.protocol_interface import MCPProtocolMixin
 
 # Optional GCS support
@@ -832,22 +832,18 @@ class FilesystemMCPTool(MCPProtocolMixin, BaseTool):
         ))
         brief = kwargs.pop('brief', "Enhanced Filesystem MCP tool with GCS support")
         
-        # Add MCP server reference
-        kwargs['mcp_server'] = server
-        
         # Initialize with BaseTool (handles all MCP setup automatically)
         super().__init__(
             name=name or f"EnhancedFilesystemMCPTool-{identifier}",
             description=description,
-            instruction=instruction,
-            identifier=identifier,
-            brief=brief,
+            tool_id=identifier,
             **kwargs
         )
         
         # Store configuration AFTER parent initialization to prevent overrides
         object.__setattr__(self, 'permissions', permissions or DEFAULT_PERMISSIONS)
         object.__setattr__(self, 'gcs_project_id', gcs_project_id)
+        object.__setattr__(self, 'mcp_server', server)  # Store MCP server reference
         
         # Set MCP tool attributes to bypass Pydantic validation issues
         object.__setattr__(self, '_is_mcp_tool', True)

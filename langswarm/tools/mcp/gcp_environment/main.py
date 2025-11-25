@@ -73,7 +73,7 @@ except ImportError:
     HAS_STORAGE = False
 
 from langswarm.mcp.server_base import BaseMCPToolServer
-from langswarm.synapse.tools.base import BaseTool
+from langswarm.tools.base import BaseTool
 from langswarm.tools.mcp.protocol_interface import MCPProtocolMixin
 from pydantic import BaseModel
 
@@ -579,9 +579,7 @@ class GCPEnvironmentMCPTool(MCPProtocolMixin, BaseTool):
         super().__init__(
             name=name,
             description=description,
-            instruction=instruction,
-            identifier=identifier,
-            brief=brief,
+            tool_id=identifier,
             **kwargs
         )
         

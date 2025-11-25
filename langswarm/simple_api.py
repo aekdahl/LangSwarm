@@ -6,8 +6,12 @@ This provides a clean, beginner-friendly interface for the most common use cases
 
 import os
 import asyncio
-from typing import Dict, List, Optional, Any, AsyncGenerator, Union
+from typing import Dict, List, Optional, Any, AsyncGenerator, Union, TYPE_CHECKING
 from pathlib import Path
+
+# Type hint for memory manager without importing (avoid circular imports)
+if TYPE_CHECKING:
+    from langswarm.core.memory import IMemoryManager
 
 # Import error handling
 def require_package(package_name: str, feature_desc: str):
@@ -36,15 +40,20 @@ class Agent:
     def __init__(self, model: str, provider: Optional[str] = None, 
                  system_prompt: Optional[str] = None, memory: bool = False,
                  tools: Optional[List[str]] = None, stream: bool = False,
-                 track_costs: bool = False, **kwargs):
+                 track_costs: bool = False, 
+                 memory_manager: Optional["IMemoryManager"] = None,
+                 **kwargs):
         self.model = model
         self.provider = provider or self._detect_provider(model)
         self.system_prompt = system_prompt or "You are a helpful AI assistant."
-        self.memory_enabled = memory
+        self.memory_enabled = memory or (memory_manager is not None)
         self.tools = tools or []
         self.stream_enabled = stream
         self.track_costs = track_costs
         self.kwargs = kwargs
+        
+        # External memory manager for persistent sessions
+        self._memory_manager: Optional["IMemoryManager"] = memory_manager
         
         # Usage tracking
         self._usage_stats = {
@@ -53,8 +62,11 @@ class Agent:
             "request_count": 0
         }
         
-        # Memory store
+        # Local in-memory conversation history (fast cache)
         self._conversation_history = []
+        
+        # Session ID for external memory
+        self._session_id: Optional[str] = None
         
         # Initialize the actual agent
         self._agent = self._create_agent()
@@ -90,10 +102,28 @@ class Agent:
         # For other providers, return mock for now
         return {"client": None, "type": self.provider}
     
-    async def chat(self, message: str) -> str:
-        """Send a message and get a response."""
+    async def chat(self, message: str, session_id: Optional[str] = None) -> str:
+        """Send a message and get a response.
+        
+        Args:
+            message: The user message to send
+            session_id: Optional session ID for external memory persistence
+            
+        Returns:
+            The assistant's response
+        """
+        # Handle session ID for external memory
+        if session_id:
+            self._session_id = session_id
+        
+        # Restore from external memory if needed (session resumption)
+        if self._memory_manager and self._session_id and not self._conversation_history:
+            await self._restore_from_memory()
+        
         if self.memory_enabled:
             self._conversation_history.append({"role": "user", "content": message})
+            # Persist to external memory
+            await self._persist_message("user", message)
         
         if self._agent["type"] == "openai":
             # Build messages
@@ -127,12 +157,63 @@ class Agent:
             
             if self.memory_enabled:
                 self._conversation_history.append({"role": "assistant", "content": assistant_message})
+                # Persist to external memory
+                await self._persist_message("assistant", assistant_message)
             
             return assistant_message
         
         else:
             # Mock response for non-OpenAI providers
             return f"Mock response from {self.provider} {self.model}: I received your message '{message}'"
+    
+    async def _restore_from_memory(self) -> None:
+        """Restore conversation history from external memory."""
+        if not self._memory_manager or not self._session_id:
+            return
+        
+        try:
+            external_session = await self._memory_manager.get_session(self._session_id)
+            if external_session:
+                messages = await external_session.get_messages()
+                for msg in messages:
+                    role = msg.role.value if hasattr(msg.role, 'value') else str(msg.role)
+                    # Skip system messages (we add our own)
+                    if role != "system":
+                        self._conversation_history.append({
+                            "role": role,
+                            "content": msg.content
+                        })
+        except Exception as e:
+            # Don't fail if memory restoration fails
+            pass
+    
+    async def _persist_message(self, role: str, content: str) -> None:
+        """Persist a message to external memory."""
+        if not self._memory_manager:
+            return
+        
+        try:
+            # Import Message class from memory module
+            from langswarm.core.memory import Message, MessageRole
+            
+            # Get or create session
+            session_id = self._session_id or "default"
+            external_session = await self._memory_manager.get_or_create_session(session_id)
+            
+            # Convert role string to MessageRole enum
+            role_map = {
+                "user": MessageRole.USER,
+                "assistant": MessageRole.ASSISTANT,
+                "system": MessageRole.SYSTEM,
+            }
+            msg_role = role_map.get(role, MessageRole.USER)
+            
+            # Create and add message
+            memory_message = Message(role=msg_role, content=content)
+            await external_session.add_message(memory_message)
+        except Exception:
+            # Don't fail the main operation if persistence fails
+            pass
     
     async def chat_stream(self, message: str) -> AsyncGenerator[str, None]:
         """Stream a response as it's generated."""
@@ -212,17 +293,48 @@ class Config:
         return self._agents[agent_id]
 
 
-def create_agent(model: str, **kwargs) -> Agent:
+def create_agent(
+    model: str, 
+    memory_manager: Optional["IMemoryManager"] = None,
+    **kwargs
+) -> Agent:
     """Create a simple agent.
     
     Args:
         model: AI model name (e.g., "gpt-3.5-turbo", "gpt-4")
-        **kwargs: Additional agent options
+        memory_manager: Optional external memory manager for persistent sessions.
+            When provided, conversations are automatically persisted and can be
+            restored across agent restarts.
+        **kwargs: Additional agent options:
+            - provider: Provider name (auto-detected from model if not specified)
+            - system_prompt: System instructions for the agent
+            - memory: Enable in-memory conversation history (default: False)
+            - tools: List of tool names to enable
+            - stream: Enable streaming responses (default: False)
+            - track_costs: Track token usage and costs (default: False)
         
     Returns:
         Agent instance
+        
+    Example:
+        # Simple agent
+        agent = create_agent(model="gpt-4")
+        
+        # Agent with persistent memory
+        from langswarm.core.memory import create_memory_manager
+        manager = create_memory_manager("sqlite", db_path="memory.db")
+        await manager.backend.connect()
+        
+        agent = create_agent(
+            model="gpt-4",
+            memory_manager=manager,
+            system_prompt="You are a helpful assistant"
+        )
+        
+        # Chat with session persistence
+        response = await agent.chat("Hello!", session_id="user-123")
     """
-    return Agent(model=model, **kwargs)
+    return Agent(model=model, memory_manager=memory_manager, **kwargs)
 
 
 def create_workflow(definition: str, agents: List[Dict[str, Any]]) -> Workflow:

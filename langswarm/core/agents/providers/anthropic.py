@@ -53,17 +53,9 @@ class AnthropicProvider(IAgentProvider):
     
     @property
     def supported_models(self) -> List[str]:
-        """Anthropic models supported by this provider"""
-        return [
-            "claude-3-5-sonnet-20241022",
-            "claude-3-5-sonnet-20240620",
-            "claude-3-opus-20240229",
-            "claude-3-sonnet-20240229",
-            "claude-3-haiku-20240307",
-            "claude-2.1",
-            "claude-2.0",
-            "claude-instant-1.2"
-        ]
+        """Anthropic models supported by this provider - sourced from centralized config"""
+        from .config import get_supported_models
+        return get_supported_models("anthropic")
     
     @property
     def supported_capabilities(self) -> List[AgentCapability]:
@@ -575,23 +567,48 @@ class AnthropicProvider(IAgentProvider):
                 )
     
     def _estimate_cost(self, usage: Any, model: str) -> float:
-        """Estimate cost for Anthropic API usage"""
-        # Simplified cost estimation (rates as of 2024)
+        """Estimate cost for Anthropic API usage (prices per 1K tokens, updated Nov 2024)"""
+        # Pricing from https://www.anthropic.com/pricing
         rates = {
+            # Claude 3.5 Sonnet (latest flagship)
             "claude-3-5-sonnet-20241022": {"input": 0.003, "output": 0.015},
             "claude-3-5-sonnet-20240620": {"input": 0.003, "output": 0.015},
+            "claude-3-5-sonnet-latest": {"input": 0.003, "output": 0.015},
+            
+            # Claude 3.5 Haiku (fast & affordable)
+            "claude-3-5-haiku-20241022": {"input": 0.001, "output": 0.005},
+            "claude-3-5-haiku-latest": {"input": 0.001, "output": 0.005},
+            
+            # Claude 3 Opus (most capable)
             "claude-3-opus-20240229": {"input": 0.015, "output": 0.075},
+            "claude-3-opus-latest": {"input": 0.015, "output": 0.075},
+            
+            # Claude 3 Sonnet
             "claude-3-sonnet-20240229": {"input": 0.003, "output": 0.015},
+            "claude-3-sonnet-latest": {"input": 0.003, "output": 0.015},
+            
+            # Claude 3 Haiku (fastest)
             "claude-3-haiku-20240307": {"input": 0.00025, "output": 0.00125},
+            "claude-3-haiku-latest": {"input": 0.00025, "output": 0.00125},
+            
+            # Legacy models (deprecated)
             "claude-2.1": {"input": 0.008, "output": 0.024},
             "claude-2.0": {"input": 0.008, "output": 0.024},
             "claude-instant-1.2": {"input": 0.0008, "output": 0.0024}
         }
         
-        if model not in rates:
+        # Try exact match first, then prefix match for aliases
+        model_rates = rates.get(model)
+        if not model_rates:
+            # Try to find a matching base model
+            for rate_model in rates:
+                if model.startswith(rate_model.rsplit("-", 1)[0]):
+                    model_rates = rates[rate_model]
+                    break
+        
+        if not model_rates:
             return 0.0
         
-        model_rates = rates[model]
         input_cost = (usage.input_tokens / 1000) * model_rates["input"]
         output_cost = (usage.output_tokens / 1000) * model_rates["output"]
         

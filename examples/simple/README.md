@@ -71,11 +71,14 @@ agent = create_agent(tools=["web_search"])
 await agent.chat("What's the latest Python news?")
 ```
 
-### **08_config_from_file.py** (24 lines)
-Load configuration from YAML
+### **08_builder_pattern.py** (24 lines)
+Advanced configuration using builder pattern
 ```python
-config = load_config("simple_config.yaml")
-agent = config.get_agent("helper")
+agent = await AgentBuilder()
+    .openai()
+    .model("gpt-3.5-turbo")
+    .memory_enabled(True)
+    .build()
 ```
 
 ### **09_streaming_response.py** (19 lines)
@@ -117,7 +120,7 @@ done
 - **Model selection** - Using different AI models
 - **Tools** - File system and web search
 - **Workflows** - Agent pipelines
-- **Configuration** - YAML vs programmatic setup
+- **Configuration** - Builder pattern for advanced config
 - **Streaming** - Real-time responses
 - **Monitoring** - Cost and usage tracking
 

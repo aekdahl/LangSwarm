@@ -1,5 +1,5 @@
 import os
-from langswarm.synapse.tools.base import BaseTool
+from langswarm.tools.base import BaseTool
 from langswarm.tools.mcp.protocol_interface import MCPProtocolMixin
 from langswarm.tools.mcp.template_loader import get_cached_tool_template_safe
 
@@ -31,9 +31,7 @@ class MCPGitHubTool(MCPProtocolMixin, BaseTool):
         super().__init__(
             name=name,
             description=description,
-            instruction=instruction,
-            identifier=identifier,
-            brief=brief,
+            tool_id=identifier,
             **kwargs
         )
     

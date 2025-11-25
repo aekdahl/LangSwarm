@@ -51,6 +51,13 @@ class MCPToolAdapter(IToolInterface):
             name = getattr(self._mcp_tool, 'name', self._tool_id)
             description = getattr(self._mcp_tool, 'description', '')
             
+            # Try to get instruction from MCP tool
+            instruction = getattr(self._mcp_tool, 'instruction', None)
+            
+            # If no instruction but we have description, use description as instruction
+            if not instruction and description:
+                instruction = description
+            
             # Try to get description from template.md if available
             if not description:
                 description = self._load_description_from_template()
@@ -131,6 +138,7 @@ class MCPToolAdapter(IToolInterface):
                 id=self._tool_id,
                 name=name,
                 description=description,
+                instruction=instruction,
                 version="1.0.0",
                 tool_type=tool_type,
                 capabilities=capabilities,

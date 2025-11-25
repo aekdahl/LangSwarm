@@ -470,7 +470,7 @@ app = server.build_app()
 
 # === LangChain-Compatible Tool Class ===
 try:
-    from langswarm.synapse.tools.base import BaseTool
+    from langswarm.tools.base import BaseTool
     from langswarm.tools.mcp.protocol_interface import MCPProtocolMixin
     
     class BigQueryVectorSearchMCPTool(MCPProtocolMixin, BaseTool):
@@ -617,9 +617,8 @@ try:
             super().__init__(
                 name="BigQuery Vector Search",
                 description=description,
-                instruction=instruction,
-                identifier=identifier,
-                brief=brief,
+                tool_id=identifier,
+                config=config,  # Pass config to BaseTool
                 **kwargs
             )
             
@@ -631,8 +630,6 @@ try:
             
             object.__setattr__(self, 'server', server)
             object.__setattr__(self, 'default_config', config)
-            # CRITICAL FIX: Also assign to self.config for backward compatibility
-            object.__setattr__(self, 'config', config)
             
             # CRITICAL FIX: Pass the tool's config to the server so it can use it
             # The server is what actually handles the MCP calls, so it needs the config

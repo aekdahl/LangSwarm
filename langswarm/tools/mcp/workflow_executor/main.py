@@ -21,7 +21,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from langswarm.mcp.server_base import BaseMCPToolServer
-from langswarm.synapse.tools.base import BaseTool
+from langswarm.tools.base import BaseTool
 from langswarm.tools.mcp.protocol_interface import MCPProtocolMixin
 
 # Global execution tracking
@@ -832,9 +832,7 @@ class WorkflowExecutorMCPTool(MCPProtocolMixin, BaseTool):
         super().__init__(
             name=name or "workflow_executor",
             description="Execute LangSwarm workflows with support for pre-written and dynamically generated configurations",
-            instruction="Use this tool to execute existing workflows, generate new workflows from natural language, and manage workflow executions. Supports sync, async, and isolated execution modes.",
-            identifier=identifier,
-            brief="Dynamic workflow orchestration and execution",
+            tool_id=identifier,
             **kwargs
         )
         

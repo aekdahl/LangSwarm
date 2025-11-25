@@ -15,8 +15,21 @@ from .interfaces import (
     MemoryBackendType, MemoryConfig
 )
 from .base import MemoryManager
-from .backends import InMemoryBackend, SQLiteBackend, RedisBackend
+from .backends import (
+    InMemoryBackend, SQLiteBackend, RedisBackend,
+    BIGQUERY_AVAILABLE, POSTGRES_AVAILABLE, MONGODB_AVAILABLE, ELASTICSEARCH_AVAILABLE
+)
 from .vector_backend import VectorMemoryBackend
+
+# Conditionally import new backends
+if BIGQUERY_AVAILABLE:
+    from .backends import BigQueryBackend
+if POSTGRES_AVAILABLE:
+    from .backends import PostgresBackend
+if MONGODB_AVAILABLE:
+    from .backends import MongoDBBackend
+if ELASTICSEARCH_AVAILABLE:
+    from .backends import ElasticsearchBackend
 
 
 # Custom exception classes for better error handling
@@ -225,7 +238,10 @@ class MemoryConfiguration:
             return errors  # No validation needed for disabled memory
         
         # Validate backend
-        valid_backends = ["auto", "in_memory", "sqlite", "redis", "vector"]
+        valid_backends = [
+            "auto", "in_memory", "sqlite", "redis", "vector",
+            "bigquery", "postgres", "mongodb", "elasticsearch"
+        ]
         if self.backend not in valid_backends:
             errors.append(f"Invalid backend '{self.backend}'. Must be one of: {valid_backends}")
         
@@ -268,8 +284,18 @@ class MemoryFactory:
         "in_memory": InMemoryBackend,
         "sqlite": SQLiteBackend,
         "redis": RedisBackend,
-        "vector": VectorMemoryBackend
+        "vector": VectorMemoryBackend,
     }
+    
+    # Register optional backends if available
+    if BIGQUERY_AVAILABLE:
+        _backend_registry["bigquery"] = BigQueryBackend
+    if POSTGRES_AVAILABLE:
+        _backend_registry["postgres"] = PostgresBackend
+    if MONGODB_AVAILABLE:
+        _backend_registry["mongodb"] = MongoDBBackend
+    if ELASTICSEARCH_AVAILABLE:
+        _backend_registry["elasticsearch"] = ElasticsearchBackend
     
     _logger = logging.getLogger(__name__)
     
@@ -347,6 +373,34 @@ class MemoryFactory:
                     "Check vector store configuration and dependencies",
                     "Verify embedding provider settings",
                     "Ensure vector store service is accessible"
+                ])
+            elif backend_name == "bigquery":
+                troubleshooting.extend([
+                    "Install google-cloud-bigquery: pip install google-cloud-bigquery",
+                    "Ensure project_id is set in configuration",
+                    "Verify GCP credentials (GOOGLE_APPLICATION_CREDENTIALS)",
+                    "Check BigQuery API is enabled in GCP project"
+                ])
+            elif backend_name == "postgres":
+                troubleshooting.extend([
+                    "Install asyncpg: pip install asyncpg",
+                    "Ensure database, user, and password are set in configuration",
+                    "Verify PostgreSQL server is running and accessible",
+                    "Check database user has CREATE TABLE permissions"
+                ])
+            elif backend_name == "mongodb":
+                troubleshooting.extend([
+                    "Install motor: pip install motor",
+                    "Verify MongoDB connection URI is correct",
+                    "Ensure MongoDB server is running and accessible",
+                    "Check authentication credentials if required"
+                ])
+            elif backend_name == "elasticsearch":
+                troubleshooting.extend([
+                    "Install elasticsearch: pip install elasticsearch[async]",
+                    "Verify Elasticsearch hosts are correct",
+                    "Ensure Elasticsearch cluster is running",
+                    "Check API key or basic auth credentials if required"
                 ])
             
             error_details = {
@@ -481,6 +535,18 @@ class MemoryFactory:
                 return cls._test_redis_connection()
             except ImportError:
                 return False
+        
+        if backend_name == "bigquery":
+            return BIGQUERY_AVAILABLE
+        
+        if backend_name == "postgres":
+            return POSTGRES_AVAILABLE
+        
+        if backend_name == "mongodb":
+            return MONGODB_AVAILABLE
+        
+        if backend_name == "elasticsearch":
+            return ELASTICSEARCH_AVAILABLE
         
         # Most backends are always available
         return True

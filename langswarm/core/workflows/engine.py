@@ -11,7 +11,7 @@ import uuid
 import time
 import logging
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional, Union, AsyncIterator, Set
+from typing import Dict, Any, List, Optional, Union, AsyncIterator, Set, TYPE_CHECKING
 from dataclasses import dataclass
 
 from .interfaces import (
@@ -27,6 +27,10 @@ from ..orchestration_errors import (
     AgentNotFoundError, WorkflowExecutionError, AgentExecutionError,
     DataPassingError, agent_not_found, workflow_failed, agent_failed
 )
+
+# Type hint for memory manager without importing (avoid circular imports)
+if TYPE_CHECKING:
+    from langswarm.core.memory import IMemoryManager
 
 # Import V2 systems
 try:
@@ -68,7 +72,8 @@ class WorkflowExecutionEngine(IWorkflowEngine, AutoInstrumentedMixin):
         workflow: IWorkflow,
         input_data: Dict[str, Any],
         execution_mode: ExecutionMode = ExecutionMode.SYNC,
-        context_variables: Optional[Dict[str, Any]] = None
+        context_variables: Optional[Dict[str, Any]] = None,
+        memory_manager: Optional["IMemoryManager"] = None
     ) -> Union[WorkflowResult, IWorkflowExecution]:
         """Execute a multi-agent workflow with automatic orchestration.
         
@@ -80,6 +85,9 @@ class WorkflowExecutionEngine(IWorkflowEngine, AutoInstrumentedMixin):
             input_data: Initial input data (typically {"input": "your query"})
             execution_mode: How to execute (SYNC waits for completion, ASYNC returns immediately)
             context_variables: Additional variables available to all agents
+            memory_manager: Optional shared memory manager for all agents in the workflow.
+                When provided, all agents share the same memory backend for session
+                persistence and conversation history.
             
         Returns:
             WorkflowResult: For SYNC mode - contains final result and status
@@ -97,14 +105,15 @@ class WorkflowExecutionEngine(IWorkflowEngine, AutoInstrumentedMixin):
             ... )
             >>> print(result.result)  # Final output from last agent
             >>> 
-            >>> # Asynchronous execution (monitor progress)
-            >>> execution = await engine.execute_workflow(
+            >>> # With shared memory for all agents
+            >>> from langswarm.core.memory import create_memory_manager
+            >>> manager = create_memory_manager("sqlite", db_path="workflow.db")
+            >>> await manager.backend.connect()
+            >>> result = await engine.execute_workflow(
             ...     workflow=my_workflow,
             ...     input_data={"input": "Research AI safety"},
-            ...     execution_mode=ExecutionMode.ASYNC
+            ...     memory_manager=manager
             ... )
-            >>> # Check status periodically
-            >>> status = execution.get_status()
         """
         
         # Create execution context
@@ -117,6 +126,10 @@ class WorkflowExecutionEngine(IWorkflowEngine, AutoInstrumentedMixin):
         
         # Add input data to context
         context.variables.update(input_data)
+        
+        # Store memory manager in context for agents to access
+        if memory_manager:
+            context.variables["_memory_manager"] = memory_manager
         
         # Create execution tracking
         execution = WorkflowExecution(execution_id, workflow.workflow_id, context)
@@ -248,7 +261,8 @@ class WorkflowExecutionEngine(IWorkflowEngine, AutoInstrumentedMixin):
         self,
         workflow: IWorkflow,
         input_data: Dict[str, Any],
-        context_variables: Optional[Dict[str, Any]] = None
+        context_variables: Optional[Dict[str, Any]] = None,
+        memory_manager: Optional["IMemoryManager"] = None
     ) -> AsyncIterator[Union[StepResult, WorkflowResult]]:
         """Execute workflow with streaming step results"""
         
@@ -259,6 +273,10 @@ class WorkflowExecutionEngine(IWorkflowEngine, AutoInstrumentedMixin):
             variables=context_variables or {},
         )
         context.variables.update(input_data)
+        
+        # Store memory manager in context for agents to access
+        if memory_manager:
+            context.variables["_memory_manager"] = memory_manager
         
         execution = WorkflowExecution(execution_id, workflow.workflow_id, context)
         self._executions[execution_id] = execution

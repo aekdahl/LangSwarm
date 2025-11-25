@@ -8,7 +8,7 @@ from datetime import datetime
 import uvicorn
 
 from langswarm.mcp.server_base import BaseMCPToolServer
-from langswarm.synapse.tools.base import BaseTool
+from langswarm.tools.base import BaseTool
 from langswarm.tools.mcp.protocol_interface import MCPProtocolMixin
 from langswarm.tools.mcp.template_loader import get_cached_tool_template_safe
 
@@ -365,20 +365,16 @@ class DynamicFormsMCPTool(MCPProtocolMixin, BaseTool):
         instruction = kwargs.pop('instruction', template_values.get('instruction', 'Use this tool to generate dynamic forms from configuration files'))
         brief = kwargs.pop('brief', template_values.get('brief', 'Dynamic forms tool'))
         
-        # Add MCP server reference
-        kwargs['mcp_server'] = server
-        
         super().__init__(
-            name=name,
+            name=name or f"DynamicForms-{identifier}",
             description=description,
-            instruction=instruction,
-            identifier=identifier,
-            brief=brief,
+            tool_id=identifier,
             **kwargs
         )
         
         # Set configuration file path
         object.__setattr__(self, 'user_config_path', user_config_path or os.path.join(os.getcwd(), "tools.yaml"))
+        object.__setattr__(self, 'mcp_server', server)
         
         # Set MCP tool attributes to bypass Pydantic validation issues
         object.__setattr__(self, '_is_mcp_tool', True)

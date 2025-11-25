@@ -9,7 +9,11 @@ import uvicorn
 import aiohttp
 import subprocess
 
-from langswarm.mcp.server_base import BaseMCPToolServer
+try:
+    from .server import BaseMCPToolServer
+except ImportError:
+    # Fallback for direct execution
+    from server import BaseMCPToolServer
 
 # === Pydantic Schemas (Reusing from main Daytona tool) ===
 
@@ -794,6 +798,172 @@ server.add_task(
 
 # Build app
 app = server.build_app()
+
+# === LangChain-Compatible Tool Class ===
+try:
+    try:
+        from langswarm.tools.base import BaseTool
+    except ImportError:
+        from langswarm.tools.base import BaseTool
+        
+    from langswarm.tools.mcp.protocol_interface import MCPProtocolMixin
+    
+    class DaytonaSelfHostedMCPTool(MCPProtocolMixin, BaseTool):
+        """
+        Daytona Self-Hosted MCP Tool for workspace management.
+        
+        Features:
+        - Create and manage development environments (sandboxes)
+        - Execute code and shell commands
+        - File system operations
+        - Git integration
+        """
+        _bypass_pydantic = True
+        
+        def preprocess_parameters(self, params, explicit_method=None):
+            """Daytona-specific parameter preprocessing"""
+            if params is None:
+                params = {}
+            
+            # If explicit method provided, use it
+            if explicit_method:
+                return explicit_method, params
+            
+            # Check for nested MCP structure
+            if "mcp" in params and isinstance(params["mcp"], dict):
+                nested = params["mcp"]
+                if "method" in nested:
+                    return nested["method"], nested.get("params", {})
+            
+            # Check for input wrapper
+            if "input" in params:
+                val = params["input"]
+                if isinstance(val, dict):
+                    return "daytona_workflow", val
+                elif isinstance(val, str):
+                    return "daytona_workflow", {"user_input": val}
+            
+            # Default to workflow
+            return "daytona_workflow", params
+            
+        def __init__(self, identifier: str, **kwargs):
+            description = "Manage self-hosted Daytona workspaces"
+            instruction = "Use this tool to create, manage, and interact with Daytona workspaces."
+            
+            super().__init__(
+                name="Daytona Self-Hosted",
+                description=description,
+                tool_id=identifier,
+                **kwargs
+            )
+            
+            # Link server
+            server.name = identifier
+            if server.local_mode:
+                server._register_globally()
+            object.__setattr__(self, 'server', server)
+            
+        async def run_async(self, input_data=None):
+            """Unified async execution method"""
+            # Dispatch logic
+            if isinstance(input_data, str):
+                return await self._handle_intent_call({"user_input": input_data})
+            
+            method = "daytona_workflow"
+            params = input_data or {}
+            
+            if isinstance(input_data, dict):
+                if "method" in input_data:
+                    method = input_data["method"]
+                    params = input_data.get("params", {})
+                elif "user_input" in input_data:
+                    method = "daytona_workflow"
+                    params = input_data
+            
+            if method == "daytona_workflow":
+                return await self._handle_intent_call(params)
+            
+            # Direct method calls - map to manager methods
+            mgr = get_manager()
+            
+            try:
+                if method == "create_sandbox":
+                    result = await mgr.create_sandbox(CreateSandboxInput(**params))
+                    return result.dict()
+                elif method == "execute_code":
+                    result = await mgr.execute_code(ExecuteCodeInput(**params))
+                    return result.dict()
+                elif method == "execute_shell":
+                    result = await mgr.execute_shell(ExecuteShellInput(**params))
+                    return result.dict()
+                elif method == "file_operation":
+                    result = await mgr.file_operation(FileOperationInput(**params))
+                    return result.dict()
+                elif method == "git_operation":
+                    result = await mgr.git_operation(GitOperationInput(**params))
+                    return result.dict()
+                elif method == "list_sandboxes":
+                    result = await mgr.list_sandboxes()
+                    return result.dict()
+                elif method == "delete_sandbox":
+                    result = await mgr.delete_sandbox(DeleteSandboxInput(**params))
+                    return result.dict()
+                elif method == "get_sandbox_info":
+                    result = await mgr.get_sandbox_info(SandboxInfoInput(**params))
+                    return result.dict()
+                else:
+                    return {"error": f"Unknown method: {method}"}
+            except Exception as e:
+                return {"error": str(e)}
+
+        async def _handle_intent_call(self, input_data):
+            """Handle intent-based calling using LangSwarm workflow system"""
+            try:
+                from langswarm.core.config import LangSwarmConfigLoader
+            except ImportError:
+                from langswarm.v1.core.config import LangSwarmConfigLoader
+            
+            import os
+            import yaml
+            from pathlib import Path
+            
+            # Get tool directory and workflow config
+            tool_directory = Path(__file__).parent
+            workflows_config = tool_directory / "workflows.yaml"
+            agents_config = tool_directory / "agents.yaml"
+            
+            if not workflows_config.exists() or not agents_config.exists():
+                return {"error": "Workflow configuration not found"}
+                
+            # Load configs
+            with open(workflows_config, 'r') as f:
+                workflow_data = yaml.safe_load(f)
+            with open(agents_config, 'r') as f:
+                agents_data = yaml.safe_load(f)
+                
+            combined_config = {}
+            if workflow_data:
+                combined_config.update(workflow_data)
+            if agents_data:
+                # Merge agents
+                if "agents" in combined_config and "agents" in agents_data:
+                    combined_config["agents"].extend(agents_data["agents"])
+                else:
+                    combined_config.update(agents_data)
+            
+            # Execute workflow
+            from langswarm.core.utils.workflows.engine import WorkflowEngine
+            engine = WorkflowEngine(combined_config)
+            
+            # Prepare context
+            context = input_data.copy()
+            
+            # Run workflow
+            result = await engine.run_workflow("daytona_workflow", context)
+            return result
+
+except ImportError:
+    pass
 
 # === Entry Point ===
 if __name__ == "__main__":

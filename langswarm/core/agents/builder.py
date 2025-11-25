@@ -6,7 +6,7 @@ and simplified configuration. This replaces the complex AgentWrapper
 constructor with an intuitive, type-safe building experience.
 """
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING
 import os
 import logging
 
@@ -14,6 +14,10 @@ logger = logging.getLogger(__name__)
 
 from .interfaces import ProviderType, AgentCapability
 from .base import AgentConfiguration, BaseAgent
+
+# Type hint for memory manager without importing (avoid circular imports)
+if TYPE_CHECKING:
+    from langswarm.core.memory import IMemoryManager
 # STRICT MODE: Import real providers - fail if required providers are missing
 # No graceful fallbacks to None - providers must be available when requested
 from .providers.openai import OpenAIProvider
@@ -71,6 +75,9 @@ class AgentBuilder:
         self._memory_enabled: bool = False
         self._max_memory_messages: int = 50
         self._streaming_enabled: bool = False
+        
+        # External memory manager for persistent sessions
+        self._memory_manager: Optional["IMemoryManager"] = None
         
         # Provider-specific config
         self._provider_config: Dict[str, Any] = {}
@@ -284,6 +291,36 @@ class AgentBuilder:
         self._max_memory_messages = max_messages
         return self
     
+    def memory_manager(self, manager: "IMemoryManager") -> 'AgentBuilder':
+        """
+        Set external memory manager for persistent session storage.
+        
+        When a memory manager is set:
+        - Sessions are automatically restored from external storage when accessed
+        - Messages are persisted to external storage (write-through caching)
+        - Local in-memory cache is used for fast access
+        
+        Args:
+            manager: IMemoryManager instance (e.g., from create_memory_manager())
+            
+        Returns:
+            Self for method chaining
+            
+        Example:
+            manager = create_memory_manager("sqlite", db_path="conversations.db")
+            await manager.backend.connect()
+            
+            agent = await (AgentBuilder()
+                .openai()
+                .memory_manager(manager)
+                .build())
+        """
+        self._memory_manager = manager
+        # Also enable memory if not already enabled
+        if not self._memory_enabled:
+            self._memory_enabled = True
+        return self
+    
     def streaming(self, enabled: bool = True) -> 'AgentBuilder':
         """Enable streaming responses"""
         self._streaming_enabled = enabled
@@ -397,35 +434,28 @@ class AgentBuilder:
         )
     
     def _validate_provider_specific(self):
-        """Validate provider-specific constraints"""
-        # OpenAI validations
-        if self._provider == ProviderType.OPENAI:
-            valid_models = [
-                "gpt-4o", "gpt-4o-mini", "gpt-4", "gpt-4-turbo", 
-                "gpt-4-vision-preview", "gpt-3.5-turbo", "gpt-3.5-turbo-16k",
-                "o1-preview", "o1-mini"
-            ]
-            if self._model not in valid_models:
-                raise ValueError(f"Model '{self._model}' not supported by OpenAI provider. "
-                               f"Valid models: {', '.join(valid_models)}")
+        """Validate provider-specific constraints using centralized config"""
+        from .providers.config import get_supported_models
         
-        # Anthropic validations
-        elif self._provider == ProviderType.ANTHROPIC:
-            valid_models = [
-                "claude-3-5-sonnet-20241022", "claude-3-5-sonnet-20240620",
-                "claude-3-opus-20240229", "claude-3-sonnet-20240229",
-                "claude-3-haiku-20240307", "claude-2.1", "claude-2.0", "claude-instant-1.2"
-            ]
-            if self._model not in valid_models:
-                raise ValueError(f"Model '{self._model}' not supported by Anthropic provider. "
-                               f"Valid models: {', '.join(valid_models)}")
+        # Map provider types to config keys
+        provider_map = {
+            ProviderType.OPENAI: "openai",
+            ProviderType.ANTHROPIC: "anthropic",
+            ProviderType.GEMINI: "gemini",
+            ProviderType.MISTRAL: "mistral",
+            ProviderType.COHERE: "cohere",
+        }
         
-        # Gemini validations
-        elif self._provider == ProviderType.GEMINI:
-            valid_models = ["gemini-pro", "gemini-pro-vision", "gemini-ultra"]
+        provider_key = provider_map.get(self._provider)
+        if provider_key:
+            valid_models = get_supported_models(provider_key)
             if self._model not in valid_models:
-                raise ValueError(f"Model '{self._model}' not supported by Gemini provider. "
-                               f"Valid models: {', '.join(valid_models)}")
+                # Show helpful subset of models
+                sample_models = valid_models[:5] if len(valid_models) > 5 else valid_models
+                raise ValueError(
+                    f"Model '{self._model}' not supported by {provider_key.title()} provider. "
+                    f"Valid models include: {', '.join(sample_models)}"
+                )
     
     async def build(self) -> BaseAgent:
         """Build the complete agent with automatic tool injection"""
@@ -433,7 +463,12 @@ class AgentBuilder:
         
         # Create provider based on type and availability
         provider = self._create_provider(config)
-        agent = BaseAgent(self._name, config, provider)
+        agent = BaseAgent(
+            self._name, 
+            config, 
+            provider,
+            memory_manager=self._memory_manager
+        )
         
         # Automatic tool injection if tools are specified
         if config.tools_enabled and config.available_tools:
@@ -445,8 +480,18 @@ class AgentBuilder:
         """Build agent synchronously (without automatic tool injection)"""
         config = self.build_config()
         provider = self._create_provider(config)
-        return BaseAgent(self._name, config, provider)
+        return BaseAgent(
+            self._name, 
+            config, 
+            provider,
+            memory_manager=self._memory_manager
+        )
     
+    def tool_configs(self, configs: Dict[str, Dict[str, Any]]) -> 'AgentBuilder':
+        """Set configuration for specific tools"""
+        self._tool_configs = configs
+        return self
+
     async def _auto_inject_tools(self, agent: BaseAgent, tool_names: List[str]) -> None:
         """Pass tools to agent - let provider handle tool integration"""
         try:
@@ -468,6 +513,18 @@ class AgentBuilder:
                     f"Ensure all tools are properly registered before building the agent."
                 )
             
+            # Apply tool configurations if provided
+            if hasattr(self, '_tool_configs') and self._tool_configs:
+                for tool_name, config in self._tool_configs.items():
+                    if tool_name in tool_names:
+                        tool = registry.get_tool(tool_name)
+                        if tool:
+                            # Initialize tool with config
+                            # Note: This might re-initialize an already initialized tool, 
+                            # which is acceptable as it updates the configuration
+                            await tool.initialize(config)
+                            logger.info(f"🔧 Configured tool '{tool_name}' with provided settings")
+
             # Let the agent provider handle tool integration in their own format
             if hasattr(agent, 'add_tools'):
                 await agent.add_tools(tool_names)
@@ -561,6 +618,10 @@ async def create_openai_agent(
     
     if temperature != 0.7:
         builder.temperature(temperature)
+    
+    # Handle tool_configs specifically
+    if 'tool_configs' in kwargs:
+        builder.tool_configs(kwargs.pop('tool_configs'))
     
     # Apply additional kwargs
     for key, value in kwargs.items():

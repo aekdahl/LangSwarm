@@ -39,13 +39,9 @@ class MistralProvider(IAgentProvider):
     
     @property
     def supported_models(self) -> List[str]:
-        return [
-            "mistral-large-latest",
-            "mistral-medium-latest", 
-            "mistral-small-latest",
-            "open-mistral-7b",
-            "open-mixtral-8x7b"
-        ]
+        """Mistral models supported by this provider - sourced from centralized config"""
+        from .config import get_supported_models
+        return get_supported_models("mistral")
     
     @property
     def supported_capabilities(self) -> List[AgentCapability]:

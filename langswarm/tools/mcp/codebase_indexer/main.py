@@ -22,7 +22,7 @@ except ImportError:
     NUMPY_AVAILABLE = False
 
 from langswarm.mcp.server_base import BaseMCPToolServer
-from langswarm.synapse.tools.base import BaseTool
+from langswarm.tools.base import BaseTool
 from langswarm.tools.mcp.protocol_interface import MCPProtocolMixin
 from pydantic import BaseModel
 
@@ -1049,21 +1049,17 @@ class CodebaseIndexerMCPTool(MCPProtocolMixin, BaseTool):
         ))
         brief = kwargs.pop('brief', "Enhanced Codebase Indexer with AI-powered analysis")
         
-        # Add MCP server reference
-        kwargs['mcp_server'] = server
-        
         # Initialize with BaseTool (handles all MCP setup automatically)
         super().__init__(
             name=name or f"EnhancedCodebaseIndexer-{identifier}",
             description=description,
-            instruction=instruction,
-            identifier=identifier,
-            brief=brief,
+            tool_id=identifier,
             **kwargs
         )
         
         # Store configuration AFTER parent initialization
         object.__setattr__(self, 'root_path', root_path)
+        object.__setattr__(self, 'mcp_server', server)
         object.__setattr__(self, '_is_mcp_tool', True)
         object.__setattr__(self, 'local_mode', local_mode)
     

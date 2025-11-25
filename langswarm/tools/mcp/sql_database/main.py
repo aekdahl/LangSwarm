@@ -955,7 +955,7 @@ app = server.build_app()
 
 # === LangChain-Compatible Tool Class ===
 try:
-    from langswarm.synapse.tools.base import BaseTool
+    from langswarm.tools.base import BaseTool
     from langswarm.tools.mcp.protocol_interface import MCPProtocolMixin
     
     class SQLDatabaseMCPTool(MCPProtocolMixin, BaseTool):
@@ -996,9 +996,7 @@ try:
             super().__init__(
                 name="SQL Database Query Tool",
                 description="Execute secure SQL queries with intent-based natural language support",
-                instruction=instruction_content,  # Full template.md content
-                identifier=identifier,
-                brief="Secure SQL database querying with intent-based natural language support"
+                tool_id=identifier
             )
             object.__setattr__(self, 'server', server)
             object.__setattr__(self, 'config', DEFAULT_CONFIG.copy())

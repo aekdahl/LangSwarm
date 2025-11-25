@@ -20,7 +20,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from langswarm.mcp.server_base import BaseMCPToolServer
-from langswarm.synapse.tools.base import BaseTool
+from langswarm.tools.base import BaseTool
 from langswarm.tools.mcp.protocol_interface import MCPProtocolMixin
 
 logger = logging.getLogger(__name__)
@@ -495,7 +495,6 @@ class RealtimeVoiceMCPTool(MCPProtocolMixin, BaseTool):
         brief = kwargs.pop('brief', "Realtime Voice MCP Tool")
         
         # Add MCP server reference
-        kwargs['mcp_server'] = server
         
         # Set MCP tool attributes
         object.__setattr__(self, '_is_mcp_tool', True)
@@ -505,9 +504,7 @@ class RealtimeVoiceMCPTool(MCPProtocolMixin, BaseTool):
         super().__init__(
             name=name or "RealtimeVoiceMCPTool",
             description=description,
-            instruction=instruction,
-            identifier=identifier,
-            brief=brief,
+            tool_id=identifier,
             **kwargs
         )
     

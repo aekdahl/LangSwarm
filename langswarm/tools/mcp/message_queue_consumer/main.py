@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 from enum import Enum
 
 from langswarm.mcp.server_base import BaseMCPToolServer
-from langswarm.synapse.tools.base import BaseTool
+from langswarm.tools.base import BaseTool
 from langswarm.tools.mcp.protocol_interface import MCPProtocolMixin
 
 # Global consumer instances and state
@@ -1041,9 +1041,7 @@ class MessageQueueConsumerMCPTool(MCPProtocolMixin, BaseTool):
         super().__init__(
             name=name or "message_queue_consumer",
             description="Poll message queues and consume tasks for processing with LangSwarm workflows",
-            instruction="Use this tool to start/stop message queue consumers, monitor task processing, and manage distributed task execution across Redis, GCP Pub/Sub, or in-memory queues.",
-            identifier=identifier,
-            brief="Message queue consumer for distributed task processing",
+            tool_id=identifier,
             **kwargs
         )
         

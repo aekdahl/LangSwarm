@@ -153,6 +153,12 @@ class AgentStep(BaseWorkflowStep):
         if not agent:
             raise ValueError(f"Agent '{self.agent_id}' not found")
         
+        # Inject shared memory manager if provided in context and agent doesn't have one
+        memory_manager = context.variables.get("_memory_manager")
+        if memory_manager and hasattr(agent, '_memory_manager') and agent._memory_manager is None:
+            agent._memory_manager = memory_manager
+            logger.debug(f"Injected shared memory manager into agent '{self.agent_id}'")
+        
         # Create consistent session_id for conversation context isolation
         # Priority: user-provided session_id > workflow execution session_id
         session_id = context.variables.get("session_id") or f"{context.workflow_id}_{context.execution_id}"

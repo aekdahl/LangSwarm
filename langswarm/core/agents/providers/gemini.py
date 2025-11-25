@@ -52,14 +52,9 @@ class GeminiProvider(IAgentProvider):
     
     @property
     def supported_models(self) -> List[str]:
-        """Gemini models supported by this provider"""
-        return [
-            "gemini-pro",
-            "gemini-pro-vision", 
-            "gemini-ultra",
-            "gemini-1.5-pro",
-            "gemini-1.5-flash"
-        ]
+        """Gemini models supported by this provider - sourced from centralized config"""
+        from .config import get_supported_models
+        return get_supported_models("gemini")
     
     @property
     def supported_capabilities(self) -> List[AgentCapability]:
@@ -514,20 +509,48 @@ class GeminiProvider(IAgentProvider):
             yield AgentResponse.error_response(e)
     
     def _estimate_cost(self, usage: Any, model: str) -> float:
-        """Estimate cost for Gemini API usage"""
-        # Simplified cost estimation (rates as of 2024)
+        """Estimate cost for Gemini API usage (prices per 1K tokens, updated Nov 2024)"""
+        # Pricing from https://ai.google.dev/pricing
+        # Note: Gemini has free tier for low usage, these are pay-as-you-go rates
         rates = {
-            "gemini-pro": {"input": 0.000125, "output": 0.000375},
-            "gemini-pro-vision": {"input": 0.000125, "output": 0.000375},
-            "gemini-ultra": {"input": 0.001, "output": 0.002},
-            "gemini-1.5-pro": {"input": 0.0035, "output": 0.0105},
-            "gemini-1.5-flash": {"input": 0.000125, "output": 0.000375}
+            # Gemini 2.0 (experimental, pricing TBD - using flash estimates)
+            "gemini-2.0-flash-exp": {"input": 0.000075, "output": 0.0003},
+            "gemini-2.0-flash-thinking-exp-1219": {"input": 0.000075, "output": 0.0003},
+            
+            # Gemini 1.5 Pro (up to 128K context)
+            "gemini-1.5-pro": {"input": 0.00125, "output": 0.005},
+            "gemini-1.5-pro-latest": {"input": 0.00125, "output": 0.005},
+            "gemini-1.5-pro-002": {"input": 0.00125, "output": 0.005},
+            
+            # Gemini 1.5 Flash (fast & efficient)
+            "gemini-1.5-flash": {"input": 0.000075, "output": 0.0003},
+            "gemini-1.5-flash-latest": {"input": 0.000075, "output": 0.0003},
+            "gemini-1.5-flash-002": {"input": 0.000075, "output": 0.0003},
+            "gemini-1.5-flash-8b": {"input": 0.0000375, "output": 0.00015},
+            
+            # Gemini 1.0 (legacy)
+            "gemini-pro": {"input": 0.0005, "output": 0.0015},
+            "gemini-pro-vision": {"input": 0.0005, "output": 0.0015},
+            
+            # Experimental
+            "gemini-exp-1206": {"input": 0.00125, "output": 0.005},
+            "learnlm-1.5-pro-experimental": {"input": 0.00125, "output": 0.005},
         }
         
-        if model not in rates or not hasattr(usage, 'prompt_token_count'):
+        if not hasattr(usage, 'prompt_token_count'):
             return 0.0
         
-        model_rates = rates[model]
+        # Try exact match first, then prefix match
+        model_rates = rates.get(model)
+        if not model_rates:
+            for rate_model in rates:
+                if model.startswith(rate_model.split("-latest")[0].split("-002")[0]):
+                    model_rates = rates[rate_model]
+                    break
+        
+        if not model_rates:
+            return 0.0
+        
         input_cost = (getattr(usage, 'prompt_token_count', 0) / 1000) * model_rates["input"]
         output_cost = (getattr(usage, 'candidates_token_count', 0) / 1000) * model_rates["output"]
         

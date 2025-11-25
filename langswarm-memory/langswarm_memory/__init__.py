@@ -72,8 +72,23 @@ from .backends import (
     RedisBackend,
     InMemorySession,
     SQLiteSession,
-    RedisSession
+    RedisSession,
+    # Availability flags for optional backends
+    BIGQUERY_AVAILABLE,
+    POSTGRES_AVAILABLE,
+    MONGODB_AVAILABLE,
+    ELASTICSEARCH_AVAILABLE,
 )
+
+# Optional backends (import if available)
+if BIGQUERY_AVAILABLE:
+    from .backends import BigQueryBackend, BigQuerySession
+if POSTGRES_AVAILABLE:
+    from .backends import PostgresBackend, PostgresSession
+if MONGODB_AVAILABLE:
+    from .backends import MongoDBBackend, MongoDBSession
+if ELASTICSEARCH_AVAILABLE:
+    from .backends import ElasticsearchBackend, ElasticsearchSession
 
 # Factory and configuration
 from .factory import (
@@ -127,6 +142,12 @@ __all__ = [
     "InMemorySession",
     "SQLiteSession",
     "RedisSession",
+    
+    # Optional backend availability flags
+    "BIGQUERY_AVAILABLE",
+    "POSTGRES_AVAILABLE",
+    "MONGODB_AVAILABLE",
+    "ELASTICSEARCH_AVAILABLE",
     
     # Configuration and factory
     "MemoryConfiguration",

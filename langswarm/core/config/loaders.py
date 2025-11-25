@@ -728,12 +728,23 @@ def load_config(config_path: Optional[str] = None) -> LangSwarmConfig:
     """
     Convenience function to load configuration.
     
+    DEPRECATED: Use code-first configuration instead.
+    
     Args:
         config_path: Optional path to configuration file
         
     Returns:
         Loaded configuration
     """
+    import warnings
+    warnings.warn(
+        "YAML configuration is deprecated and will be removed in a future version. "
+        "Please migrate to code-first configuration using AgentBuilder.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    logger.warning("⚠️  YAML configuration is deprecated. Please migrate to code-first configuration.")
+    
     loader = get_config_loader()
     return loader.load(config_path)
 

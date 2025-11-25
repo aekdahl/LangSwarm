@@ -1,3 +1,4 @@
+# langswarm/mcp/server_base.py
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -5,9 +6,6 @@ from typing import Callable, Dict, Any, Type, Optional, List
 import threading
 import asyncio
 import inspect
-import logging
-
-logger = logging.getLogger(__name__)
 
 class BaseMCPToolServer:
     def __init__(self, name: str, description: str, local_mode: bool = False):
@@ -138,10 +136,10 @@ class BaseMCPToolServer:
 
     def call_task(self, task_name: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """Call a task directly (local mode)."""
-        # print(f"🔍 MCP Server '{self.name}' call_task: {task_name} with params: {list(params.keys()) if params else 'None'}")
+        print(f"🔍 MCP Server '{self.name}' call_task: {task_name} with params: {list(params.keys()) if params else 'None'}")
         
         if task_name not in self._tasks:
-            # print(f"❌ Task '{task_name}' not found in {self.name}. Available: {list(self._tasks.keys())}")
+            print(f"❌ Task '{task_name}' not found in {self.name}. Available: {list(self._tasks.keys())}")
             # Return a simple error that agents can handle
             return {
                 "success": False,
@@ -162,8 +160,10 @@ class BaseMCPToolServer:
                     validated_input = input_model(**params)
                 except Exception as validation_error:
                     error_msg = f"🚨 PARAMETER VALIDATION FAILED in {self.name}.{task_name}: {str(validation_error)}"
-                    # print(error_msg)  # IMMEDIATE CONSOLE ALERT
+                    print(error_msg)  # IMMEDIATE CONSOLE ALERT
                     # LOG AS ERROR (use module logger if instance logger not available)
+                    import logging
+                    logger = getattr(self, 'logger', logging.getLogger(__name__))
                     logger.error(error_msg)
                     
                     # Report to central error monitoring
@@ -237,8 +237,10 @@ class BaseMCPToolServer:
                 # Enhanced error reporting with immediate surfacing
                 error_type = type(e).__name__
                 error_msg = f"🚨 MCP TOOL EXECUTION FAILED: {self.name}.{task_name} - {error_type}: {str(e)}"
-                # print(error_msg)  # IMMEDIATE CONSOLE ALERT
+                print(error_msg)  # IMMEDIATE CONSOLE ALERT
                 # LOG AS ERROR (use module logger if instance logger not available)
+                import logging
+                logger = getattr(self, 'logger', logging.getLogger(__name__))
                 logger.error(error_msg)
                 
                 # Return structured error response
@@ -254,7 +256,7 @@ class BaseMCPToolServer:
     def build_app(self) -> Optional[FastAPI]:
         """Build FastAPI app - skip for local mode."""
         if self.local_mode:
-            # print(f"🔧 {self.name} running in LOCAL MODE - no HTTP server needed")
+            print(f"🔧 {self.name} running in LOCAL MODE - no HTTP server needed")
             return None
         
         app = FastAPI(title=self.name, description=self.description)
@@ -314,6 +316,8 @@ class BaseMCPToolServer:
         Generate an enhanced error response with actionable feedback for parameter validation failures.
         This helps agents understand what went wrong and how to fix it.
         """
+        import logging
+        logger = getattr(self, 'logger', logging.getLogger(__name__))
         
         # Extract field information from the validation error
         error_details = self._parse_validation_error(validation_error)

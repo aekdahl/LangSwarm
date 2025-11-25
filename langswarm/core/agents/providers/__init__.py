@@ -10,7 +10,25 @@ Each provider implements the IAgentProvider interface and provides:
 - Streaming and function calling support
 - Error handling and retry logic
 - Token usage tracking
+
+Model Configuration:
+All model lists and pricing are centralized in config.py.
+Update that file when new models are released or pricing changes.
 """
+
+# Centralized model configuration
+from .config import (
+    OPENAI_MODELS,
+    ANTHROPIC_MODELS,
+    GEMINI_MODELS,
+    MISTRAL_MODELS,
+    COHERE_MODELS,
+    ModelInfo,
+    get_model_info,
+    get_supported_models,
+    estimate_cost,
+    get_all_models,
+)
 
 # Provider implementations
 try:
@@ -77,3 +95,17 @@ if HUGGINGFACE_AVAILABLE:
 
 if LOCAL_AVAILABLE:
     __all__.extend(['LocalProvider', 'LocalAgent'])
+
+# Always export config utilities
+__all__.extend([
+    'OPENAI_MODELS',
+    'ANTHROPIC_MODELS', 
+    'GEMINI_MODELS',
+    'MISTRAL_MODELS',
+    'COHERE_MODELS',
+    'ModelInfo',
+    'get_model_info',
+    'get_supported_models',
+    'estimate_cost',
+    'get_all_models',
+])

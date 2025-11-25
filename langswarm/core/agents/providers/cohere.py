@@ -54,14 +54,9 @@ class CohereProvider(IAgentProvider):
     
     @property
     def supported_models(self) -> List[str]:
-        return [
-            "command-r-plus",
-            "command-r",
-            "command",
-            "command-nightly",
-            "command-light",
-            "command-light-nightly"
-        ]
+        """Cohere models supported by this provider - sourced from centralized config"""
+        from .config import get_supported_models
+        return get_supported_models("cohere")
     
     @property
     def supported_capabilities(self) -> List[AgentCapability]:
@@ -526,24 +521,45 @@ class CohereProvider(IAgentProvider):
             yield AgentResponse.error_response(e)
     
     def _estimate_cost(self, tokens: Any, model: str) -> float:
-        """Estimate cost based on token usage and model"""
-        # Cohere pricing (approximate, as of 2024)
+        """Estimate cost based on token usage and model (prices per 1M tokens, updated Nov 2024)"""
+        # Pricing from https://cohere.com/pricing
         pricing = {
-            "command-r-plus": {"input": 3.0, "output": 15.0},  # per 1M tokens
-            "command-r": {"input": 0.5, "output": 1.5},
+            # Command R+ (most capable)
+            "command-r-plus": {"input": 2.5, "output": 10.0},
+            "command-r-plus-08-2024": {"input": 2.5, "output": 10.0},
+            
+            # Command R (balanced)
+            "command-r": {"input": 0.15, "output": 0.6},
+            "command-r-08-2024": {"input": 0.15, "output": 0.6},
+            
+            # Command (legacy)
             "command": {"input": 1.0, "output": 2.0},
             "command-nightly": {"input": 1.0, "output": 2.0},
             "command-light": {"input": 0.3, "output": 0.6},
-            "command-light-nightly": {"input": 0.3, "output": 0.6}
+            "command-light-nightly": {"input": 0.3, "output": 0.6},
+            
+            # Embed models (for completeness)
+            "embed-english-v3.0": {"input": 0.1, "output": 0.0},
+            "embed-multilingual-v3.0": {"input": 0.1, "output": 0.0},
+            "embed-english-light-v3.0": {"input": 0.1, "output": 0.0},
+            "embed-multilingual-light-v3.0": {"input": 0.1, "output": 0.0},
         }
         
-        if model not in pricing:
+        # Try exact match first, then prefix match
+        model_pricing = pricing.get(model)
+        if not model_pricing:
+            for price_model in pricing:
+                if model.startswith(price_model.split("-08-")[0]):
+                    model_pricing = pricing[price_model]
+                    break
+        
+        if not model_pricing:
             return 0.0
         
         input_tokens = getattr(tokens, 'input_tokens', 0)
         output_tokens = getattr(tokens, 'output_tokens', 0)
         
-        input_cost = (input_tokens / 1_000_000) * pricing[model]["input"]
-        output_cost = (output_tokens / 1_000_000) * pricing[model]["output"]
+        input_cost = (input_tokens / 1_000_000) * model_pricing["input"]
+        output_cost = (output_tokens / 1_000_000) * model_pricing["output"]
         
         return input_cost + output_cost

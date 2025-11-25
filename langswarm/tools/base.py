@@ -90,6 +90,7 @@ class ToolMetadata(IToolMetadata):
         id: str,
         name: str,
         description: str,
+        instruction: str = None,
         version: str = "1.0.0",
         tool_type: ToolType = ToolType.MCP,
         capabilities: List[ToolCapability] = None,
@@ -102,6 +103,7 @@ class ToolMetadata(IToolMetadata):
         self._id = id
         self._name = name
         self._description = description
+        self._instruction = instruction
         self._version = version
         self._tool_type = tool_type
         self._capabilities = capabilities or []
@@ -122,6 +124,10 @@ class ToolMetadata(IToolMetadata):
     @property
     def description(self) -> str:
         return self._description
+    
+    @property
+    def instruction(self) -> Optional[str]:
+        return self._instruction
     
     @property
     def version(self) -> str:
@@ -171,7 +177,7 @@ class ToolMetadata(IToolMetadata):
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert metadata to dictionary"""
-        return {
+        result = {
             "id": self.id,
             "name": self.name,
             "description": self.description,
@@ -184,6 +190,9 @@ class ToolMetadata(IToolMetadata):
             "homepage": self.homepage,
             "license": self.license
         }
+        if self.instruction:
+            result["instruction"] = self.instruction
+        return result
 
 
 class ToolExecution(IToolExecution, AutoInstrumentedMixin):

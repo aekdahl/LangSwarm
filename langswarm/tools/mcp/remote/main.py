@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from datetime import datetime
 
 # LangSwarm imports
-from langswarm.synapse.tools.base import BaseTool
+from langswarm.tools.base import BaseTool
 from langswarm.tools.mcp.protocol_interface import MCPProtocolMixin
 
 # === Remote MCP Tool Implementation ===
@@ -61,9 +61,7 @@ class RemoteMCPTool(MCPProtocolMixin, BaseTool):
         super().__init__(
             name=name or f"RemoteMCPTool-{identifier}",
             description=description,
-            instruction=instruction,
-            identifier=identifier,
-            brief=brief,
+            tool_id=identifier,
             **kwargs
         )
         
@@ -380,7 +378,7 @@ def create_user_mcp_tool(identifier: str = "user_mcp", api_key: str = None, **kw
     # Merge with user-provided config
     config = {**default_config, **kwargs}
     
-    return RemoteMCPTool(identifier=identifier, **config)
+    return RemoteMCPTool(tool_id=identifier, **config)
 
 if __name__ == "__main__":
     # Test the remote MCP tool

@@ -40,8 +40,6 @@ pip install langswarm openai
 export OPENAI_API_KEY="your-api-key-here"
 ```
 
-> **Note**: LangSwarm supports both V1 (archived) and V2 (current) versions with full backward compatibility. See [V1/V2 Import Guide](V1_V2_IMPORT_GUIDE.md) for details on using either version.
-
 ### Simple Agent (30 seconds)
 
 ```python
@@ -62,17 +60,20 @@ asyncio.run(main())
 ### Multi-Agent Orchestration (Real Power)
 
 ```python
-from langswarm.core.agents import create_openai_agent, register_agent
+from langswarm import create_agent
+from langswarm.core.agents import register_agent
 from langswarm.core.workflows import create_simple_workflow, get_workflow_engine
 
 # Create specialized agents
-researcher = create_openai_agent(
+researcher = create_agent(
     name="researcher",
+    model="gpt-4",
     system_prompt="You are a research specialist. Gather comprehensive information."
 )
 
-writer = create_openai_agent(
-    name="writer", 
+writer = create_agent(
+    name="writer",
+    model="gpt-4",
     system_prompt="You are a writing specialist. Create clear, engaging content."
 )
 
@@ -114,7 +115,7 @@ Agents are AI-powered entities with specific roles and capabilities. LangSwarm s
 agent = create_agent(model="gpt-4", memory=True)
 
 # Advanced agent with tools
-agent = create_openai_agent(
+agent = create_agent(
     name="assistant",
     model="gpt-4",
     system_prompt="You are a helpful assistant",
@@ -140,44 +141,7 @@ engine = get_workflow_engine()
 result = await engine.execute_workflow(workflow, {"input": "task data"})
 ```
 
-### 4. **Memory**
-
-LangSwarm's conversational memory system is powered by **[AgentMem](./agentmem)**, a standalone package that provides enterprise-grade memory management for AI agents.
-
-**Key Features:**
-- **Session Management**: Organize conversations with persistent sessions
-- **Multiple Backends**: SQLite, Redis, In-Memory, and vector stores
-- **Auto-Summarization**: Automatic conversation compression when limits reached
-- **Token Management**: Keep context within model limits
-- **LLM Integration**: Native OpenAI and Anthropic format support
-
-```python
-from langswarm.core.memory import create_memory_manager, Message, MessageRole
-
-# Create memory manager
-manager = create_memory_manager("sqlite", db_path="conversations.db")
-await manager.backend.connect()
-
-# Create a session
-session = await manager.create_session(user_id="user123")
-
-# Add messages
-await session.add_message(Message(role=MessageRole.USER, content="Hello"))
-```
-
-**AgentMem as Standalone Package:**
-
-AgentMem can also be used independently in other projects:
-
-```bash
-pip install agentmem
-```
-
-See the [AgentMem documentation](./agentmem/README.md) for more details on standalone usage.
-
----
-
-## 🛠️ Tools (MCP)
+### 3. **Tools (MCP)**
 
 LangSwarm implements the Model Context Protocol (MCP) for tool integration:
 
@@ -199,7 +163,7 @@ agent = create_agent(
     tools=["filesystem", "web_search"]
 )
 
-# Tools are automatically discovered and injected
+# Tools are automatically injected
 response = await agent.chat("Find the latest Python news and save it to a file")
 ```
 
@@ -216,19 +180,22 @@ Conversation history and context management with multiple backends:
 - **Pinecone**: Managed vector database
 
 ```python
-# Simple memory
-agent = create_agent(model="gpt-3.5-turbo", memory=True)
+# Simple memory (in-memory, no persistence)
+agent = create_agent(model="gpt-4", memory=True)
 
-# Advanced memory configuration
-config = {
-    "memory": {
-        "backend": "chromadb",
-        "settings": {
-            "persist_directory": "./data/memory",
-            "embedding_model": "text-embedding-3-small"
-        }
-    }
-}
+# Persistent memory with SQLite
+from langswarm.core.memory import create_memory_manager
+
+memory = create_memory_manager(
+    backend="sqlite",
+    db_path="./conversations.db"
+)
+
+agent = create_agent(
+    model="gpt-4",
+    memory=True,
+    memory_manager=memory
+)
 ```
 
 ---
@@ -255,11 +222,11 @@ config = {
 │  ┌────────────────────────────────────────────────┐   │
 │  │           Infrastructure Layer                  │   │
 │  │                                                 │   │
-│  │  Memory    Session      Observability   Config │   │
-│  │  • SQLite  • Storage    • OpenTelemetry • YAML │   │
-│  │  • Redis   • Providers  • LangSmith     • JSON │   │
-│  │  • ChromaDB• Lifecycle  • Tracing       • Code │   │
-│  │  • BigQuery                                     │   │
+│  │  Memory     Session      Observability         │   │
+│  │  • SQLite   • Storage    • OpenTelemetry       │   │
+│  │  • Redis    • Providers  • Tracing             │   │
+│  │  • ChromaDB • Lifecycle  • Metrics             │   │
+│  │  • BigQuery • Management                       │   │
 │  └────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -271,18 +238,39 @@ config = {
 ### Content Creation Pipeline
 
 ```python
+from langswarm import create_agent
+from langswarm.core.agents import register_agent
+from langswarm.core.workflows import create_simple_workflow, get_workflow_engine
+
 # Specialized agents
-researcher = create_openai_agent(name="researcher", system_prompt="Research topics")
-writer = create_openai_agent(name="writer", system_prompt="Write engaging content")
-editor = create_openai_agent(name="editor", system_prompt="Edit and polish")
+researcher = create_agent(
+    name="researcher",
+    model="gpt-4",
+    system_prompt="Research topics thoroughly"
+)
+
+writer = create_agent(
+    name="writer",
+    model="gpt-4",
+    system_prompt="Write engaging content"
+)
+
+editor = create_agent(
+    name="editor",
+    model="gpt-4",
+    system_prompt="Edit and polish"
+)
 
 # Register all
 for agent in [researcher, writer, editor]:
     register_agent(agent)
 
 # Workflow: research → write → edit
-workflow = create_simple_workflow("content", "Content Pipeline", 
-                                 ["researcher", "writer", "editor"])
+workflow = create_simple_workflow(
+    workflow_id="content",
+    name="Content Pipeline",
+    agent_chain=["researcher", "writer", "editor"]
+)
 
 # Execute
 result = await get_workflow_engine().execute_workflow(
@@ -321,60 +309,99 @@ escalation = create_agent(system_prompt="Handle escalations")
 
 ## 🔧 Configuration
 
-### Code Configuration
+LangSwarm uses **code-first configuration** for maximum flexibility and type safety. Configure everything programmatically in Python:
+
+### Simple Configuration
 
 ```python
 from langswarm import create_agent
 
+# Quick start - minimal config
+agent = create_agent(model="gpt-4")
+
+# Common configuration options
 agent = create_agent(
+    name="assistant",
     model="gpt-4",
     system_prompt="You are a helpful assistant",
     memory=True,
     tools=["filesystem", "web_search"],
     temperature=0.7,
-    stream=False,
-    track_costs=True
+    max_tokens=2000,
+    stream=False
 )
 ```
 
-### YAML Configuration
-
-```yaml
-# langswarm.yaml
-version: "2.0"
-project_name: "my-agents"
-
-agents:
-  - id: assistant
-    model: gpt-4
-    provider: openai
-    system_prompt: "You are a helpful assistant"
-    tools: ["filesystem", "web_search"]
-    
-  - id: analyst
-    model: claude-3-sonnet-20240229
-    provider: anthropic
-    system_prompt: "You are a data analyst"
-    memory_enabled: true
-
-memory:
-  backend: chromadb
-  settings:
-    persist_directory: "./data/memory"
-
-workflows:
-  - id: research_task
-    workflow: "assistant -> analyst -> user"
-```
-
-Load and use:
+### Advanced Configuration with Builder Pattern
 
 ```python
-from langswarm.core.config import load_config
+from langswarm.core.agents import AgentBuilder
 
-config = load_config("langswarm.yaml")
-agent = config.get_agent("assistant")
-response = await agent.chat("Hello!")
+# Full control with builder pattern
+agent = await (
+    AgentBuilder()
+    .name("advanced-assistant")
+    .openai()  # or .anthropic(), .gemini(), etc.
+    .model("gpt-4")
+    .system_prompt("You are a helpful assistant")
+    .tools(["filesystem", "web_search", "github"])
+    .memory_enabled(True)
+    .streaming(True)
+    .temperature(0.7)
+    .max_tokens(4000)
+    .timeout(60)
+    .build()
+)
+```
+
+### Provider-Specific Configuration
+
+```python
+# OpenAI
+agent = create_agent(
+    model="gpt-4",
+    api_key="your-key-here",  # or use OPENAI_API_KEY env var
+    temperature=0.7
+)
+
+# Anthropic (Claude)
+from langswarm.core.agents import AgentBuilder
+
+agent = await (
+    AgentBuilder()
+    .anthropic(api_key="your-key-here")  # or use ANTHROPIC_API_KEY
+    .model("claude-3-5-sonnet-20241022")
+    .build()
+)
+
+# Google (Gemini)
+agent = await (
+    AgentBuilder()
+    .gemini(api_key="your-key-here")  # or use GOOGLE_API_KEY
+    .model("gemini-pro")
+    .build()
+)
+```
+
+### Memory Configuration
+
+```python
+# Simple in-memory (default)
+agent = create_agent(model="gpt-4", memory=True)
+
+# Advanced memory with custom settings
+from langswarm.core.memory import create_memory_manager
+
+memory_manager = create_memory_manager(
+    backend="sqlite",
+    db_path="./conversations.db"
+)
+
+agent = create_agent(
+    model="gpt-4",
+    memory=True,
+    memory_manager=memory_manager
+)
 ```
 
 ---
@@ -488,21 +515,15 @@ agent = create_agent(model="gpt-4", tools=["my_custom_tool"])
 - **[Multi-Agent Orchestration](docs/MULTI_AGENT_ORCHESTRATION_GUIDE.md)** - Learn workflow patterns
 - **[Simple Examples](examples/simple/)** - 10 working examples to learn from
 
-**🆕 V2 - Hierarchical Planning**
+**🚀 Core Features**
 - **[Hierarchical Planning](docs/planning/HIERARCHICAL_PLANNING_COMPLETE.md)** - Advanced orchestration system
 - **[Retrospective Validation](docs/planning/RETROSPECTIVE_VALIDATION_COMPLETE.md)** - Async validation & rollback
 - **[Planning Examples](examples/planning/)** - 6 comprehensive workflow examples
 
-**📦 V1 - Legacy Support**
-- **[V1 Quick Start](docs/v1/README_V1_USERS.md)** - Fix V1 bugs (LangChain + UTF-8)
-- **[V1 Migration](docs/v1/V1_MIGRATION_GUIDE.md)** - Upgrade to fixed V1
-- **[V1 Monkey Patch](docs/v1/langswarm_v1_monkey_patch.py)** - Standalone bug fix
-
 **🔧 Advanced Topics**
 - **[Tool Development](docs/tools/mcp/MCP_TOOL_DEVELOPER_GUIDE.md)** - Create custom tools
 - **[API Reference](docs/api-reference/)** - Complete API documentation
-- **[Migration Guide](docs/migration/)** - Upgrading from older versions
-- **[Release Notes](docs/releases/RELEASE_NOTES_v0.0.54.dev46.md)** - Latest release info
+- **[Observability Guide](docs/observability/)** - Monitoring and tracing
 
 ---
 
@@ -658,11 +679,11 @@ See the [`examples/simple/`](examples/simple/) directory for 10 working examples
 5. **With Tools** - Agents using tools (filesystem, web search)
 6. **Workflow** - Sequential agent workflows
 7. **Web Search** - Agent with web search capabilities
-8. **Config From File** - Loading configuration from YAML
-9. **Streaming Response** - Real-time streaming responses
-10. **Cost Tracking** - Tracking token usage and costs
+8. **Streaming Response** - Real-time streaming responses
+9. **Cost Tracking** - Tracking token usage and costs
+10. **Advanced Configuration** - Full builder pattern examples
 
-Each example is **10-25 lines of code** and **fully working**.
+Each example is **10-30 lines of code** and **fully working**.
 
 ---
 

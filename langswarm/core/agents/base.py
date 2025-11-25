@@ -11,7 +11,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional, AsyncIterator
+from typing import Any, Dict, List, Optional, AsyncIterator, TYPE_CHECKING
 import uuid
 
 from .interfaces import (
@@ -21,6 +21,10 @@ from .interfaces import (
 from ..observability.auto_instrumentation import (
     AutoInstrumentedMixin, auto_trace_operation, auto_record_metric, auto_log_operation
 )
+
+# Type hint for memory manager without importing (avoid circular imports)
+if TYPE_CHECKING:
+    from langswarm.core.memory import IMemoryManager
 
 logger = logging.getLogger(__name__)
 
@@ -357,7 +361,8 @@ class BaseAgent(AutoInstrumentedMixin):
         name: str,
         configuration: AgentConfiguration,
         provider: IAgentProvider,
-        agent_id: Optional[str] = None
+        agent_id: Optional[str] = None,
+        memory_manager: Optional["IMemoryManager"] = None
     ):
         self._agent_id = agent_id or str(uuid.uuid4())
         self._name = name
@@ -369,6 +374,9 @@ class BaseAgent(AutoInstrumentedMixin):
         self._metadata = AgentMetadata(agent_id=self._agent_id, name=name)
         self._tools: Dict[str, Any] = {}
         self._logger = logging.getLogger(f"langswarm.agent.{name}")
+        
+        # External memory manager for persistent session storage
+        self._memory_manager: Optional["IMemoryManager"] = memory_manager
         
         # Performance tracking
         self._response_times: List[float] = []
@@ -541,6 +549,108 @@ class BaseAgent(AutoInstrumentedMixin):
     async def list_sessions(self) -> List[str]:
         """List all session IDs"""
         return list(self._sessions.keys())
+    
+    async def _get_or_create_session(self, session_id: Optional[str] = None) -> IAgentSession:
+        """
+        Get or create a session with two-level caching strategy:
+        1. Check local in-memory cache first (fast path)
+        2. If external memory exists, try to restore session from persistent storage
+        3. Create new session if not found anywhere
+        
+        Args:
+            session_id: Optional session ID. If None, uses current session or creates new one.
+            
+        Returns:
+            The session (existing or newly created)
+        """
+        # If no session_id provided, use current session or create new one
+        if session_id is None:
+            if self._current_session:
+                return self._current_session
+            return await self.create_session()
+        
+        # Level 1: Check local in-memory cache first (fast path)
+        if session_id in self._sessions:
+            session = self._sessions[session_id]
+            self._current_session = session
+            return session
+        
+        # Level 2: If external memory exists, try to restore session
+        if self._memory_manager:
+            try:
+                external_session = await self._memory_manager.get_session(session_id)
+                if external_session:
+                    # Load messages from external into local AgentSession
+                    messages = await external_session.get_messages()
+                    local_session = await self.create_session(session_id=session_id)
+                    
+                    # Convert external messages to AgentMessages and populate session
+                    # Skip system message if already added by create_session
+                    has_system = any(m.role == "system" for m in local_session.messages)
+                    
+                    for msg in messages:
+                        # Skip system messages if we already have one
+                        if msg.role.value == "system" and has_system:
+                            continue
+                        
+                        agent_msg = AgentMessage(
+                            role=msg.role.value if hasattr(msg.role, 'value') else str(msg.role),
+                            content=msg.content,
+                            metadata=msg.metadata if hasattr(msg, 'metadata') else {}
+                        )
+                        await local_session.add_message(agent_msg)
+                    
+                    self._logger.info(f"Restored session {session_id} from external memory with {len(messages)} messages")
+                    return local_session
+            except Exception as e:
+                self._logger.warning(f"Failed to restore session from external memory: {e}")
+        
+        # Level 3: Create new session
+        return await self.create_session(session_id=session_id)
+    
+    async def _persist_to_memory(self, session: IAgentSession, message: AgentMessage) -> None:
+        """
+        Persist a message to external memory (write-through caching).
+        
+        Args:
+            session: The local session
+            message: The message to persist
+        """
+        if not self._memory_manager:
+            return
+        
+        try:
+            # Get or create external session
+            external_session = await self._memory_manager.get_or_create_session(
+                session_id=session.session_id,
+                agent_id=self._agent_id
+            )
+            
+            # Import Message class from memory module
+            from langswarm.core.memory import Message, MessageRole
+            
+            # Convert role string to MessageRole enum
+            role_map = {
+                "user": MessageRole.USER,
+                "assistant": MessageRole.ASSISTANT,
+                "system": MessageRole.SYSTEM,
+                "tool": MessageRole.TOOL if hasattr(MessageRole, 'TOOL') else MessageRole.SYSTEM
+            }
+            role = role_map.get(message.role, MessageRole.USER)
+            
+            # Create memory Message and add to external session
+            memory_message = Message(
+                role=role,
+                content=message.content,
+                metadata=message.metadata if hasattr(message, 'metadata') else {}
+            )
+            await external_session.add_message(memory_message)
+            
+            self._logger.debug(f"Persisted message to external memory for session {session.session_id}")
+            
+        except Exception as e:
+            # Don't fail the main operation if persistence fails
+            self._logger.warning(f"Failed to persist message to external memory: {e}")
     
     async def _execute_tool_calls(
         self,
@@ -759,20 +869,15 @@ class BaseAgent(AutoInstrumentedMixin):
                               session_id=session_id,
                               message_length=len(message))
                 
-                # Get or create session
-                if session_id:
-                    session = await self.get_session(session_id)
-                    if not session:
-                        # Auto-create session with the provided ID
-                        session = await self.create_session(session_id=session_id)
-                else:
-                    session = self._current_session
-                    if not session:
-                        session = await self.create_session()
+                # Get or create session using two-level caching
+                session = await self._get_or_create_session(session_id)
                 
                 # Create user message
                 user_message = AgentMessage(role="user", content=message)
                 await session.add_message(user_message)
+                
+                # Persist to external memory (write-through)
+                await self._persist_to_memory(session, user_message)
                 
                 # Set status to busy
                 self._status = AgentStatus.BUSY
@@ -833,6 +938,8 @@ class BaseAgent(AutoInstrumentedMixin):
                 # Add final response to session
                 if response.success and response.message:
                     await session.add_message(response.message)
+                    # Persist assistant response to external memory
+                    await self._persist_to_memory(session, response.message)
                 
                 # Calculate metrics
                 duration = time.time() - start_time
@@ -926,19 +1033,15 @@ class BaseAgent(AutoInstrumentedMixin):
         start_time = time.time()
         
         try:
-            # Get or create session
-            if session_id:
-                session = await self.get_session(session_id)
-                if not session:
-                    raise ValueError(f"Session {session_id} not found")
-            else:
-                session = self._current_session
-                if not session:
-                    session = await self.create_session()
+            # Get or create session using two-level caching
+            session = await self._get_or_create_session(session_id)
             
             # Create user message
             user_message = AgentMessage(role="user", content=message)
             await session.add_message(user_message)
+            
+            # Persist to external memory (write-through)
+            await self._persist_to_memory(session, user_message)
             
             # Set status to busy
             self._status = AgentStatus.BUSY
@@ -1019,6 +1122,8 @@ class BaseAgent(AutoInstrumentedMixin):
                 if full_content:
                     complete_message = AgentMessage(role="assistant", content=full_content)
                     await session.add_message(complete_message)
+                    # Persist assistant response to external memory
+                    await self._persist_to_memory(session, complete_message)
             
             # Update statistics
             self._update_statistics(time.time() - start_time, True)
@@ -1202,3 +1307,8 @@ class BaseAgent(AutoInstrumentedMixin):
     def get_available_tools(self) -> List[str]:
         """Get list of available tools"""
         return self._configuration.available_tools.copy()
+    
+    # Alias for workflow compatibility - AgentStep calls send_message
+    async def send_message(self, message: str, session_id: Optional[str] = None, **kwargs) -> IAgentResponse:
+        """Alias for chat() - provides workflow compatibility with AgentStep"""
+        return await self.chat(message, session_id, **kwargs)

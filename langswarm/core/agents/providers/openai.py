@@ -61,18 +61,9 @@ class OpenAIProvider(IAgentProvider):
     
     @property
     def supported_models(self) -> List[str]:
-        """OpenAI models supported by this provider"""
-        return [
-            "gpt-4o",
-            "gpt-4o-mini", 
-            "gpt-4",
-            "gpt-4-turbo",
-            "gpt-4-vision-preview",
-            "gpt-3.5-turbo",
-            "gpt-3.5-turbo-16k",
-            "o1-preview",
-            "o1-mini"
-        ]
+        """OpenAI models supported by this provider - sourced from centralized config"""
+        from .config import get_supported_models
+        return get_supported_models("openai")
     
     @property
     def supported_capabilities(self) -> List[AgentCapability]:
@@ -706,22 +697,56 @@ class OpenAIProvider(IAgentProvider):
                 )
     
     def _estimate_cost(self, usage: Any, model: str) -> float:
-        """Estimate cost for OpenAI API usage"""
-        # Simplified cost estimation (rates as of 2024)
+        """Estimate cost for OpenAI API usage (prices per 1K tokens, updated Nov 2024)"""
+        # Pricing from https://openai.com/api/pricing/
         rates = {
-            "gpt-4o": {"input": 0.005, "output": 0.015},
-            "gpt-4o-mini": {"input": 0.0015, "output": 0.0006},
-            "gpt-4": {"input": 0.03, "output": 0.06},
-            "gpt-4-turbo": {"input": 0.01, "output": 0.03},
-            "gpt-3.5-turbo": {"input": 0.0015, "output": 0.002},
+            # GPT-4o family (flagship multimodal)
+            "gpt-4o": {"input": 0.0025, "output": 0.01},
+            "gpt-4o-2024-11-20": {"input": 0.0025, "output": 0.01},
+            "gpt-4o-2024-08-06": {"input": 0.0025, "output": 0.01},
+            "gpt-4o-2024-05-13": {"input": 0.005, "output": 0.015},
+            "chatgpt-4o-latest": {"input": 0.005, "output": 0.015},
+            
+            # GPT-4o mini (cost-effective)
+            "gpt-4o-mini": {"input": 0.00015, "output": 0.0006},
+            "gpt-4o-mini-2024-07-18": {"input": 0.00015, "output": 0.0006},
+            
+            # O1 reasoning models
+            "o1": {"input": 0.015, "output": 0.06},
+            "o1-2024-12-17": {"input": 0.015, "output": 0.06},
             "o1-preview": {"input": 0.015, "output": 0.06},
-            "o1-mini": {"input": 0.003, "output": 0.012}
+            "o1-preview-2024-09-12": {"input": 0.015, "output": 0.06},
+            "o1-mini": {"input": 0.003, "output": 0.012},
+            "o1-mini-2024-09-12": {"input": 0.003, "output": 0.012},
+            
+            # GPT-4 Turbo
+            "gpt-4-turbo": {"input": 0.01, "output": 0.03},
+            "gpt-4-turbo-2024-04-09": {"input": 0.01, "output": 0.03},
+            "gpt-4-turbo-preview": {"input": 0.01, "output": 0.03},
+            
+            # GPT-4 base
+            "gpt-4": {"input": 0.03, "output": 0.06},
+            "gpt-4-0613": {"input": 0.03, "output": 0.06},
+            
+            # GPT-3.5 Turbo
+            "gpt-3.5-turbo": {"input": 0.0005, "output": 0.0015},
+            "gpt-3.5-turbo-0125": {"input": 0.0005, "output": 0.0015},
+            "gpt-3.5-turbo-1106": {"input": 0.001, "output": 0.002},
+            "gpt-3.5-turbo-16k": {"input": 0.003, "output": 0.004},
         }
         
-        if model not in rates:
+        # Try exact match first, then prefix match for versioned models
+        model_rates = rates.get(model)
+        if not model_rates:
+            # Try to find a matching base model
+            for rate_model in rates:
+                if model.startswith(rate_model.split("-2024")[0]):
+                    model_rates = rates[rate_model]
+                    break
+        
+        if not model_rates:
             return 0.0
         
-        model_rates = rates[model]
         input_cost = (usage.prompt_tokens / 1000) * model_rates["input"]
         output_cost = (usage.completion_tokens / 1000) * model_rates["output"]
         
