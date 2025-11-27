@@ -261,7 +261,25 @@ class AgentBuilder:
         return self
     
     def observability(self, provider: str = "langfuse", **kwargs) -> 'AgentBuilder':
-        """Enable observability (e.g. LangFuse) via LiteLLM"""
+        """
+        Enable observability (e.g. LangFuse) via LiteLLM.
+        
+        Note: LangFuse is automatically enabled when LANGFUSE_PUBLIC_KEY and 
+        LANGFUSE_SECRET_KEY environment variables are set. Use this method to:
+        - Explicitly configure LangFuse with different credentials
+        - Override environment variable settings
+        - Configure observability programmatically
+        
+        Args:
+            provider: Observability provider (currently only "langfuse" supported)
+            **kwargs: Provider-specific configuration:
+                - public_key: LangFuse public key (overrides LANGFUSE_PUBLIC_KEY)
+                - secret_key: LangFuse secret key (overrides LANGFUSE_SECRET_KEY)
+                - host: LangFuse host URL (overrides LANGFUSE_HOST)
+        
+        Returns:
+            Self for method chaining
+        """
         if provider == "langfuse":
             try:
                 import litellm

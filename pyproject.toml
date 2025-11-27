@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "langswarm"
-version = "0.0.54.dev106"
-# langswarm-v0.0.54.dev106
+version = "0.0.54.dev107"
+# langswarm-v0.0.54.dev107
 # Tag format: langswarm-v{version}
 description = "A multi-agent ecosystem for large language models (LLMs) and autonomous systems."
 readme = "README.md"
@@ -110,8 +110,7 @@ opentelemetry = [
 observability = [
   "langfuse",
 ]
-  "opentelemetry-instrumentation",
-]
+
 google-workspace = [
   "google-api-python-client",
   "google-auth-oauthlib",

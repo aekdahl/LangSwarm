@@ -343,7 +343,6 @@ agent = await (
     .name("advanced-assistant")
     .litellm()  # Unified provider (supports OpenAI, Anthropic, etc.)
     .model("gpt-4")
-    .observability(provider="langfuse") # Built-in observability
     .system_prompt("You are a helpful assistant")
     .tools(["filesystem", "web_search", "github"])
     .memory_enabled(True)
@@ -354,6 +353,66 @@ agent = await (
     .build()
 )
 ```
+
+### Automatic Observability with LangFuse
+
+LangSwarm automatically enables **LangFuse tracing and prompt management** when environment variables are set:
+
+```bash
+# Set these environment variables
+export LANGFUSE_PUBLIC_KEY="pk-lf-..."
+export LANGFUSE_SECRET_KEY="sk-lf-..."
+export LANGFUSE_HOST="https://cloud.langfuse.com"  # Optional
+```
+
+**Zero configuration needed!** Just set the env vars and all LiteLLM calls are automatically traced:
+
+```python
+# LangFuse is automatically enabled!
+agent = await (
+    AgentBuilder()
+    .litellm()
+    .model("gpt-4")
+    .build()
+)
+
+# All interactions are now traced in LangFuse
+response = await agent.chat("Hello!")
+```
+
+**Manual override** (if you need explicit configuration):
+
+```python
+# Explicitly configure LangFuse (overrides environment variables)
+agent = await (
+    AgentBuilder()
+    .litellm()
+    .model("gpt-4")
+    .observability(
+        provider="langfuse",
+        public_key="pk-lf-...",
+        secret_key="sk-lf-...",
+        host="https://cloud.langfuse.com"
+    )
+    .build()
+)
+```
+
+**What you get with LangFuse:**
+- 📊 Full trace of all LLM calls with timing and costs
+- 🎯 Prompt versioning and management
+- 💰 Automatic cost tracking per trace
+- 📈 Performance monitoring (latency, tokens, errors)
+- 👥 User analytics and session tracking
+- 🐛 Complete debugging with conversation history
+
+**Installation:**
+```bash
+pip install langswarm[observability]
+# or separately
+pip install langfuse
+```
+
 
 ### Provider-Specific Configuration
 
@@ -553,15 +612,19 @@ export OPENAI_API_KEY="sk-..."
 export ANTHROPIC_API_KEY="sk-ant-..."
 export GOOGLE_API_KEY="..."
 
+# Observability & Tracing
+export LANGFUSE_PUBLIC_KEY="pk-lf-..."      # Auto-enables LangFuse tracing
+export LANGFUSE_SECRET_KEY="sk-lf-..."     # Required with public key
+export LANGFUSE_HOST="https://cloud.langfuse.com"  # Optional
+export LANGSMITH_API_KEY="..."             # Alternative observability
+export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4318"
+
 # Memory backends
 export REDIS_URL="redis://localhost:6379"
 export BIGQUERY_PROJECT="my-project"
 export CHROMADB_PATH="./data/chromadb"
-
-# Observability
-export LANGSMITH_API_KEY="..."
-export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4318"
 ```
+
 
 ### Cloud Deployment
 

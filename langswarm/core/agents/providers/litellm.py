@@ -49,6 +49,54 @@ class LiteLLMProvider(IAgentProvider):
         
         # Cache tool definitions
         self._tool_definitions_cache: Dict[str, List[Dict[str, Any]]] = {}
+        
+        # Auto-detect and enable LangFuse if environment variables are set
+        self._auto_configure_langfuse()
+    
+    def _auto_configure_langfuse(self):
+        """
+        Automatically configure LangFuse observability if environment variables are set.
+        
+        Checks for:
+        - LANGFUSE_PUBLIC_KEY
+        - LANGFUSE_SECRET_KEY
+        - LANGFUSE_HOST (optional)
+        
+        If credentials are found, registers LangFuse callbacks with LiteLLM.
+        """
+        # Check if LangFuse credentials are in environment
+        public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
+        secret_key = os.getenv("LANGFUSE_SECRET_KEY")
+        
+        if not public_key or not secret_key:
+            # No LangFuse credentials found, skip configuration
+            return
+        
+        try:
+            # Verify langfuse package is installed
+            import langfuse
+            
+            # Register LangFuse callbacks with LiteLLM
+            if "langfuse" not in litellm.success_callback:
+                litellm.success_callback.append("langfuse")
+            if "langfuse" not in litellm.failure_callback:
+                litellm.failure_callback.append("langfuse")
+            
+            # Get optional host setting
+            host = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
+            
+            logger.info(
+                f"✅ LangFuse observability auto-enabled for LiteLLM "
+                f"(host: {host})"
+            )
+            
+        except ImportError:
+            logger.warning(
+                "⚠️  LangFuse credentials found in environment, but 'langfuse' package is not installed. "
+                "Install it with: pip install langfuse or pip install langswarm[observability]"
+            )
+        except Exception as e:
+            logger.warning(f"⚠️  Failed to auto-configure LangFuse: {e}")
     
     @property
     def provider_type(self) -> ProviderType:
