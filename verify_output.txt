@@ -1,0 +1,35 @@
+/Users/alexanderekdahl/.pyenv/versions/3.12.3/lib/python3.12/site-packages/google/__init__.py:16: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+LiteLLM error: object MagicMock can't be used in 'await' expression
+AgentResponse content mismatch detected and auto-corrected: response.content='LiteLLM error: object MagicMock can't be used in '...' != response.message.content='Error: LiteLLM error: object MagicMock can't be us...'
+🧪 Verifying LiteLLM Integration...
+
+1. Testing Builder Configuration...
+✅ Builder configured correctly
+
+2. Testing Observability Configuration...
+✅ Observability configured correctly
+
+3. Testing Failover Configuration...
+✅ Failover configured correctly
+
+4. Testing Message Sending (Mocked)...
+Response content: Error: LiteLLM error: object MagicMock can't be used in 'await' expression
+Response success: False
+Response error: object MagicMock can't be used in 'await' expression
+Traceback (most recent call last):
+  File "/Users/alexanderekdahl/Docker/LangSwarm/tests/manual_verification/verify_litellm.py", line 88, in <module>
+    asyncio.run(verify_litellm_integration())
+  File "/Users/alexanderekdahl/.pyenv/versions/3.12.3/lib/python3.12/asyncio/runners.py", line 194, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/Users/alexanderekdahl/.pyenv/versions/3.12.3/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/alexanderekdahl/.pyenv/versions/3.12.3/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/Users/alexanderekdahl/Docker/LangSwarm/tests/manual_verification/verify_litellm.py", line 75, in verify_litellm_integration
+    assert response.content == "Hello from LiteLLM!"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

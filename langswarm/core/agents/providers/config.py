@@ -1,14 +1,21 @@
 """
-Centralized Provider Configuration
+Centralized Provider Configuration (DEPRECATED)
 
-Single source of truth for all LLM provider models and pricing.
-Update this file when new models are released or pricing changes.
+This file is deprecated and will be removed in a future version.
+Cost tracking and model support are now handled dynamically by LiteLLM.
 
 Pricing is per 1M tokens (divide by 1000 to get per 1K tokens).
 
 Last updated: November 2024
 Source: https://openai.com/api/pricing/
 """
+import warnings
+warnings.warn(
+    "The 'langswarm.core.agents.providers.config' module is deprecated. "
+    "Model costs and validation are now handled by LiteLLM.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 from typing import Dict, List, Any
 from dataclasses import dataclass

@@ -337,12 +337,13 @@ agent = create_agent(
 ```python
 from langswarm.core.agents import AgentBuilder
 
-# Full control with builder pattern
+# Full control with builder pattern (Unified Provider)
 agent = await (
     AgentBuilder()
     .name("advanced-assistant")
-    .openai()  # or .anthropic(), .gemini(), etc.
+    .litellm()  # Unified provider (supports OpenAI, Anthropic, etc.)
     .model("gpt-4")
+    .observability(provider="langfuse") # Built-in observability
     .system_prompt("You are a helpful assistant")
     .tools(["filesystem", "web_search", "github"])
     .memory_enabled(True)
@@ -622,13 +623,14 @@ cd examples/simple && python test_all_examples.py
 
 | Provider | Status | Models | Notes |
 |----------|--------|--------|-------|
-| **OpenAI** | ✅ Stable | GPT-4, GPT-3.5, etc. | Full support, function calling |
-| **Anthropic** | ✅ Stable | Claude 3.5, Claude 3 | Full support, tool use |
-| **Google** | ✅ Stable | Gemini Pro, Gemini Pro Vision | Multimodal support |
-| **Mistral** | ✅ Stable | Mixtral, Mistral Large | Function calling |
-| **Cohere** | ✅ Stable | Command R+, Command R | RAG capabilities |
-| **Hugging Face** | ✅ Beta | Open source models | Local & API |
-| **Local** | ✅ Beta | Ollama, LocalAI, etc. | OpenAI-compatible |
+| **Unified (LiteLLM)** | ✅ Stable | All Providers | Universal adapter, failover, observability |
+| **OpenAI** | ⚠️ Legacy | GPT-4, GPT-3.5, etc. | Use Unified provider |
+| **Anthropic** | ⚠️ Legacy | Claude 3.5, Claude 3 | Use Unified provider |
+| **Google** | ⚠️ Legacy | Gemini Pro, Gemini Pro Vision | Use Unified provider |
+| **Mistral** | ⚠️ Legacy | Mixtral, Mistral Large | Use Unified provider |
+| **Cohere** | ⚠️ Legacy | Command R+, Command R | Use Unified provider |
+| **Hugging Face** | ⚠️ Legacy | Open source models | Use Unified provider |
+| **Local** | ⚠️ Legacy | Ollama, LocalAI, etc. | Use Unified provider |
 | **Custom** | ✅ Beta | Any OpenAI-compatible API | Community template |
 
 ---

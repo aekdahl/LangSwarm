@@ -1,0 +1,20 @@
+/Users/alexanderekdahl/.pyenv/versions/3.12.3/lib/python3.12/site-packages/google/__init__.py:16: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+Max tool iterations (3) reached. Returning current response to user.
+🧪 Verifying LiteLLM Integration...
+
+1. Testing Builder Configuration...
+✅ Builder configured correctly
+
+2. Testing Observability Configuration...
+✅ Observability configured correctly
+
+3. Testing Failover Configuration...
+✅ Failover configured correctly
+
+4. Testing Message Sending (Mocked)...
+Response content: Hello from LiteLLM!
+Response success: True
+✅ Message sending works
+
+🎉 All LiteLLM verification tests passed!

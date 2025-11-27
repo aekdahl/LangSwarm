@@ -32,6 +32,7 @@ class ProviderType(Enum):
     HUGGINGFACE = "huggingface"
     LOCAL = "local"
     CUSTOM = "custom"
+    LITELLM = "litellm"
 
 
 class AgentCapability(Enum):

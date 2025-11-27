@@ -287,8 +287,7 @@ These follow the Model Context Protocol and provide extended capabilities:
 | `message_queue_publisher` | Publish to message queues (Pub/Sub, SQS) |
 | `message_queue_consumer` | Consume from message queues |
 | `gcp_environment` | Google Cloud Platform operations |
-| `daytona_environment` | Daytona sandbox environments |
-| `daytona_self_hosted` | Self-hosted Daytona instances |
+| `daytona_environment` | Secure cloud sandbox environments (Daytona) |
 | `realtime_voice` | Real-time voice processing |
 | `remote` | Connect to remote MCP servers |
 

@@ -27,6 +27,7 @@ from .providers.cohere import CohereProvider
 from .providers.mistral import MistralProvider
 from .providers.huggingface import HuggingFaceProvider
 from .providers.local import LocalProvider
+from .providers.litellm import LiteLLMProvider
 
 # Mock provider removed - agent builder now fails fast with clear error messages
 
@@ -85,6 +86,13 @@ class AgentBuilder:
     # Provider selection
     def openai(self, api_key: Optional[str] = None) -> 'AgentBuilder':
         """Configure for OpenAI provider - STRICT MODE"""
+        import warnings
+        warnings.warn(
+            "The .openai() method is deprecated and will be removed in a future version. "
+            "Please use .litellm().model('gpt-4o') instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         self._provider = ProviderType.OPENAI
         self._api_key = api_key or os.getenv("OPENAI_API_KEY")
         
@@ -102,6 +110,13 @@ class AgentBuilder:
     
     def anthropic(self, api_key: Optional[str] = None) -> 'AgentBuilder':
         """Configure for Anthropic provider - STRICT MODE"""
+        import warnings
+        warnings.warn(
+            "The .anthropic() method is deprecated and will be removed in a future version. "
+            "Please use .litellm().model('claude-3-5-sonnet') instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         self._provider = ProviderType.ANTHROPIC
         self._api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
         
@@ -119,6 +134,13 @@ class AgentBuilder:
     
     def gemini(self, api_key: Optional[str] = None) -> 'AgentBuilder':
         """Configure for Google Gemini provider - STRICT MODE"""
+        import warnings
+        warnings.warn(
+            "The .gemini() method is deprecated and will be removed in a future version. "
+            "Please use .litellm().model('gemini/gemini-pro') instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         self._provider = ProviderType.GEMINI
         self._api_key = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         
@@ -136,6 +158,13 @@ class AgentBuilder:
     
     def cohere(self, api_key: Optional[str] = None) -> 'AgentBuilder':
         """Configure for Cohere provider - STRICT MODE"""
+        import warnings
+        warnings.warn(
+            "The .cohere() method is deprecated and will be removed in a future version. "
+            "Please use .litellm().model('command-r-plus') instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         self._provider = ProviderType.COHERE
         self._api_key = api_key or os.getenv("COHERE_API_KEY")
         
@@ -153,6 +182,13 @@ class AgentBuilder:
     
     def mistral(self, api_key: Optional[str] = None) -> 'AgentBuilder':
         """Configure for Mistral provider - STRICT MODE"""
+        import warnings
+        warnings.warn(
+            "The .mistral() method is deprecated and will be removed in a future version. "
+            "Please use .litellm().model('mistral/mistral-large') instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         self._provider = ProviderType.MISTRAL
         self._api_key = api_key or os.getenv("MISTRAL_API_KEY")
         
@@ -170,6 +206,13 @@ class AgentBuilder:
     
     def huggingface(self, api_key: Optional[str] = None, use_local: bool = False) -> 'AgentBuilder':
         """Configure for Hugging Face provider - STRICT MODE"""
+        import warnings
+        warnings.warn(
+            "The .huggingface() method is deprecated and will be removed in a future version. "
+            "Please use .litellm().model('huggingface/...') instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         self._provider = ProviderType.HUGGINGFACE
         self._api_key = api_key or os.getenv("HUGGINGFACE_API_KEY")
         self._use_local = use_local
@@ -192,6 +235,13 @@ class AgentBuilder:
     
     def local(self, base_url: str, model: str) -> 'AgentBuilder':
         """Configure for local model provider"""
+        import warnings
+        warnings.warn(
+            "The .local() method is deprecated and will be removed in a future version. "
+            "Please use .litellm().model('openai/...') with base_url instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         self._provider = ProviderType.LOCAL
         self._base_url = base_url
         self._model = model
@@ -201,6 +251,50 @@ class AgentBuilder:
         """Configure custom provider"""
         self._provider = ProviderType.CUSTOM
         self._provider_config = provider_config
+        return self
+    
+    def litellm(self, model: Optional[str] = None) -> 'AgentBuilder':
+        """Configure for LiteLLM provider (Unified Interface)"""
+        self._provider = ProviderType.LITELLM
+        if model:
+            self._model = model
+        return self
+    
+    def observability(self, provider: str = "langfuse", **kwargs) -> 'AgentBuilder':
+        """Enable observability (e.g. LangFuse) via LiteLLM"""
+        if provider == "langfuse":
+            try:
+                import litellm
+                # Verify langfuse is installed
+                try:
+                    import langfuse
+                except ImportError:
+                    logger.warning("LangFuse not installed. Run 'pip install langfuse' to enable observability.")
+                    return self
+
+                # Set callbacks
+                if "langfuse" not in litellm.success_callback:
+                    litellm.success_callback.append("langfuse")
+                if "langfuse" not in litellm.failure_callback:
+                    litellm.failure_callback.append("langfuse")
+                
+                # Set env vars if provided
+                if "public_key" in kwargs:
+                    os.environ["LANGFUSE_PUBLIC_KEY"] = kwargs["public_key"]
+                if "secret_key" in kwargs:
+                    os.environ["LANGFUSE_SECRET_KEY"] = kwargs["secret_key"]
+                if "host" in kwargs:
+                    os.environ["LANGFUSE_HOST"] = kwargs["host"]
+                    
+                logger.info("Enabled LangFuse observability for LiteLLM")
+            except ImportError:
+                logger.warning("LiteLLM not installed, cannot enable observability")
+                
+        return self
+        
+    def failover(self, models: List[str]) -> 'AgentBuilder':
+        """Set failover models for LiteLLM (e.g. ['gpt-4o', 'claude-3-5-sonnet'])"""
+        self._provider_config["fallbacks"] = models
         return self
     
     # Basic configuration
@@ -333,8 +427,29 @@ class AgentBuilder:
     
     # Aliases for convenience
     def provider(self, provider_type: ProviderType) -> 'AgentBuilder':
-        """Set provider type directly"""
+        """Set provider type directly with intelligent defaults"""
         self._provider = provider_type
+        
+        # Apply provider-specific defaults
+        if provider_type == ProviderType.OPENAI:
+            if not self._api_key:
+                self._api_key = os.getenv("OPENAI_API_KEY")
+        elif provider_type == ProviderType.ANTHROPIC:
+            if not self._api_key:
+                self._api_key = os.getenv("ANTHROPIC_API_KEY")
+        elif provider_type == ProviderType.GEMINI:
+            if not self._api_key:
+                self._api_key = os.getenv("GOOGLE_API_KEY")
+        elif provider_type == ProviderType.MISTRAL:
+            if not self._api_key:
+                self._api_key = os.getenv("MISTRAL_API_KEY")
+        elif provider_type == ProviderType.COHERE:
+            if not self._api_key:
+                self._api_key = os.getenv("COHERE_API_KEY")
+        elif provider_type == ProviderType.HUGGINGFACE:
+            if not self._api_key:
+                self._api_key = os.getenv("HUGGINGFACE_API_KEY")
+        
         return self
     
     def enable_tools(self, tool_names: List[str], tool_choice: str = "auto") -> 'AgentBuilder':
@@ -434,28 +549,10 @@ class AgentBuilder:
         )
     
     def _validate_provider_specific(self):
-        """Validate provider-specific constraints using centralized config"""
-        from .providers.config import get_supported_models
-        
-        # Map provider types to config keys
-        provider_map = {
-            ProviderType.OPENAI: "openai",
-            ProviderType.ANTHROPIC: "anthropic",
-            ProviderType.GEMINI: "gemini",
-            ProviderType.MISTRAL: "mistral",
-            ProviderType.COHERE: "cohere",
-        }
-        
-        provider_key = provider_map.get(self._provider)
-        if provider_key:
-            valid_models = get_supported_models(provider_key)
-            if self._model not in valid_models:
-                # Show helpful subset of models
-                sample_models = valid_models[:5] if len(valid_models) > 5 else valid_models
-                raise ValueError(
-                    f"Model '{self._model}' not supported by {provider_key.title()} provider. "
-                    f"Valid models include: {', '.join(sample_models)}"
-                )
+        """Validate provider-specific constraints (Deprecated)"""
+        # Validation is now handled by the provider or LiteLLM at runtime.
+        # We skip static validation to allow for new models without code changes.
+        pass
     
     async def build(self) -> BaseAgent:
         """Build the complete agent with automatic tool injection"""
@@ -563,6 +660,8 @@ class AgentBuilder:
                 backend=getattr(config, 'backend', 'ollama'),
                 base_url=getattr(config, 'base_url', None)
             )
+        elif config.provider == ProviderType.LITELLM:
+            return LiteLLMProvider()
         else:
             raise ValueError(
                 f"Unknown provider type '{config.provider}'. "
