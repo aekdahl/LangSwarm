@@ -1,0 +1,22 @@
+/Users/alexanderekdahl/.pyenv/versions/3.12.3/lib/python3.12/site-packages/google/__init__.py:16: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+📦 Langfuse version: 3.10.1
+
+🔍 Inspecting Original Langfuse Class:
+   Type: <class 'type'>
+   Has 'trace' method: False
+   Instance has 'trace': False
+
+🛠️  Applying Monkeypatch...
+
+🔍 Inspecting Wrapper Class:
+   Type: <class 'type'>
+   Has 'trace' method: False
+
+🧪 Testing Wrapper Instantiation & Trace:
+   Wrapper __init__ called
+   Removing sdk_integration: litellm
+   Wrapper Instance created: <__main__.test_wrapper.<locals>.LangfuseWrapper object at 0x11116e180>
+   Wrapper Instance has 'trace': False
+   ❌ trace method MISSING!
+   Dir(instance): ['__annotations__', '__class__', '__delattr__', '__dict__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__getstate__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_base_url', '_create_experiment_run_name', '_create_observation_from_otel_span', '_create_observation_id', '_create_remote_parent_span', '_create_span_with_parent_context', '_environment', '_fetch_prompt_and_update_cache', '_format_otel_span_id', '_format_otel_trace_id', '_get_bounded_max_retries', '_get_current_otel_span', '_get_otel_span_id', '_get_otel_trace_id', '_get_project_id', '_get_span_class', '_is_valid_span_id', '_is_valid_trace_id', '_mask', '_otel_tracer', '_process_experiment_item', '_project_id', '_resources', '_run_experiment_async', '_start_as_current_otel_span_with_processed_media', '_tracing_enabled', '_url_encode', 'api', 'async_api', 'auth_check', 'clear_prompt_cache', 'create_dataset', 'create_dataset_item', 'create_event', 'create_prompt', 'create_score', 'create_trace_id', 'flush', 'get_current_observation_id', 'get_current_trace_id', 'get_dataset', 'get_prompt', 'get_trace_url', 'resolve_media_references', 'run_batched_evaluation', 'run_experiment', 'score_current_span', 'score_current_trace', 'shutdown', 'start_as_current_generation', 'start_as_current_observation', 'start_as_current_span', 'start_generation', 'start_observation', 'start_span', 'update_current_generation', 'update_current_span', 'update_current_trace', 'update_prompt']
