@@ -54,7 +54,7 @@ class AgentConfiguration:
     tools_enabled: bool = False
     available_tools: List[str] = field(default_factory=list)
     tool_choice: Optional[str] = None  # "auto", "none", or specific tool name
-    max_tool_iterations: int = 3  # Maximum iterations for tool call refinement
+    max_tool_iterations: int = 10  # Maximum iterations for tool call refinement
     
     # Memory configuration
     memory_enabled: bool = False
@@ -929,14 +929,19 @@ class BaseAgent(AutoInstrumentedMixin):
                     iteration += 1
                 
                 # Warn if max iterations reached with pending tool calls
+                response_handled = False
                 if iteration >= max_iterations and response.message and response.message.tool_calls:
                     self._logger.warning(
                         f"Max tool iterations ({max_iterations}) reached. "
-                        f"Returning current response to user."
+                        f"Executing pending tools to ensure valid conversation state."
                     )
+                    # Execute the pending tools so we have a valid state (ToolCall + ToolResult)
+                    # This adds the messages to the session
+                    await self._execute_tool_calls(response, session)
+                    response_handled = True
                 
-                # Add final response to session
-                if response.success and response.message:
+                # Add final response to session (if not already handled)
+                if response.success and response.message and not response_handled:
                     await session.add_message(response.message)
                     # Persist assistant response to external memory
                     await self._persist_to_memory(session, response.message)
@@ -1114,8 +1119,10 @@ class BaseAgent(AutoInstrumentedMixin):
                 if iteration >= max_iterations and response.message and response.message.tool_calls:
                     self._logger.warning(
                         f"Max tool iterations ({max_iterations}) reached in streaming mode. "
-                        f"Returning current response to user."
+                        f"Executing pending tools to ensure valid conversation state."
                     )
+                    # Execute the pending tools so we have a valid state (ToolCall + ToolResult)
+                    await self._execute_tool_calls(response, session)
             else:
                 # No tool calls - add complete response to session
                 self._logger.debug("No tool calls to execute in stream")

@@ -76,14 +76,35 @@ class LiteLLMProvider(IAgentProvider):
             # Verify langfuse package is installed
             import langfuse
             
+            # MONKEYPATCH: Fix for version mismatch between litellm and langfuse
+            # litellm v1.74+ passes 'sdk_integration' which langfuse v3.10+ rejects
+            if not hasattr(langfuse.Langfuse, "_patched_by_langswarm"):
+                OriginalLangfuse = langfuse.Langfuse
+                
+                class LangfuseWrapper(OriginalLangfuse):
+                    def __init__(self, **kwargs):
+                        # Strip unsupported arguments
+                        if 'sdk_integration' in kwargs:
+                            kwargs.pop('sdk_integration')
+                        super().__init__(**kwargs)
+                
+                # Mark as patched to avoid recursion/re-patching
+                LangfuseWrapper._patched_by_langswarm = True
+                langfuse.Langfuse = LangfuseWrapper
+                logger.info("🔧 Applied compatibility patch to Langfuse SDK")
+
             # Register LangFuse callbacks with LiteLLM
             if "langfuse" not in litellm.success_callback:
                 litellm.success_callback.append("langfuse")
             if "langfuse" not in litellm.failure_callback:
                 litellm.failure_callback.append("langfuse")
             
-            # Get optional host setting
-            host = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
+            # Get optional host setting (support both standard env vars)
+            host = os.getenv("LANGFUSE_HOST") or os.getenv("LANGFUSE_BASE_URL") or "https://cloud.langfuse.com"
+            
+            # Ensure it's set in environment for the SDK to pick it up if it wasn't already
+            if host:
+                os.environ["LANGFUSE_HOST"] = host
             
             logger.info(
                 f"✅ LangFuse observability auto-enabled for LiteLLM "

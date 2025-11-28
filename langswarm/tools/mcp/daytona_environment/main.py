@@ -510,10 +510,32 @@ class DaytonaEnvironmentManager:
             )
     
     def _get_sandbox(self, sandbox_id: str):
-        """Get sandbox reference by ID"""
-        # This would typically involve getting the sandbox from the client
-        # For now, we'll create a placeholder that the actual Daytona SDK would handle
-        return type('Sandbox', (), {'id': sandbox_id})()
+        """Get sandbox reference by ID or name"""
+        try:
+            # List all sandboxes to find the target
+            sandboxes = self._client.list()
+            
+            # Try to find by ID first
+            target = next((s for s in sandboxes if s.id == sandbox_id), None)
+            
+            # If not found, try to find by name
+            if not target:
+                target = next((s for s in sandboxes if getattr(s, 'name', None) == sandbox_id), None)
+            
+            if target:
+                return target
+                
+            # If still not found, and it looks like a UUID, maybe we can just return a proxy
+            # But for safety, let's raise if we can't find it in the list
+            raise ValueError(f"Sandbox '{sandbox_id}' not found")
+            
+        except Exception as e:
+            # Fallback for when list() fails or other issues
+            # If we can't verify, we return a proxy object assuming it exists (legacy behavior)
+            # but log a warning if possible
+            if "Sandbox" in str(e) and "not found" in str(e):
+                raise e
+            return type('Sandbox', (), {'id': sandbox_id, 'process': type('Process', (), {'code_run': lambda x: type('Result', (), {'exit_code': 1, 'result': '', 'stderr': 'Sandbox connection failed'})(), 'shell_run': lambda x: type('Result', (), {'exit_code': 1, 'result': '', 'stderr': 'Sandbox connection failed'})()})(), 'files': type('Files', (), {'read': lambda x: '', 'write': lambda x, y: None, 'list': lambda x: [], 'delete': lambda x: None, 'upload': lambda x, y: None, 'download': lambda x, y: None})()})()
 
 # === MCP Tool Handler Functions ===
 
@@ -784,9 +806,90 @@ class DaytonaEnvironmentMCPTool(MCPProtocolMixin, BaseTool):
             tool_id=identifier,
             **kwargs
         )
+        
+        # Register methods explicitly for V2 discovery
+        # Create Sandbox
+        schema = CreateSandboxInput.model_json_schema()
+        self.add_method(
+            name="create_sandbox",
+            description="Create a new Daytona sandbox environment",
+            parameters=schema.get("properties", {}),
+            required=schema.get("required", []),
+            returns=CreateSandboxOutput.model_json_schema()
+        )
+        
+        # Execute Code
+        schema = ExecuteCodeInput.model_json_schema()
+        self.add_method(
+            name="execute_code",
+            description="Execute Python or other code in a Daytona sandbox",
+            parameters=schema.get("properties", {}),
+            required=schema.get("required", []),
+            returns=ExecuteCodeOutput.model_json_schema()
+        )
+        
+        # Execute Shell
+        schema = ExecuteShellInput.model_json_schema()
+        self.add_method(
+            name="execute_shell",
+            description="Execute shell commands in a Daytona sandbox",
+            parameters=schema.get("properties", {}),
+            required=schema.get("required", []),
+            returns=ExecuteShellOutput.model_json_schema()
+        )
+        
+        # File Operation
+        schema = FileOperationInput.model_json_schema()
+        self.add_method(
+            name="file_operation",
+            description="Perform file operations (read, write, upload, download, list, delete) in a sandbox",
+            parameters=schema.get("properties", {}),
+            required=schema.get("required", []),
+            returns=FileOperationOutput.model_json_schema()
+        )
+        
+        # Git Operation
+        schema = GitOperationInput.model_json_schema()
+        self.add_method(
+            name="git_operation",
+            description="Perform git operations (clone, pull, push, commit, status, checkout) in a sandbox",
+            parameters=schema.get("properties", {}),
+            required=schema.get("required", []),
+            returns=GitOperationOutput.model_json_schema()
+        )
+        
+        # List Sandboxes
+        # Empty input schema for list_sandboxes
+        self.add_method(
+            name="list_sandboxes",
+            description="List all available Daytona sandboxes",
+            parameters={},
+            required=[],
+            returns=ListSandboxesOutput.model_json_schema()
+        )
+        
+        # Delete Sandbox
+        schema = DeleteSandboxInput.model_json_schema()
+        self.add_method(
+            name="delete_sandbox",
+            description="Delete a Daytona sandbox",
+            parameters=schema.get("properties", {}),
+            required=schema.get("required", []),
+            returns=DeleteSandboxOutput.model_json_schema()
+        )
+        
+        # Get Sandbox Info
+        schema = SandboxInfoInput.model_json_schema()
+        self.add_method(
+            name="get_sandbox_info",
+            description="Get detailed information about a specific sandbox",
+            parameters=schema.get("properties", {}),
+            required=schema.get("required", []),
+            returns=SandboxInfoOutput.model_json_schema()
+        )
     
     # V2 Direct Method Calls - Expose operations as class methods
-    def create_sandbox(self, name: str, image: str = "python:3.11", **kwargs):
+    def create_sandbox(self, name: str = None, image: str = "python:3.11", **kwargs):
         """Create a new Daytona sandbox environment"""
         return create_sandbox(name=name, image=image, **kwargs)
     

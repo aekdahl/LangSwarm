@@ -9,6 +9,7 @@ constructor with an intuitive, type-safe building experience.
 from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING
 import os
 import logging
+import inspect
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ from .base import AgentConfiguration, BaseAgent
 # Type hint for memory manager without importing (avoid circular imports)
 if TYPE_CHECKING:
     from langswarm.core.memory import IMemoryManager
+    from langswarm.tools.registry import IToolRegistry
 # STRICT MODE: Import real providers - fail if required providers are missing
 # No graceful fallbacks to None - providers must be available when requested
 from .providers.openai import OpenAIProvider
@@ -51,8 +53,9 @@ class AgentBuilder:
                  .build())
     """
     
-    def __init__(self, name: Optional[str] = None):
+    def __init__(self, name: Optional[str] = None, registry: Optional["IToolRegistry"] = None):
         self._name = name or "langswarm-agent"
+        self._registry = registry
         self._provider: Optional[ProviderType] = None
         self._model: Optional[str] = None
         self._api_key: Optional[str] = None
@@ -403,6 +406,11 @@ class AgentBuilder:
         self._max_memory_messages = max_messages
         return self
     
+    def registry(self, registry: "IToolRegistry") -> 'AgentBuilder':
+        """Set custom tool registry"""
+        self._registry = registry
+        return self
+
     def memory_manager(self, manager: "IMemoryManager") -> 'AgentBuilder':
         """
         Set external memory manager for persistent session storage.
@@ -610,49 +618,81 @@ class AgentBuilder:
     async def _auto_inject_tools(self, agent: BaseAgent, tool_names: List[str]) -> None:
         """Pass tools to agent - let provider handle tool integration"""
         try:
-            from langswarm.tools.registry import ToolRegistry
+            # Use custom registry if provided, otherwise default
+            if self._registry:
+                registry = self._registry
+            else:
+                from langswarm.tools.registry import ToolRegistry
+                registry = ToolRegistry()
+                
+                # Auto-populate registry with adapted MCP tools if empty and using default registry
+                if not registry._tools:
+                    registry.auto_populate_with_mcp_tools()
             
-            registry = ToolRegistry()
+            missing_tools = []
             
-            # Auto-populate registry with adapted MCP tools if empty
-            if not registry._tools:
-                registry.auto_populate_with_mcp_tools()
-            
-            # Validate that all requested tools exist in registry
-            available_tools = list(registry._tools.keys())
-            missing_tools = [tool for tool in tool_names if tool not in available_tools]
-            if missing_tools:
-                raise ValueError(
-                    f"Requested tools not found in registry: {missing_tools}. "
-                    f"Available tools: {available_tools}. "
-                    f"Ensure all tools are properly registered before building the agent."
-                )
-            
-            # Apply tool configurations if provided
-            if hasattr(self, '_tool_configs') and self._tool_configs:
-                for tool_name, config in self._tool_configs.items():
-                    if tool_name in tool_names:
-                        tool = registry.get_tool(tool_name)
-                        if tool:
-                            # Initialize tool with config
-                            # Note: This might re-initialize an already initialized tool, 
-                            # which is acceptable as it updates the configuration
+            for tool_name in tool_names:
+                tool = registry.get_tool(tool_name)
+                
+                if tool:
+                    # Try injection methods in order of preference
+                    injected = False
+                    
+                    # 1. register_tool (Preferred V2 interface)
+                    if hasattr(agent, 'register_tool'):
+                        if inspect.iscoroutinefunction(agent.register_tool):
+                            await agent.register_tool(tool)
+                        else:
+                            agent.register_tool(tool)
+                        injected = True
+                        
+                    # 2. add_tools (List based)
+                    elif hasattr(agent, 'add_tools'):
+                        if inspect.iscoroutinefunction(agent.add_tools):
+                            await agent.add_tools([tool])
+                        else:
+                            agent.add_tools([tool])
+                        injected = True
+                        
+                    # 3. add_tool (Single tool)
+                    elif hasattr(agent, 'add_tool'):
+                        if inspect.iscoroutinefunction(agent.add_tool):
+                            await agent.add_tool(tool)
+                        else:
+                            agent.add_tool(tool)
+                        injected = True
+                        
+                    if injected:
+                        logger.info(f"✅ Injected tool '{tool_name}' into agent '{agent.name}'")
+                    else:
+                        # Fallback for agents without explicit tool methods (e.g. some legacy wrappers)
+                        # We just hope the provider picks it up from config later if we set it here
+                        if not hasattr(agent, '_available_tools'):
+                            agent._available_tools = []
+                        if isinstance(agent._available_tools, list):
+                            agent._available_tools.append(tool_name)
+                            logger.warning(f"⚠️ Agent '{agent.name}' has no injection method. Added '{tool_name}' to _available_tools list.")
+                        else:
+                            logger.warning(f"⚠️ Could not inject tool '{tool_name}' into agent '{agent.name}': No compatible method found.")
+                            
+                    # Apply tool configurations if provided
+                    if hasattr(self, '_tool_configs') and self._tool_configs:
+                        if tool_name in self._tool_configs:
+                            config = self._tool_configs[tool_name]
                             await tool.initialize(config)
                             logger.info(f"🔧 Configured tool '{tool_name}' with provided settings")
+                            
+                else:
+                    missing_tools.append(tool_name)
+                    logger.warning(f"❌ Tool '{tool_name}' not found in registry")
 
-            # Let the agent provider handle tool integration in their own format
-            if hasattr(agent, 'add_tools'):
-                await agent.add_tools(tool_names)
-            elif hasattr(agent, 'set_tools'):
-                await agent.set_tools(tool_names)
-            else:
-                # Store tools for provider to use during execution
-                agent._available_tools = tool_names
-            
-            logger.info(f"✅ Passed {len(tool_names)} tools to agent '{agent.name}': {tool_names}")
+            if missing_tools:
+                logger.warning(f"⚠️ The following tools were requested but not found: {missing_tools}")
+                # We do NOT raise an error here to allow partial startup as requested
                 
         except Exception as e:
-            # STRICT MODE: Fail agent creation if tool injection fails
+            # Log error but don't crash unless critical
+            logger.error(f"Tool injection error for agent '{agent.name}': {e}")
             raise RuntimeError(f"Tool injection failed for agent '{agent.name}': {e}") from e
     
     def _create_provider(self, config: AgentConfiguration):
