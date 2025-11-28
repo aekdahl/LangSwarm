@@ -161,7 +161,7 @@ class LiteLLMProvider(IAgentProvider):
             messages = await self._build_messages(session, message, config)
             
             # Prepare parameters
-            params = self._build_params(config, messages)
+            params = self._build_params(config, messages, session=session)
             
             # Make API call
             start_time = time.time()
@@ -192,7 +192,7 @@ class LiteLLMProvider(IAgentProvider):
             messages = await self._build_messages(session, message, config)
             
             # Prepare parameters with streaming
-            params = self._build_params(config, messages, stream=True)
+            params = self._build_params(config, messages, stream=True, session=session)
             
             # Make streaming API call
             start_time = time.time()
@@ -300,10 +300,20 @@ class LiteLLMProvider(IAgentProvider):
             messages.append(openai_msg)
         
         # New message
-        messages.append({
-            "role": new_message.role,
-            "content": new_message.content
-        })
+        # CRITICAL FIX: Check if the message is already in the context to prevent duplication
+        # BaseAgent adds message to session before calling send_message, so it might be in context_messages
+        is_duplicate = False
+        if messages:
+            last_msg = messages[-1]
+            if (last_msg.get("role") == new_message.role and 
+                last_msg.get("content") == new_message.content):
+                is_duplicate = True
+        
+        if not is_duplicate:
+            messages.append({
+                "role": new_message.role,
+                "content": new_message.content
+            })
         
         return messages
     
@@ -311,7 +321,8 @@ class LiteLLMProvider(IAgentProvider):
         self, 
         config: IAgentConfiguration, 
         messages: List[Dict[str, Any]],
-        stream: bool = False
+        stream: bool = False,
+        session: Optional[IAgentSession] = None
     ) -> Dict[str, Any]:
         """Build LiteLLM parameters"""
         params = {
@@ -319,6 +330,12 @@ class LiteLLMProvider(IAgentProvider):
             "messages": messages,
             "stream": stream
         }
+        
+        # Add session_id to metadata for Langfuse
+        if session and session.session_id:
+            if "metadata" not in params:
+                params["metadata"] = {}
+            params["metadata"]["session_id"] = session.session_id
         
         # Optional params
         if config.max_tokens:
