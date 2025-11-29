@@ -50,10 +50,10 @@ class LiteLLMProvider(IAgentProvider):
         # Monkeypatch litellm.utils.is_cached_message to fix Gemini TypeError
         # Fixes: TypeError: 'TextPromptClient' object is not iterable
         try:
-            import litellm.utils
+            import litellm.utils as litellm_utils
             def noop_is_cached_message(message):
                 return False
-            litellm.utils.is_cached_message = noop_is_cached_message
+            litellm_utils.is_cached_message = noop_is_cached_message
             logger.info("Applied monkeypatch to litellm.utils.is_cached_message to fix Gemini compatibility.")
         except Exception as e:
             logger.warning(f"Failed to apply litellm monkeypatch: {e}")
