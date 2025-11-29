@@ -75,6 +75,19 @@ class LiteLLMProvider(IAgentProvider):
         try:
             # Verify langfuse package is installed
             import langfuse
+            import packaging.version
+            
+            # Check for incompatible v3.x
+            try:
+                current_version = packaging.version.parse(langfuse.version.__version__)
+                if current_version >= packaging.version.parse("3.0.0"):
+                    logger.warning(
+                        f"⚠️  Incompatible Langfuse version detected: {current_version}. "
+                        "LiteLLM currently requires langfuse<3.0.0 (e.g., 2.53.0). "
+                        "Observability may fail. Please run: pip install 'langfuse<3.0.0'"
+                    )
+            except Exception as e:
+                logger.debug(f"Failed to check langfuse version: {e}")
             
             # Register LangFuse callbacks with LiteLLM
             if "langfuse" not in litellm.success_callback:
