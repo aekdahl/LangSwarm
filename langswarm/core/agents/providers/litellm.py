@@ -197,6 +197,28 @@ class LiteLLMProvider(IAgentProvider):
             
         except Exception as e:
             execution_time = time.time() - start_time if 'start_time' in locals() else 0.0
+            
+            # Handle RateLimitError and APIError as user-facing responses
+            if hasattr(litellm, 'RateLimitError') and isinstance(e, litellm.RateLimitError):
+                error_msg = f"⚠️ **Rate Limit Exceeded**: {str(e)}"
+                logger.warning(f"LiteLLM RateLimitError: {e}")
+                return AgentResponse.success_response(
+                    content=error_msg,
+                    role="assistant",
+                    execution_time=execution_time,
+                    metadata={"error": True, "error_type": "RateLimitError"}
+                )
+            
+            if hasattr(litellm, 'APIError') and isinstance(e, litellm.APIError):
+                error_msg = f"⚠️ **Provider Error**: {str(e)}"
+                logger.warning(f"LiteLLM APIError: {e}")
+                return AgentResponse.success_response(
+                    content=error_msg,
+                    role="assistant",
+                    execution_time=execution_time,
+                    metadata={"error": True, "error_type": "APIError"}
+                )
+
             logger.error(f"LiteLLM error: {e}")
             return AgentResponse.error_response(
                 e, 
@@ -227,8 +249,26 @@ class LiteLLMProvider(IAgentProvider):
                 yield chunk
                 
         except Exception as e:
-            logger.error(f"LiteLLM streaming error: {e}")
-            yield AgentResponse.error_response(e)
+            # Handle RateLimitError and APIError as user-facing responses
+            if hasattr(litellm, 'RateLimitError') and isinstance(e, litellm.RateLimitError):
+                error_msg = f"⚠️ **Rate Limit Exceeded**: {str(e)}"
+                logger.warning(f"LiteLLM streaming RateLimitError: {e}")
+                yield AgentResponse.success_response(
+                    content=error_msg,
+                    role="assistant",
+                    metadata={"error": True, "error_type": "RateLimitError"}
+                )
+            elif hasattr(litellm, 'APIError') and isinstance(e, litellm.APIError):
+                error_msg = f"⚠️ **Provider Error**: {str(e)}"
+                logger.warning(f"LiteLLM streaming APIError: {e}")
+                yield AgentResponse.success_response(
+                    content=error_msg,
+                    role="assistant",
+                    metadata={"error": True, "error_type": "APIError"}
+                )
+            else:
+                logger.error(f"LiteLLM streaming error: {e}")
+                yield AgentResponse.error_response(e)
     
     async def call_tool(
         self,

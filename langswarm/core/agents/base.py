@@ -872,12 +872,23 @@ class BaseAgent(AutoInstrumentedMixin):
                 # Get or create session using two-level caching
                 session = await self._get_or_create_session(session_id)
                 
-                # Create user message
+                # Create user message (with deduplication)
                 user_message = AgentMessage(role="user", content=message)
-                await session.add_message(user_message)
                 
-                # Persist to external memory (write-through)
-                await self._persist_to_memory(session, user_message)
+                # Check if message is already the last one in session
+                is_duplicate = False
+                if session.messages:
+                    last_msg = session.messages[-1]
+                    if last_msg.role == "user" and last_msg.content == message:
+                        is_duplicate = True
+                        user_message = last_msg # Use existing message instance
+                        self._logger.debug("Skipping duplicate user message in session (chat)")
+                
+                if not is_duplicate:
+                    await session.add_message(user_message)
+                    
+                    # Persist to external memory (write-through)
+                    await self._persist_to_memory(session, user_message)
                 
                 # Set status to busy
                 self._status = AgentStatus.BUSY
@@ -1041,12 +1052,23 @@ class BaseAgent(AutoInstrumentedMixin):
             # Get or create session using two-level caching
             session = await self._get_or_create_session(session_id)
             
-            # Create user message
+            # Create user message (with deduplication)
             user_message = AgentMessage(role="user", content=message)
-            await session.add_message(user_message)
             
-            # Persist to external memory (write-through)
-            await self._persist_to_memory(session, user_message)
+            # Check if message is already the last one in session
+            is_duplicate = False
+            if session.messages:
+                last_msg = session.messages[-1]
+                if last_msg.role == "user" and last_msg.content == message:
+                    is_duplicate = True
+                    user_message = last_msg # Use existing message instance
+                    self._logger.debug("Skipping duplicate user message in session")
+            
+            if not is_duplicate:
+                await session.add_message(user_message)
+                
+                # Persist to external memory (write-through)
+                await self._persist_to_memory(session, user_message)
             
             # Set status to busy
             self._status = AgentStatus.BUSY
