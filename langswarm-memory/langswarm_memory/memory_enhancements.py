@@ -17,7 +17,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional, Tuple, Set
 
 from .agent_memory_types import EnhancedMemoryRecord as MemoryRecord, RelationType, MemoryRelation
-from .errors import AgentMemError
+from .errors import LangSwarmMemoryError
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ class MemoryRelationManager:
             
         except Exception as e:
             logger.error(f"Failed to add relation: {e}")
-            raise AgentMemError(f"Failed to add memory relation", details={"error": str(e)})
+            raise LangSwarmMemoryError(f"Failed to add memory relation", details={"error": str(e)})
     
     async def find_related(
         self, 
@@ -494,7 +494,7 @@ class MemoryDeduplicator:
             The merged memory record
         """
         if not memories:
-            raise AgentMemError("No memories provided for merging")
+            raise LangSwarmMemoryError("No memories provided for merging")
         
         if len(memories) == 1:
             return memories[0]

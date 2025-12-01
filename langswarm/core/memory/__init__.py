@@ -48,7 +48,7 @@ try:
         MemoryFactory,
         
         # Error classes
-        AgentMemError as MemoryError,  # Map to old name
+        LangSwarmMemoryError as MemoryError,  # Map to old name
         MemoryBackendError,
         MemoryConfigurationError,
         
@@ -100,7 +100,7 @@ except ImportError:
         MemoryFactory,
         
         # Error classes
-        AgentMemError as MemoryError,  # Map to old name
+        LangSwarmMemoryError as MemoryError,  # Map to old name
         MemoryBackendError,
         MemoryConfigurationError,
         
