@@ -23,7 +23,7 @@ Quick Start:
     messages = await session.get_messages()
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 __author__ = "Alexander Ekdahl"
 __license__ = "Apache-2.0"
 

@@ -15,7 +15,7 @@ keywords = ["LLM", "multi-agent", "langchain", "hugginface", "openai", "MCP", "a
 python = ">=3.8,<4.0"
 
 # Memory system
-langswarm-memory = "^0.1.0"
+langswarm-memory = "^0.1.1"
 
 # Core dependencies
 pyyaml = "^6.0.2"
