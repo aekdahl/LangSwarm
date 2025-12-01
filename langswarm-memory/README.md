@@ -1,12 +1,12 @@
-# AgentMem
+# LangSwarm Memory
 
 **Enterprise-grade conversational memory for AI agents**
 
-AgentMem provides session-based conversation management, multiple storage backends, and seamless integration with major LLM providers.
+LangSwarm Memory provides session-based conversation management, multiple storage backends, and seamless integration with major LLM providers.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![PyPI](https://img.shields.io/pypi/v/agentmem.svg)](https://pypi.org/project/agentmem/)
+[![PyPI](https://img.shields.io/pypi/v/langswarm_memory.svg)](https://pypi.org/project/langswarm_memory/)
 
 ---
 
@@ -26,22 +26,22 @@ AgentMem provides session-based conversation management, multiple storage backen
 ### Installation
 
 ```bash
-pip install agentmem
+pip install langswarm_memory
 ```
 
 Optional dependencies:
 ```bash
-pip install agentmem[redis]      # Redis backend
-pip install agentmem[vector]     # Vector store support
-pip install agentmem[chromadb]   # ChromaDB vector store
-pip install agentmem[all]        # All optional dependencies
+pip install langswarm_memory[redis]      # Redis backend
+pip install langswarm_memory[vector]     # Vector store support
+pip install langswarm_memory[chromadb]   # ChromaDB vector store
+pip install langswarm_memory[all]        # All optional dependencies
 ```
 
 ### Basic Usage
 
 ```python
 import asyncio
-from agentmem import create_memory_manager, Message, MessageRole
+from langswarm_memory import create_memory_manager, Message, MessageRole
 
 async def main():
     # Create memory manager with SQLite backend
@@ -77,7 +77,7 @@ asyncio.run(main())
 ```python
 import asyncio
 from openai import AsyncOpenAI
-from agentmem import create_memory_manager, Message, MessageRole
+from langswarm_memory import create_memory_manager, Message, MessageRole
 
 async def chat_with_memory(user_message: str, user_id: str = "default"):
     # Initialize
@@ -129,7 +129,7 @@ asyncio.run(chat_with_memory("What's the weather like?"))
 
 ### In-Memory (Development)
 ```python
-from agentmem import InMemoryBackend
+from langswarm_memory import InMemoryBackend
 
 backend = InMemoryBackend()
 await backend.connect()
@@ -137,7 +137,7 @@ await backend.connect()
 
 ### SQLite (Production)
 ```python
-from agentmem import SQLiteBackend
+from langswarm_memory import SQLiteBackend
 
 backend = SQLiteBackend(db_path="memory.db")
 await backend.connect()
@@ -145,7 +145,7 @@ await backend.connect()
 
 ### Redis (Distributed)
 ```python
-from agentmem import RedisBackend
+from langswarm_memory import RedisBackend
 
 backend = RedisBackend(
     host="localhost",
@@ -274,9 +274,9 @@ manager = create_memory_manager("redis",
 
 ```python
 from langchain.memory import ConversationBufferMemory
-from agentmem import create_memory_manager
+from langswarm_memory import create_memory_manager
 
-# Use agentmem as LangChain memory backend
+# Use langswarm_memory as LangChain memory backend
 manager = create_memory_manager("sqlite")
 # ... integrate with LangChain chains
 ```
@@ -285,9 +285,9 @@ manager = create_memory_manager("sqlite")
 
 ```python
 from llama_index import ChatMemoryBuffer
-from agentmem import create_memory_manager
+from langswarm_memory import create_memory_manager
 
-# Use agentmem with LlamaIndex
+# Use langswarm_memory with LlamaIndex
 manager = create_memory_manager("sqlite")
 # ... integrate with LlamaIndex agents
 ```
@@ -332,15 +332,15 @@ Apache License 2.0 - see [LICENSE](LICENSE) file for details.
 
 ## Support
 
-- **Documentation**: [https://github.com/aekdahl/agentmem](https://github.com/aekdahl/agentmem)
-- **Issues**: [https://github.com/aekdahl/agentmem/issues](https://github.com/aekdahl/agentmem/issues)
-- **Discussions**: [https://github.com/aekdahl/agentmem/discussions](https://github.com/aekdahl/agentmem/discussions)
+- **Documentation**: [https://github.com/aekdahl/langswarm-memory](https://github.com/aekdahl/langswarm-memory)
+- **Issues**: [https://github.com/aekdahl/langswarm-memory/issues](https://github.com/aekdahl/langswarm-memory/issues)
+- **Discussions**: [https://github.com/aekdahl/langswarm-memory/discussions](https://github.com/aekdahl/langswarm-memory/discussions)
 
 ---
 
 ## Acknowledgments
 
-AgentMem is extracted from [LangSwarm](https://github.com/aekdahl/langswarm), a multi-agent AI orchestration framework. It represents Phase 1 of the memory system, focusing on conversational memory management.
+LangSwarm Memory is extracted from [LangSwarm](https://github.com/aekdahl/langswarm), a multi-agent AI orchestration framework. It represents Phase 1 of the memory system, focusing on conversational memory management.
 
 ---
 

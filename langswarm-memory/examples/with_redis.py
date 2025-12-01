@@ -1,12 +1,12 @@
 """
-Redis Backend Example for AgentMem
+Redis Backend Example for LangSwarm Memory
 
-Demonstrates using AgentMem with Redis backend for distributed memory storage.
+Demonstrates using LangSwarm Memory with Redis backend for distributed memory storage.
 """
 
 import asyncio
 import os
-from agentmem import (
+from langswarm_memory import (
     RedisBackend,
     MemoryManager,
     Message,
@@ -16,7 +16,7 @@ from agentmem import (
 
 
 async def main():
-    print("=== AgentMem Redis Backend Example ===\n")
+    print("=== LangSwarm Memory Redis Backend Example ===\n")
     
     # Configure Redis connection
     redis_host = os.getenv("REDIS_HOST", "localhost")
@@ -31,7 +31,7 @@ async def main():
         port=redis_port,
         password=redis_password,
         db=0,
-        key_prefix="agentmem:",
+        key_prefix="langswarm_memory:",
         ttl=3600  # Sessions expire after 1 hour
     )
     

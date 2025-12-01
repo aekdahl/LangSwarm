@@ -1,13 +1,13 @@
 """
-OpenAI Integration Example for AgentMem
+OpenAI Integration Example for LangSwarm Memory
 
-Demonstrates using AgentMem with OpenAI's API for a conversational chatbot
+Demonstrates using LangSwarm Memory with OpenAI's API for a conversational chatbot
 with persistent memory.
 """
 
 import asyncio
 import os
-from agentmem import (
+from langswarm_memory import (
     create_memory_manager,
     Message,
     MessageRole,
@@ -16,7 +16,7 @@ from agentmem import (
 
 async def chat_with_memory(user_message: str, user_id: str = "default_user"):
     """
-    Chat with OpenAI while maintaining conversation history in AgentMem.
+    Chat with OpenAI while maintaining conversation history in LangSwarm Memory.
     
     Args:
         user_message: The user's message
@@ -82,7 +82,7 @@ async def chat_with_memory(user_message: str, user_id: str = "default_user"):
 
 
 async def main():
-    print("=== AgentMem + OpenAI Chat Example ===\n")
+    print("=== LangSwarm Memory + OpenAI Chat Example ===\n")
     
     # Check for API key
     if not os.getenv("OPENAI_API_KEY"):

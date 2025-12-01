@@ -11,7 +11,7 @@ import argparse
 
 from langswarm.core.utils.optional_imports import optional_imports
 from langswarm.core.agents.provider_registry import provider_registry
-from langswarm.core.memory.enhanced_backends import memory_backend_registry
+from langswarm.core.memory import MemoryFactory
 
 
 def check_all_dependencies():
@@ -24,7 +24,11 @@ def check_all_dependencies():
     print()
     
     # Check memory backends
-    print(memory_backend_registry.get_backend_status_summary())
+    print("Memory Backends:")
+    for backend in MemoryFactory.list_backends():
+        info = MemoryFactory.get_backend_info(backend)
+        status = "✅ Available" if info['available'] else "❌ Not available"
+        print(f"  - {backend}: {status}")
     print()
     
     # Check overall optional features
@@ -164,7 +168,13 @@ def diagnose_installation():
         print(f"✅ {len(available_providers)} AI provider(s) available: {', '.join(available_providers)}")
     
     # Check memory backends
-    available_backends = memory_backend_registry.list_available_backends()
+    # Check memory backends
+    available_backends = []
+    for backend in MemoryFactory.list_backends():
+        info = MemoryFactory.get_backend_info(backend)
+        if info['available']:
+            available_backends.append(backend)
+            
     if len(available_backends) == 1 and 'sqlite' in available_backends:
         print("ℹ️  Only SQLite memory backend available")
         print("   For production, consider: pip install langswarm[redis]")

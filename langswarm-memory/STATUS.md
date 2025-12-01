@@ -1,12 +1,12 @@
-# AgentMem Package - Implementation Status
+# LangSwarm Memory Package - Implementation Status
 
 ## Phase 1: Conversational Memory Extraction - COMPLETED
 
 ### ✅ Package Structure Created
 
 ```
-agentmem/
-├── agentmem/                  # Main package
+langswarm_memory/
+├── langswarm_memory/          # Main package
 │   ├── __init__.py           # Package exports
 │   ├── interfaces.py         # Core interfaces (Message, Session, Backend)
 │   ├── base.py               # Base implementations
@@ -77,13 +77,13 @@ Total Python files: 19
 
 1. Build distribution: `python -m build`
 2. Upload to TestPyPI: `twine upload --repository testpypi dist/*`
-3. Test install: `pip install --index-url https://test.pypi.org/simple/ agentmem`
+3. Test install: `pip install --index-url https://test.pypi.org/simple/ langswarm_memory`
 4. Verify functionality
 5. Publish to PyPI: `twine upload dist/*`
 
 ### 🔗 LangSwarm Integration
 
-1. Add agentmem dependency to LangSwarm's pyproject.toml
+1. Add langswarm_memory dependency to LangSwarm's pyproject.toml
 2. Update imports across LangSwarm codebase
 3. Create backwards-compatibility adapter
 4. Run LangSwarm tests
@@ -91,7 +91,7 @@ Total Python files: 19
 
 ## Package Metadata
 
-- **Name**: agentmem
+- **Name**: langswarm_memory
 - **Version**: 0.1.0
 - **License**: Apache-2.0
 - **Python**: >=3.8
@@ -130,7 +130,7 @@ Total Python files: 19
 
 ### Build Package
 ```bash
-cd agentmem/
+cd langswarm_memory/
 python -m build
 ```
 

@@ -1,11 +1,11 @@
 """
-Test suite for AgentMem backends (InMemory, SQLite, Redis)
+Test suite for LangSwarm Memory backends (InMemory, SQLite, Redis)
 """
 
 import pytest
 import asyncio
 from datetime import datetime, timezone
-from agentmem import (
+from langswarm_memory import (
     InMemoryBackend,
     SQLiteBackend,
     Message,

@@ -1,5 +1,5 @@
 """
-Error handling for AgentMem
+Error handling for LangSwarm Memory
 
 Provides clear, actionable error messages for memory-related issues.
 """
@@ -7,8 +7,8 @@ Provides clear, actionable error messages for memory-related issues.
 from typing import Optional, Dict, Any
 
 
-class AgentMemError(Exception):
-    """Base error for agentmem operations"""
+class LangSwarmMemoryError(Exception):
+    """Base error for langswarm_memory operations"""
     
     def __init__(self, message: str, details: Optional[Dict[str, Any]] = None, suggestion: Optional[str] = None):
         super().__init__(message)
@@ -25,7 +25,7 @@ class AgentMemError(Exception):
         return result
 
 
-class MemoryBackendError(AgentMemError):
+class MemoryBackendError(LangSwarmMemoryError):
     """Raised when backend operations fail"""
     
     def __init__(self, backend: str, operation: str, error: Optional[Exception] = None, suggestion: Optional[str] = None):
@@ -46,7 +46,7 @@ class MemoryBackendError(AgentMemError):
         super().__init__(message, details=details, suggestion=suggestion)
 
 
-class MemoryConfigurationError(AgentMemError):
+class MemoryConfigurationError(LangSwarmMemoryError):
     """Raised when configuration is invalid"""
     
     def __init__(self, issue: str, component: Optional[str] = None, config_data: Optional[Dict[str, Any]] = None):
@@ -67,7 +67,7 @@ class MemoryConfigurationError(AgentMemError):
         super().__init__(message, details=details)
 
 
-class EmbeddingError(AgentMemError):
+class EmbeddingError(LangSwarmMemoryError):
     """Raised when embedding operations fail"""
     
     def __init__(
@@ -123,7 +123,7 @@ class EmbeddingError(AgentMemError):
         return "\n".join(suggestions)
 
 
-class VectorSearchError(AgentMemError):
+class VectorSearchError(LangSwarmMemoryError):
     """Raised when vector search operations fail"""
     
     def __init__(
@@ -152,7 +152,7 @@ class VectorSearchError(AgentMemError):
         super().__init__(message, details=details)
 
 
-class MemoryStorageError(AgentMemError):
+class MemoryStorageError(LangSwarmMemoryError):
     """Raised when memory storage operations fail"""
     
     def __init__(

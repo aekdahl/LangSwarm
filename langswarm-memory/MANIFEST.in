@@ -1,7 +1,7 @@
 include README.md
 include LICENSE
 include pyproject.toml
-recursive-include agentmem *.py
+recursive-include langswarm_memory *.py
 recursive-include examples *.py
 recursive-include tests *.py
 global-exclude __pycache__

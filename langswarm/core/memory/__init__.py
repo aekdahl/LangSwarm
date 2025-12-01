@@ -1,18 +1,18 @@
 """
-LangSwarm Memory Integration - Now using AgentMem
+LangSwarm Memory Integration - Now using LangSwarm Memory
 
-This module maintains backwards compatibility by re-exporting from the agentmem package.
+This module maintains backwards compatibility by re-exporting from the langswarm_memory package.
 LangSwarm's memory system has been extracted as a standalone package that can be used
 by any AI agent framework.
 
-For more information about AgentMem, see: https://github.com/aekdahl/agentmem
+For more information about LangSwarm Memory, see: https://github.com/aekdahl/langswarm-memory
 """
 
-# Re-export everything from agentmem for backwards compatibility
-# Note: During development, agentmem is a namespace package, so we import from agentmem.agentmem
-# When published to PyPI, this will work as: from agentmem import ...
+# Re-export everything from langswarm_memory for backwards compatibility
+# Note: During development, langswarm_memory is a namespace package, so we import from langswarm_memory.langswarm_memory
+# When published to PyPI, this will work as: from langswarm_memory import ...
 try:
-    from agentmem import (
+    from langswarm_memory import (
         # Enums
         MessageRole,
         SessionStatus,
@@ -64,7 +64,7 @@ try:
     )
 except ImportError:
     # During development with editable install, use nested import
-    from agentmem.agentmem import (
+    from langswarm_memory.langswarm_memory import (
         # Enums
         MessageRole,
         SessionStatus,
@@ -192,14 +192,14 @@ def initialize_memory(config=None):
 
 def get_memory():
     """Get global memory manager (for backwards compatibility)"""
-    # Note: AgentMem doesn't have a global singleton by default
+    # Note: LangSwarm Memory doesn't have a global singleton by default
     # This is a stub for compatibility
     return None
 
 
 # Alias for common usage patterns
-MemorySessionContext = None  # Placeholder - not yet implemented in agentmem
+MemorySessionContext = None  # Placeholder - not yet implemented in langswarm_memory
 
 
-__version__ = "2.0.0"  # LangSwarm V2 with AgentMem integration
-__agentmem_version__ = "0.1.0"
+__version__ = "2.0.0"  # LangSwarm V2 with LangSwarm Memory integration
+__langswarm_memory_version__ = "0.1.0"

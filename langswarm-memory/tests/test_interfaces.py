@@ -1,10 +1,10 @@
 """
-Test suite for AgentMem interfaces and data classes
+Test suite for LangSwarm Memory interfaces and data classes
 """
 
 import pytest
 from datetime import datetime, timezone, timedelta
-from agentmem import (
+from langswarm_memory import (
     Message,
     MessageRole,
     SessionMetadata,

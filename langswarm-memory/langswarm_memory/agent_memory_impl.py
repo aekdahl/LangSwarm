@@ -1,5 +1,5 @@
 """
-Agent Memory & Context Management Implementations for AgentMem
+Agent Memory & Context Management Implementations for LangSwarm Memory
 
 Concrete implementations of the memory and context interfaces providing:
 - Persistent conversation memory with SQLite/Vector storage
@@ -26,8 +26,8 @@ from .agent_memory_interfaces import (
     AgentMessage
 )
 
-# Import agentmem error handling
-from .errors import AgentMemError, MemoryBackendError
+# Import langswarm_memory error handling
+from .errors import LangSwarmMemoryError, MemoryBackendError
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ class AgentMemoryManager(IAgentMemory):
             
         except Exception as e:
             logger.error(f"Failed to initialize memory database: {e}")
-            raise AgentMemError(
+            raise LangSwarmMemoryError(
                 "Failed to initialize agent memory database",
                 details={"agent_id": self._agent_id, "error": str(e)}
             )
@@ -619,7 +619,7 @@ class ContextManager(IContextManager):
         """Compress context to fit within token limit"""
         context = self._contexts.get(session_id)
         if not context:
-            raise AgentMemError(
+            raise LangSwarmMemoryError(
                 f"Context not found for session {session_id}"
             )
         

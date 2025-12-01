@@ -1,11 +1,11 @@
 """
-Basic Usage Example for AgentMem
+Basic Usage Example for LangSwarm Memory
 
 Demonstrates creating a memory manager, managing sessions, and storing/retrieving messages.
 """
 
 import asyncio
-from agentmem import (
+from langswarm_memory import (
     create_memory_manager,
     Message,
     MessageRole,
@@ -13,7 +13,7 @@ from agentmem import (
 
 
 async def main():
-    print("=== AgentMem Basic Usage Example ===\n")
+    print("=== LangSwarm Memory Basic Usage Example ===\n")
     
     # Create memory manager with in-memory backend (for demo)
     print("1. Creating memory manager...")

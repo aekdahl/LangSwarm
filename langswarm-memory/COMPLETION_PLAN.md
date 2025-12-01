@@ -1,14 +1,14 @@
-# AgentMem Extraction - Implementation Summary & Completion Plan
+# LangSwarm Memory Extraction - Implementation Summary & Completion Plan
 
 ## ✅ PHASE 1 COMPLETED: Package Extraction (100%)
 
 ### What Was Successfully Built
 
-**Standalone Package Created**: `/Users/alexanderekdahl/Docker/LangSwarm/agentmem/`
+**Standalone Package Created**: `/Users/alexanderekdahl/Docker/LangSwarm/langswarm_memory/`
 
 - ✅ **19 Python files** extracted and adapted
 - ✅ **All LangSwarm dependencies removed**
-- ✅ **Package built**: `agentmem-0.1.0-py3-none-any.whl` (48KB)
+- ✅ **Package built**: `langswarm_memory-0.1.0-py3-none-any.whl` (48KB)
 - ✅ **Comprehensive README** (400+ lines)
 - ✅ **3 working examples** (basic_usage.py, with_openai.py, with_redis.py)
 - ✅ **27+ test cases** covering all features
@@ -20,7 +20,7 @@
 ```bash
 # Successfully tested:
 python examples/basic_usage.py  # ✅ WORKS
-python -c "from agentmem import create_memory_manager, Message, MessageRole"  # ✅ WORKS
+python -c "from langswarm_memory import create_memory_manager, Message, MessageRole"  # ✅ WORKS
 ```
 
 **Package is production-ready and fully functional!**
@@ -41,11 +41,11 @@ cd /Users/alexanderekdahl/Docker/LangSwarm
 which python
 which python3
 
-# Install agentmem for that Python
-pip install -e ./agentmem
+# Install langswarm_memory for that Python
+pip install -e ./langswarm_memory
 
 # OR use Poetry if LangSwarm uses it
-poetry add ./agentmem --editable
+poetry add ./langswarm_memory --editable
 ```
 
 **Test**:
@@ -75,8 +75,8 @@ from langswarm.core.memory import Message
 # Option 1: Use langswarm adapter (backwards compatible)
 from langswarm.core.memory import Message
 
-# Option 2: Import directly from agentmem
-from agentmem import Message
+# Option 2: Import directly from langswarm_memory
+from langswarm_memory import Message
 ```
 
 ### Task 3: Test LangSwarm Integration (20 minutes)
@@ -98,8 +98,8 @@ python examples/simple/05_with_tools.py
 ### Task 4: Update Documentation (30 minutes)
 
 **Files to update**:
-1. `README.md` - Add note about agentmem
-2. `docs/api-reference/memory/README.md` - Mention powered by agentmem
+1. `README.md` - Add note about langswarm_memory
+2. `docs/api-reference/memory/README.md` - Mention powered by langswarm_memory
 3. `docs/user-guides/memory/README.md` - Update examples
 4. `CHANGELOG.md` - Document the change
 
@@ -107,12 +107,12 @@ python examples/simple/05_with_tools.py
 ```markdown
 ## Memory System
 
-LangSwarm's memory system is powered by [AgentMem](https://github.com/aekdahl/agentmem),
+LangSwarm's memory system is powered by [LangSwarm Memory](https://github.com/aekdahl/langswarm-memory),
 a standalone package that provides enterprise-grade conversational memory for AI agents.
 
-AgentMem can also be used independently in other projects:
+LangSwarm Memory can also be used independently in other projects:
 \`\`\`bash
-pip install agentmem
+pip install langswarm_memory
 \`\`\`
 ```
 
@@ -120,7 +120,7 @@ pip install agentmem
 
 **For TestPyPI** (test first):
 ```bash
-cd agentmem/
+cd langswarm_memory/
 
 # Build if not already built
 python -m build
@@ -134,8 +134,8 @@ twine upload --repository testpypi dist/*
 # Password: your-testpypi-token
 
 # Test installation
-pip install --index-url https://test.pypi.org/simple/ agentmem
-python -c "from agentmem import create_memory_manager; print('Works!')"
+pip install --index-url https://test.pypi.org/simple/ langswarm_memory
+python -c "from langswarm_memory import create_memory_manager; print('Works!')"
 ```
 
 **For Real PyPI**:
@@ -146,7 +146,7 @@ twine upload dist/*
 # Password: your-pypi-token
 
 # Test installation
-pip install agentmem
+pip install langswarm_memory
 python examples/basic_usage.py
 ```
 
@@ -154,7 +154,7 @@ python examples/basic_usage.py
 ```toml
 [tool.poetry.dependencies]
 # Change from local path to PyPI version:
-agentmem = "^0.1.0"  # Instead of {path = "./agentmem"}
+langswarm_memory = "^0.1.0"  # Instead of {path = "./langswarm_memory"}
 ```
 
 ---
@@ -194,7 +194,7 @@ agentmem = "^0.1.0"  # Instead of {path = "./agentmem"}
 ### Phase 1A: Package Extraction ✅ COMPLETE
 - **Status**: 100% Done
 - **Time**: 3 hours actual
-- **Deliverable**: Working agentmem package
+- **Deliverable**: Working langswarm_memory package
 
 ### Phase 1B: Publishing & Integration (YOU ARE HERE)
 - **Status**: 85% Done
@@ -207,8 +207,8 @@ agentmem = "^0.1.0"  # Instead of {path = "./agentmem"}
 
 ### Phase 1C: Announcement & Feedback (1-2 weeks)
 - Create GitHub repo (optional - can stay in monorepo)
-- Post to r/MachineLearning: "AgentMem - Enterprise memory for AI agents"
-- Show HN: "Show HN: AgentMem – Memory system extracted from LangSwarm"
+- Post to r/MachineLearning: "LangSwarm Memory - Enterprise memory for AI agents"
+- Show HN: "Show HN: LangSwarm Memory – Memory system extracted from LangSwarm"
 - Twitter/LinkedIn announcement
 - Collect feedback and fix issues
 
@@ -240,7 +240,7 @@ agentmem = "^0.1.0"  # Instead of {path = "./agentmem"}
 - Write tests (50+ cases)
 
 ### Phase 2C: Agent Memory Release (2-3 weeks)
-- Release agentmem v0.2.0
+- Release langswarm_memory v0.2.0
 - Migration guide (v0.1 → v0.2)
 - Benchmark against mem0
 - Announce features
@@ -255,7 +255,7 @@ agentmem = "^0.1.0"  # Instead of {path = "./agentmem"}
 
 ### Phase 3: Enterprise Features (3-6 months, optional)
 
-**Managed Service** (agentmem.io):
+**Managed Service** (langswarm_memory.io):
 - Cloud hosting
 - Web dashboard
 - Analytics
@@ -278,13 +278,13 @@ agentmem = "^0.1.0"  # Instead of {path = "./agentmem"}
 
 ## 📦 Repository Strategy: MONOREPO ✅
 
-**Decision**: Keep agentmem in LangSwarm repo (recommended)
+**Decision**: Keep langswarm_memory in LangSwarm repo (recommended)
 
 **Structure**:
 ```
 LangSwarm/
-├── agentmem/              # Standalone package ✅
-│   ├── agentmem/
+├── langswarm_memory/      # Standalone package ✅
+│   ├── langswarm_memory/
 │   ├── tests/
 │   ├── examples/
 │   ├── dist/
@@ -292,7 +292,7 @@ LangSwarm/
 ├── langswarm/             # Main package
 ├── docs/
 ├── tests/
-└── pyproject.toml         # Depends on ./agentmem
+└── pyproject.toml         # Depends on ./langswarm_memory
 ```
 
 **Advantages**:
@@ -302,24 +302,24 @@ LangSwarm/
 - ✅ Can sync changes easily
 - ✅ Can split later if needed
 
-**Optional Later**: Move to `aekdahl/agentmem` repo once stable.
+**Optional Later**: Move to `aekdahl/langswarm-memory` repo once stable.
 
 ---
 
 ## 🚀 Quick Commands Reference
 
-### Test AgentMem
+### Test LangSwarm Memory
 ```bash
-cd agentmem/
+cd langswarm_memory/
 python examples/basic_usage.py
 pytest tests/ -v
 ```
 
 ### Fix Installation
 ```bash
-pip install -e ./agentmem
+pip install -e ./langswarm_memory
 # OR
-poetry add ./agentmem --editable
+poetry add ./langswarm_memory --editable
 ```
 
 ### Test LangSwarm Integration
@@ -331,7 +331,7 @@ python examples/simple/02_memory_chat.py
 
 ### Publish to PyPI
 ```bash
-cd agentmem/
+cd langswarm_memory/
 python -m build
 twine upload --repository testpypi dist/*  # Test first
 twine upload dist/*  # Real PyPI
@@ -340,7 +340,7 @@ twine upload dist/*  # Real PyPI
 ### Update Docs
 ```bash
 # Add to README.md
-echo "Powered by AgentMem" >> README.md
+echo "Powered by LangSwarm Memory" >> README.md
 
 # Update memory docs
 vim docs/api-reference/memory/README.md
@@ -374,7 +374,7 @@ vim docs/api-reference/memory/README.md
 
 1. **Fix Installation** (10 min):
    ```bash
-   pip install -e ./agentmem
+   pip install -e ./langswarm_memory
    python -c "from langswarm.core.memory import create_memory_manager"
    ```
 
@@ -391,7 +391,7 @@ vim docs/api-reference/memory/README.md
 
 4. **Publish to PyPI** (optional, when ready):
    ```bash
-   cd agentmem/
+   cd langswarm_memory/
    twine upload --repository testpypi dist/*
    ```
 
@@ -405,13 +405,13 @@ vim docs/api-reference/memory/README.md
 ## 📝 Files Created/Modified
 
 ### New Files Created:
-- `agentmem/` - Complete package (19 files)
-- `agentmem/IMPLEMENTATION_COMPLETE.md` - Full summary
-- `agentmem/STATUS.md` - Status tracker
+- `langswarm_memory/` - Complete package (19 files)
+- `langswarm_memory/IMPLEMENTATION_COMPLETE.md` - Full summary
+- `langswarm_memory/STATUS.md` - Status tracker
 - `langswarm/core/memory/__init__.py` - Adapter ✅
 
 ### Modified Files:
-- `pyproject.toml` - Added agentmem dependency ✅
+- `pyproject.toml` - Added langswarm_memory dependency ✅
 
 ### Files Need Manual Update:
 - Any files that import memory directly
@@ -427,7 +427,7 @@ vim docs/api-reference/memory/README.md
 
 ---
 
-*AgentMem v0.1.0 - Enterprise-grade conversational memory for AI agents*  
+*LangSwarm Memory v0.1.0 - Enterprise-grade conversational memory for AI agents*  
 *Extracted from LangSwarm, designed for everyone*
 
 
