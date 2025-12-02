@@ -406,6 +406,21 @@ class AgentBuilder:
         self._max_memory_messages = max_messages
         return self
     
+    def memory(self, config: Union[bool, "IMemoryManager"] = True, max_messages: int = 50) -> 'AgentBuilder':
+        """
+        Smart alias for memory configuration.
+        
+        Args:
+            config: Either a boolean to enable/disable default memory, 
+                   or an IMemoryManager instance for external memory.
+            max_messages: Max messages to keep in memory (only used if config is bool)
+        """
+        if isinstance(config, bool):
+            return self.memory_enabled(config, max_messages)
+        else:
+            # Assume it's a memory manager instance
+            return self.memory_manager(config)
+    
     def registry(self, registry: "IToolRegistry") -> 'AgentBuilder':
         """Set custom tool registry"""
         self._registry = registry

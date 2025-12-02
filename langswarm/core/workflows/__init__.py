@@ -71,6 +71,9 @@ from .engine import (
     get_workflow_engine
 )
 
+# Backward compatibility alias
+WorkflowExecutor = WorkflowExecutionEngine
+
 # Builder pattern
 from .builder import (
     WorkflowBuilder,
@@ -214,6 +217,7 @@ __all__ = [
     
     # Engine
     "WorkflowExecutionEngine",
+    "WorkflowExecutor",  # Alias for backward compatibility
     
     # Builders
     "WorkflowBuilder",

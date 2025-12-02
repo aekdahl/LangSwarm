@@ -861,7 +861,7 @@ class PostgresBackend(BaseMemoryBackend):
         if not self._user:
             raise ValueError("user is required for PostgreSQL backend")
         
-        self._pool: Optional[asyncpg.Pool] = None
+        self._pool: Any = None
         self._logger = logging.getLogger(__name__)
     
     @property
@@ -1167,7 +1167,7 @@ class PostgresBackend(BaseMemoryBackend):
                 "error": str(e),
             }
     
-    def get_pool(self) -> asyncpg.Pool:
+    def get_pool(self) -> Any:
         """Get connection pool (for internal use)"""
         return self._pool
 
