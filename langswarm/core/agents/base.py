@@ -322,6 +322,9 @@ class AgentMetadata:
     description: Optional[str] = None
     tags: List[str] = field(default_factory=list)
     
+    # Hierarchy support
+    parent_id: Optional[str] = None  # ID of parent agent (for sub-agents)
+    
     # Statistics
     total_messages: int = 0
     total_tokens_used: int = 0
@@ -342,6 +345,7 @@ class AgentMetadata:
             "version": self.version,
             "description": self.description,
             "tags": self.tags,
+            "parent_id": self.parent_id,
             "statistics": {
                 "total_messages": self.total_messages,
                 "total_tokens_used": self.total_tokens_used,

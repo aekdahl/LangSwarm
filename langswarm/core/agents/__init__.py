@@ -78,7 +78,15 @@ from .registry import (
     list_agents,
     list_agent_info,
     agent_health_check,
-    get_agent_statistics
+    get_agent_statistics,
+    save_registry,
+    load_registry,
+    export_registry,
+    import_registry,
+    get_agent_children,
+    get_agent_parent,
+    get_agent_hierarchy,
+    get_root_agents
 )
 
 # Multimodal capabilities (Task C1)
@@ -228,7 +236,17 @@ __all__ = [
     'list_agents',
     'list_agent_info',
     'agent_health_check',
-    'get_agent_statistics'
+    'get_agent_statistics',
+    'save_registry',
+    'load_registry',
+    'export_registry',
+    'import_registry',
+    
+    # Hierarchy
+    'get_agent_children',
+    'get_agent_parent',
+    'get_agent_hierarchy',
+    'get_root_agents'
 ]
 
 # Add multimodal capabilities to __all__ if available
