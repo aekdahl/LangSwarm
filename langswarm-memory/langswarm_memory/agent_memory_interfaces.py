@@ -1,5 +1,5 @@
 """
-Agent Memory & Context Management Interfaces for AgentMem
+Agent Memory & Context Management Interfaces for langswarm-memory
 
 Sophisticated interfaces for agent memory and context handling that provide:
 - Persistent conversation memory across sessions

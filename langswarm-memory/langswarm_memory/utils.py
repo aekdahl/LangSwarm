@@ -1,5 +1,5 @@
 """
-Utility functions for AgentMem
+Utility functions for langswarm-memory
 
 Handles optional dependencies and provides helper functions.
 """

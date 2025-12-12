@@ -1,5 +1,5 @@
 """
-Memory Interfaces for AgentMem
+Memory Interfaces for langswarm-memory
 
 Unified, clean interfaces for memory management that align with major LLM
 providers and provide a consistent experience across all memory backends.

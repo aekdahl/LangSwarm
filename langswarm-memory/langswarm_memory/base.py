@@ -1,5 +1,5 @@
 """
-Base Memory Implementations for AgentMem
+Base Memory Implementations for langswarm-memory
 
 Provides base classes and core functionality for the unified memory system.
 Includes session management, conversation handling, and provider integration.

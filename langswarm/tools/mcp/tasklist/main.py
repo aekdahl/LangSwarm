@@ -93,45 +93,14 @@ class TaskStorage:
         return any(memory_indicators)
     
     def _create_default_adapter(self):
-        """Create default memory adapter using LangSwarm's memory made simple"""
-        try:
-            # V1/V2 compatibility for MemoryConfig
-            try:
-                from langswarm.core.config import MemoryConfig
-            except ImportError:
-                from langswarm.v1.core.config import MemoryConfig
-            
-            # Use memory made simple auto-detection
-            memory_config = MemoryConfig.setup_memory("production")
-            
-            if memory_config.backend == "bigquery":
-                from langswarm.memory.adapters._langswarm.bigquery.main import BigQueryAdapter
-                adapter_settings = memory_config.get_adapter_settings("bigquery")
-                return BigQueryAdapter(
-                    identifier="tasklist_storage",
-                    **adapter_settings
-                )
-            elif memory_config.backend == "redis":
-                from langswarm.memory.adapters._langswarm.redis.main import RedisAdapter
-                adapter_settings = memory_config.get_adapter_settings("redis")
-                return RedisAdapter(
-                    identifier="tasklist_storage",
-                    **adapter_settings
-                )
-            elif memory_config.backend == "sqlite":
-                from langswarm.memory.adapters._langswarm.sqlite.main import SQLiteAdapter
-                adapter_settings = memory_config.get_adapter_settings("sqlite")
-                return SQLiteAdapter(
-                    identifier="tasklist_storage",
-                    db_path=adapter_settings.get("db_path", "tasklist_memory.db")
-                )
-            else:
-                print(f"⚠️  Unsupported memory backend: {memory_config.backend}, falling back to file storage")
-                return None
-                
-        except Exception as e:
-            print(f"⚠️  Could not initialize memory adapter: {e}, falling back to file storage")
-            return None
+        """
+        Create default memory adapter.
+        
+        NOTE: Legacy adapter support has been removed in V2.
+        Task persistence currently defaults to file storage.
+        Future versions will integrate with langswarm-memory V2.
+        """
+        return None
     
     def load_from_memory(self):
         """Load tasks from memory adapter"""

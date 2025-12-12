@@ -437,6 +437,11 @@ class BaseAgent(AutoInstrumentedMixin):
                 # Validate provider configuration
                 await self._provider.validate_configuration(self._configuration)
                 
+                # Start memory manager if configured
+                if self._memory_manager:
+                    await self._memory_manager.start()
+                    self._logger.info(f"Started memory manager for agent {self.name}")
+                
                 self._status = AgentStatus.READY
                 
                 # Record initialization metrics
@@ -480,6 +485,12 @@ class BaseAgent(AutoInstrumentedMixin):
         
         self._sessions.clear()
         self._current_session = None
+        
+        # Stop memory manager if configured
+        if self._memory_manager:
+            await self._memory_manager.stop()
+            self._logger.info(f"Stopped memory manager for agent {self.name}")
+            
         self._status = AgentStatus.DISCONNECTED
         
         self._logger.info(f"Agent {self.name} shutdown complete")
@@ -665,6 +676,8 @@ class BaseAgent(AutoInstrumentedMixin):
         try:
             # Add the assistant's message with tool calls to session
             await session.add_message(response.message)
+            # Persist assistant's tool call message to external memory
+            await self._persist_to_memory(session, response.message)
             
             # Get tool registry
             from langswarm.tools.registry import ToolRegistry
@@ -801,6 +814,8 @@ class BaseAgent(AutoInstrumentedMixin):
                     metadata={"tool_name": tool_result.get("name", "unknown")}
                 )
                 await session.add_message(tool_message)
+                # Persist tool result to external memory
+                await self._persist_to_memory(session, tool_message)
             
             return tool_results
             
@@ -829,10 +844,9 @@ class BaseAgent(AutoInstrumentedMixin):
             # Send tool results back to provider to get final response
             self._logger.info("Sending tool results back to LLM for final response")
             
-            # Create a continuation message (empty user message to trigger response with tool results)
-            continuation_message = AgentMessage(role="user", content="")
+            # No new message needed - tool results are already in session
             final_response = await self._provider.send_message(
-                continuation_message, session, self._configuration
+                None, session, self._configuration
             )
             
             return final_response
@@ -931,10 +945,9 @@ class BaseAgent(AutoInstrumentedMixin):
                     # Execute tools (updates session)
                     await self._execute_tool_calls(response, session)
                     
-                    # Get next response from provider
-                    continuation_message = AgentMessage(role="user", content="")
+                    # Get next response from provider (no new message needed - tool results are in session)
                     response = await self._provider.send_message(
-                        continuation_message, session, self._configuration
+                        None, session, self._configuration
                     )
                     
                     iteration += 1
@@ -1115,13 +1128,10 @@ class BaseAgent(AutoInstrumentedMixin):
                     # Execute tools (updates session)
                     await self._execute_tool_calls(response, session)
                     
-                    # Stream next response from provider
-                    continuation_message = AgentMessage(role="user", content="")
-                    
-                    # CRITICAL FIX: Stream the response after tool execution!
+                    # Stream next response from provider (no new message needed - tool results are in session)
                     last_chunk = None
                     async for chunk in self._provider.stream_message(
-                        continuation_message, session, self._configuration
+                        None, session, self._configuration
                     ):
                         if chunk.success:
                             full_content += chunk.content

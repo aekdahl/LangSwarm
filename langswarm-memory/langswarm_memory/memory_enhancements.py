@@ -1,5 +1,5 @@
 """
-Memory Enhancement Managers for AgentMem v0.2.0
+Memory Enhancement Managers for langswarm-memory
 
 Provides mem0-inspired enhancements:
 - Memory Relations/Graph: Connect related memories

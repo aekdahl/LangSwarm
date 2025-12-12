@@ -1,5 +1,5 @@
 """
-Memory Factory for AgentMem
+Memory Factory for langswarm-memory
 
 Provides factory functions and configuration management for creating
 memory backends and managers with simplified configuration patterns.

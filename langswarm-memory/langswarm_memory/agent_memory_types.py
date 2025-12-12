@@ -1,5 +1,5 @@
 """
-Enhanced Agent Memory Data Structures for AgentMem v0.2.0
+Enhanced Agent Memory Data Structures for langswarm-memory
 
 Provides enhanced memory types with:
 - Memory relations/graph support

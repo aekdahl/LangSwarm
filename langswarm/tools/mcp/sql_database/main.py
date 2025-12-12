@@ -999,7 +999,7 @@ try:
                 tool_id=identifier
             )
             object.__setattr__(self, 'server', server)
-            object.__setattr__(self, 'config', DEFAULT_CONFIG.copy())
+            self._config = DEFAULT_CONFIG.copy()
             
             # CRITICAL FIX: Apply configuration from kwargs (from YAML settings)
             if kwargs:
@@ -1026,7 +1026,7 @@ try:
             # Merge with default config
             updated_config = DEFAULT_CONFIG.copy()
             updated_config.update(config)
-            object.__setattr__(self, 'config', updated_config)
+            self._config = updated_config
             
             # CRITICAL FIX: Apply config to server for workflow access
             config_copy = updated_config.copy()

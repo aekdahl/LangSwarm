@@ -263,7 +263,7 @@ class AgentBuilder:
             self._model = model
         return self
     
-    def observability(self, provider: str = "langfuse", **kwargs) -> 'AgentBuilder':
+    def observability(self, provider: str = "langfuse", disable_tracing: Optional[bool] = None, **kwargs) -> 'AgentBuilder':
         """
         Enable observability (e.g. LangFuse) via LiteLLM.
         
@@ -275,6 +275,9 @@ class AgentBuilder:
         
         Args:
             provider: Observability provider (currently only "langfuse" supported)
+            disable_tracing: If True, disables sending traces/data to the provider.
+                           If None, checks OBSERVABILITY_DISABLE_TRACING env var.
+                           (default: None)
             **kwargs: Provider-specific configuration:
                 - public_key: LangFuse public key (overrides LANGFUSE_PUBLIC_KEY)
                 - secret_key: LangFuse secret key (overrides LANGFUSE_SECRET_KEY)
@@ -306,8 +309,23 @@ class AgentBuilder:
                     os.environ["LANGFUSE_SECRET_KEY"] = kwargs["secret_key"]
                 if "host" in kwargs:
                     os.environ["LANGFUSE_HOST"] = kwargs["host"]
+                
+                # Determine disable_tracing value
+                if disable_tracing is None:
+                    # Check env var if not explicitly set
+                    env_val = os.getenv("OBSERVABILITY_DISABLE_TRACING", "false").lower()
+                    should_disable = env_val in ("true", "1", "yes", "on")
+                else:
+                    should_disable = disable_tracing
+
+                # Store disable_tracing preference in provider config
+                self._provider_config["observability_disable_tracing"] = should_disable
+                
+                if should_disable:
+                    logger.info("Enabled LangFuse observability (tracing DISABLED by config)")
+                else:
+                    logger.info("Enabled LangFuse observability for LiteLLM")
                     
-                logger.info("Enabled LangFuse observability for LiteLLM")
             except ImportError:
                 logger.warning("LiteLLM not installed, cannot enable observability")
                 
@@ -565,6 +583,9 @@ class AgentBuilder:
         
         # Validate provider-specific constraints
         self._validate_provider_specific()
+        
+        # Inject agent name into provider config for observability
+        self._provider_config["agent_name"] = self._name
         
         return AgentConfiguration(
             provider=self._provider,

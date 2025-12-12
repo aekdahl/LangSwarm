@@ -363,6 +363,7 @@ LangSwarm automatically enables **LangFuse tracing and prompt management** when 
 export LANGFUSE_PUBLIC_KEY="pk-lf-..."
 export LANGFUSE_SECRET_KEY="sk-lf-..."
 export LANGFUSE_HOST="https://cloud.langfuse.com"  # Optional
+export OBSERVABILITY_DISABLE_TRACING="true" # Optional: Disable tracing but keep client active (e.g. for prompts)
 ```
 
 **Zero configuration needed!** Just set the env vars and all LiteLLM calls are automatically traced:

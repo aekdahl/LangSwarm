@@ -1,5 +1,5 @@
 """
-Memory Backend Implementations for AgentMem
+Memory Backend Implementations for langswarm-memory
 
 Concrete implementations of memory backends for different storage systems.
 Provides SQLite, Redis, BigQuery, PostgreSQL, MongoDB, Elasticsearch backends.
@@ -1283,6 +1283,11 @@ class BigQueryBackend(BaseMemoryBackend):
         self._dataset_id = config.get("dataset_id", "langswarm_memory")
         self._location = config.get("location", "US")
         self._credentials_path = config.get("credentials_path")
+        
+        # Retention settings (default 180 days)
+        self._retention_days = config.get("retention_days", 180)
+        self._retention_ms = self._retention_days * 24 * 60 * 60 * 1000 if self._retention_days else None
+        
         self._client: Optional[bigquery.Client] = None
         self._logger = logging.getLogger(__name__)
     
@@ -1391,19 +1396,41 @@ class BigQueryBackend(BaseMemoryBackend):
         ]
         
         tables = [
-            ("sessions", sessions_schema),
-            ("messages", messages_schema),
-            ("summaries", summaries_schema),
+            ("sessions", sessions_schema, "created_at"),
+            ("messages", messages_schema, "timestamp"),
+            ("summaries", summaries_schema, "created_at"),
         ]
         
-        for table_name, schema in tables:
+        for table_name, schema, partition_field in tables:
             table_ref = f"{self._project_id}.{self._dataset_id}.{table_name}"
             try:
-                self._client.get_table(table_ref)
+                table = self._client.get_table(table_ref)
+                
+                # Check if retention needs to be updated for existing partitioned tables
+                if table.time_partitioning and self._retention_ms:
+                    if table.time_partitioning.expiration_ms != self._retention_ms:
+                        self._logger.info(f"Updating retention for table {table_name} to {self._retention_days} days")
+                        table.time_partitioning.expiration_ms = self._retention_ms
+                        self._client.update_table(table, ["time_partitioning"])
+                elif not table.time_partitioning and self._retention_ms:
+                    self._logger.warning(
+                        f"⚠️ Cannot apply retention to existing non-partitioned table '{table_name}'. "
+                        "To enable retention, you must migrate this table to a partitioned table."
+                    )
+                    
             except NotFound:
                 table = bigquery.Table(table_ref, schema=schema)
+                
+                # Configure partitioning if retention is enabled
+                if self._retention_ms:
+                    table.time_partitioning = bigquery.TimePartitioning(
+                        type_=bigquery.TimePartitioningType.DAY,
+                        field=partition_field,
+                        expiration_ms=self._retention_ms
+                    )
+                
                 self._client.create_table(table)
-                self._logger.info(f"Created BigQuery table: {table_name}")
+                self._logger.info(f"Created BigQuery table: {table_name} (retention: {self._retention_days} days)")
     
     def _full_table_name(self, table: str) -> str:
         """Get fully qualified table name"""

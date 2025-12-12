@@ -1,5 +1,5 @@
 """
-AgentMem Vector-Enabled Memory Backend
+langswarm-memory Vector-Enabled Memory Backend
 
 Memory backend that integrates native vector stores.
 """

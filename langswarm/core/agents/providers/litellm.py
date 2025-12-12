@@ -175,7 +175,7 @@ class LiteLLMProvider(IAgentProvider):
     
     async def send_message(
         self, 
-        message: AgentMessage, 
+        message: Optional[AgentMessage], 
         session: IAgentSession,
         config: IAgentConfiguration
     ) -> IAgentResponse:
@@ -228,7 +228,7 @@ class LiteLLMProvider(IAgentProvider):
     
     async def stream_message(
         self,
-        message: AgentMessage,
+        message: Optional[AgentMessage],
         session: IAgentSession, 
         config: IAgentConfiguration
     ) -> AsyncIterator[IAgentResponse]:
@@ -320,7 +320,7 @@ class LiteLLMProvider(IAgentProvider):
     async def _build_messages(
         self, 
         session: IAgentSession, 
-        new_message: AgentMessage,
+        new_message: Optional[AgentMessage],
         config: IAgentConfiguration
     ) -> List[Dict[str, Any]]:
         """Convert session messages to LiteLLM/OpenAI format"""
@@ -363,21 +363,22 @@ class LiteLLMProvider(IAgentProvider):
             
             messages.append(openai_msg)
         
-        # New message
-        # CRITICAL FIX: Check if the message is already in the context to prevent duplication
-        # BaseAgent adds message to session before calling send_message, so it might be in context_messages
-        is_duplicate = False
-        if messages:
-            last_msg = messages[-1]
-            if (last_msg.get("role") == new_message.role and 
-                last_msg.get("content") == new_message.content):
-                is_duplicate = True
-        
-        if not is_duplicate:
-            messages.append({
-                "role": new_message.role,
-                "content": new_message.content
-            })
+        # New message (skip if None - tool continuation case)
+        if new_message is not None:
+            # CRITICAL FIX: Check if the message is already in the context to prevent duplication
+            # BaseAgent adds message to session before calling send_message, so it might be in context_messages
+            is_duplicate = False
+            if messages:
+                last_msg = messages[-1]
+                if (last_msg.get("role") == new_message.role and 
+                    last_msg.get("content") == new_message.content):
+                    is_duplicate = True
+            
+            if not is_duplicate:
+                messages.append({
+                    "role": new_message.role,
+                    "content": new_message.content
+                })
         
         return messages
     
@@ -400,6 +401,22 @@ class LiteLLMProvider(IAgentProvider):
             if "metadata" not in params:
                 params["metadata"] = {}
             params["metadata"]["session_id"] = session.session_id
+            
+        # Add agent name to metadata if available (from AgentBuilder)
+        if hasattr(config, 'provider_config') and config.provider_config:
+            if "agent_name" in config.provider_config:
+                if "metadata" not in params:
+                    params["metadata"] = {}
+                params["metadata"]["agent_name"] = config.provider_config["agent_name"]
+                # Also add as "trace_name" or similar if Langfuse supports it directly
+                # But "agent_name" in metadata is good for filtering
+            
+            # Handle conditional observability disabling
+            if config.provider_config.get("observability_disable_tracing", False):
+                # Disable LiteLLM callbacks for this request
+                if "extra_headers" not in params:
+                    params["extra_headers"] = {}
+                params["extra_headers"]["x-litellm-disable-callbacks"] = "true"
         
         # Optional params
         if config.max_tokens:
@@ -418,6 +435,15 @@ class LiteLLMProvider(IAgentProvider):
             params["api_key"] = config.api_key
         if config.base_url:
             params["api_base"] = config.base_url
+            
+        # Timeout
+        if hasattr(config, 'timeout') and config.timeout:
+            params["timeout"] = config.timeout
+            
+        # Fallbacks (from provider_config)
+        if hasattr(config, 'provider_config') and config.provider_config:
+            if "fallbacks" in config.provider_config:
+                params["fallbacks"] = config.provider_config["fallbacks"]
             
         # Tools
         if config.tools_enabled and config.available_tools:
