@@ -74,6 +74,13 @@ class LiteLLMProvider(IAgentProvider):
         - LANGFUSE_HOST (optional)
         
         If credentials are found, registers LangFuse callbacks with LiteLLM.
+        
+        Note: LiteLLM's Langfuse callback automatically tracks:
+        - Latency (request duration)
+        - Token usage
+        - Costs
+        - Session grouping (via metadata.session_id)
+        - Trace naming (via metadata.trace_name)
         """
         # Check if LangFuse credentials are in environment
         public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
@@ -97,10 +104,18 @@ class LiteLLMProvider(IAgentProvider):
                         "LiteLLM currently requires langfuse<3.0.0 (e.g., 2.53.0). "
                         "Observability may fail. Please run: pip install 'langfuse<3.0.0'"
                     )
+                else:
+                    logger.debug(f"Langfuse version {current_version} is compatible")
             except Exception as e:
                 logger.debug(f"Failed to check langfuse version: {e}")
             
             # Register LangFuse callbacks with LiteLLM
+            # Use list assignment to ensure callbacks are properly initialized
+            if not isinstance(litellm.success_callback, list):
+                litellm.success_callback = []
+            if not isinstance(litellm.failure_callback, list):
+                litellm.failure_callback = []
+            
             if "langfuse" not in litellm.success_callback:
                 litellm.success_callback.append("langfuse")
             if "langfuse" not in litellm.failure_callback:
@@ -114,8 +129,8 @@ class LiteLLMProvider(IAgentProvider):
                 os.environ["LANGFUSE_HOST"] = host
             
             logger.info(
-                f"✅ LangFuse observability auto-enabled for LiteLLM "
-                f"(host: {host})"
+                f"✅ LangFuse observability enabled for LiteLLM "
+                f"(host: {host}, callbacks: {litellm.success_callback})"
             )
             
         except ImportError:
@@ -396,20 +411,23 @@ class LiteLLMProvider(IAgentProvider):
             "stream": stream
         }
         
-        # Add session_id to metadata for Langfuse
+        # Add Langfuse observability metadata
+        # See: https://docs.litellm.ai/docs/observability/langfuse_integration
+        if "metadata" not in params:
+            params["metadata"] = {}
+        
+        # Session tracking - used by Langfuse to group related calls
         if session and session.session_id:
-            if "metadata" not in params:
-                params["metadata"] = {}
             params["metadata"]["session_id"] = session.session_id
-            
-        # Add agent name to metadata if available (from AgentBuilder)
+        
+        # Agent name and trace naming
         if hasattr(config, 'provider_config') and config.provider_config:
-            if "agent_name" in config.provider_config:
-                if "metadata" not in params:
-                    params["metadata"] = {}
-                params["metadata"]["agent_name"] = config.provider_config["agent_name"]
-                # Also add as "trace_name" or similar if Langfuse supports it directly
-                # But "agent_name" in metadata is good for filtering
+            agent_name = config.provider_config.get("agent_name")
+            if agent_name:
+                # trace_name is used by Langfuse to name the trace
+                params["metadata"]["trace_name"] = agent_name
+                # Also keep agent_name for filtering/grouping
+                params["metadata"]["agent_name"] = agent_name
             
             # Handle conditional observability disabling
             if config.provider_config.get("observability_disable_tracing", False):
