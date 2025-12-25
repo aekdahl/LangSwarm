@@ -268,8 +268,8 @@ class OpenAIProvider(IAgentProvider):
         
         # Convert to OpenAI format
         for msg in context_messages:
-            # Skip system messages from context (we already added our own)
-            if msg.role == "system":
+            # Skip None messages and system messages from context (we already added our own)
+            if msg is None or msg.role == "system":
                 continue
                 
             openai_msg = {

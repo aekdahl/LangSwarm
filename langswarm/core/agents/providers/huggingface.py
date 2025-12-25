@@ -336,6 +336,9 @@ class HuggingFaceProvider(IAgentProvider):
         
         # Conversation history
         for msg in session.messages[-10:]:  # Last 10 messages
+            # Skip None messages
+            if msg is None:
+                continue
             if msg.role == "user":
                 prompt_parts.append(f"User: {msg.content}")
             elif msg.role == "assistant":

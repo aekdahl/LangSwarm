@@ -260,6 +260,9 @@ class MistralProvider(IAgentProvider):
             messages.append(ChatMessage(role="system", content=system_content))
         
         for msg in session.messages:
+            # Skip None messages
+            if msg is None:
+                continue
             if msg.role in ["user", "assistant"]:
                 messages.append(ChatMessage(role=msg.role, content=msg.content))
         

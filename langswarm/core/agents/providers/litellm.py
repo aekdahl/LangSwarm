@@ -362,7 +362,8 @@ class LiteLLMProvider(IAgentProvider):
         )
         
         for msg in context_messages:
-            if msg.role == "system":
+            # Skip None messages and system messages
+            if msg is None or msg.role == "system":
                 continue
                 
             openai_msg = {

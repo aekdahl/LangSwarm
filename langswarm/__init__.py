@@ -18,7 +18,12 @@ Quick Start:
     agent = config.get_agent("assistant")
 """
 
-__version__ = "0.0.54.dev45"
+# Dynamic version from package metadata (single source of truth: pyproject.toml)
+from importlib.metadata import version, PackageNotFoundError
+try:
+    __version__ = version("langswarm")
+except PackageNotFoundError:
+    __version__ = "0.0.0.dev"  # Fallback for development/editable installs
 
 # Simple API - primary interface for most users
 try:

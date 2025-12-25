@@ -236,8 +236,8 @@ class AnthropicProvider(IAgentProvider):
         
         # Convert to Anthropic format
         for msg in context_messages:
-            # Skip system messages for Anthropic - they use system parameter
-            if msg.role == "system":
+            # Skip None messages and system messages for Anthropic - they use system parameter
+            if msg is None or msg.role == "system":
                 continue
                 
             anthropic_msg = {

@@ -372,6 +372,9 @@ class GeminiProvider(IAgentProvider):
         conversation_parts = []
         
         for msg in context_messages:
+            # Skip None messages
+            if msg is None:
+                continue
             if msg.role == "user":
                 conversation_parts.append(f"User: {msg.content}")
             elif msg.role == "assistant":

@@ -233,6 +233,9 @@ class CustomProvider(IAgentProvider):
         # Example for OpenAI-like format:
         converted_messages = []
         for msg in messages:
+            # Skip None messages
+            if msg is None:
+                continue
             converted_messages.append({
                 "role": msg.role,
                 "content": msg.content

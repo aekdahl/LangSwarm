@@ -213,6 +213,9 @@ class LocalProvider(IAgentProvider):
         # Ollama uses a simple prompt format for most models
         prompt = ""
         for msg in messages:
+            # Skip None messages
+            if msg is None:
+                continue
             if msg.role == "system":
                 prompt += f"System: {msg.content}\n\n"
             elif msg.role == "user":
@@ -227,7 +230,7 @@ class LocalProvider(IAgentProvider):
         return {
             "messages": [
                 {"role": msg.role, "content": msg.content}
-                for msg in messages
+                for msg in messages if msg is not None
             ]
         }
     
@@ -236,7 +239,7 @@ class LocalProvider(IAgentProvider):
         return {
             "messages": [
                 {"role": msg.role, "content": msg.content}
-                for msg in messages
+                for msg in messages if msg is not None
             ]
         }
     
@@ -245,6 +248,9 @@ class LocalProvider(IAgentProvider):
         # TGI typically expects a single input string
         prompt = ""
         for msg in messages:
+            # Skip None messages
+            if msg is None:
+                continue
             if msg.role == "system":
                 prompt += f"<|system|>\n{msg.content}\n"
             elif msg.role == "user":
@@ -259,7 +265,7 @@ class LocalProvider(IAgentProvider):
         return {
             "messages": [
                 {"role": msg.role, "content": msg.content}
-                for msg in messages
+                for msg in messages if msg is not None
             ]
         }
     
