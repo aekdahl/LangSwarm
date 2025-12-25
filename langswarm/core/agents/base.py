@@ -605,10 +605,12 @@ class BaseAgent(AutoInstrumentedMixin):
                     
                     # Convert external messages to AgentMessages and populate session
                     # Skip system message if already added by create_session
-                    has_system = any(m.role == "system" for m in local_session.messages)
+                    has_system = any(m is not None and m.role == "system" for m in local_session.messages)
                     
                     for msg in messages:
-                        # Skip system messages if we already have one
+                        # Skip None messages and system messages if we already have one
+                        if msg is None:
+                            continue
                         if msg.role.value == "system" and has_system:
                             continue
                         
@@ -655,7 +657,7 @@ class BaseAgent(AutoInstrumentedMixin):
                 "system": MessageRole.SYSTEM,
                 "tool": MessageRole.TOOL if hasattr(MessageRole, 'TOOL') else MessageRole.SYSTEM
             }
-            role = role_map.get(message.role, MessageRole.USER)
+            role = role_map.get(message.role, MessageRole.USER) if message is not None else MessageRole.USER
             
             # Create memory Message and add to external session
             memory_message = Message(
@@ -904,7 +906,7 @@ class BaseAgent(AutoInstrumentedMixin):
                 is_duplicate = False
                 if session.messages:
                     last_msg = session.messages[-1]
-                    if last_msg.role == "user" and last_msg.content == message:
+                    if last_msg is not None and last_msg.role == "user" and last_msg.content == message:
                         is_duplicate = True
                         user_message = last_msg # Use existing message instance
                         self._logger.debug("Skipping duplicate user message in session (chat)")
@@ -1083,7 +1085,7 @@ class BaseAgent(AutoInstrumentedMixin):
             is_duplicate = False
             if session.messages:
                 last_msg = session.messages[-1]
-                if last_msg.role == "user" and last_msg.content == message:
+                if last_msg is not None and last_msg.role == "user" and last_msg.content == message:
                     is_duplicate = True
                     user_message = last_msg # Use existing message instance
                     self._logger.debug("Skipping duplicate user message in session")

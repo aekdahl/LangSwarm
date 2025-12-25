@@ -378,6 +378,9 @@ class CohereProvider(IAgentProvider):
         messages = session.messages[:-1] if session.messages else []
         
         for message in messages:
+            # Skip None messages
+            if message is None:
+                continue
             if message.role in ["user", "assistant"]:
                 # Map to Cohere format
                 cohere_role = "USER" if message.role == "user" else "CHATBOT"

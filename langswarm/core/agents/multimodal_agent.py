@@ -536,8 +536,8 @@ class MultimodalAgent(BaseAgent):
                 )
                 
                 # Insert at the beginning after any existing system messages
-                system_messages = [msg for msg in personalized_context if msg.role == "system"]
-                other_messages = [msg for msg in personalized_context if msg.role != "system"]
+                system_messages = [msg for msg in personalized_context if msg is not None and msg.role == "system"]
+                other_messages = [msg for msg in personalized_context if msg is not None and msg.role != "system"]
                 
                 personalized_context = system_messages + [system_message] + other_messages
             
@@ -578,7 +578,7 @@ class MultimodalAgent(BaseAgent):
                 
                 # Create summary of middle messages
                 middle_content = "\n".join([
-                    f"{msg.role}: {msg.content}" for msg in middle_messages
+                    f"{msg.role}: {msg.content}" for msg in middle_messages if msg is not None
                 ])
                 
                 summary_prompt = f"Summarize this conversation in 2-3 sentences:\n{middle_content}"
@@ -707,7 +707,7 @@ class MultimodalAgent(BaseAgent):
         """Predict user intent from message and context"""
         try:
             # Build intent prediction prompt
-            context_text = "\n".join([f"{msg.role}: {msg.content}" for msg in context[-5:]])
+            context_text = "\n".join([f"{msg.role}: {msg.content}" for msg in context[-5:] if msg is not None])
             
             intent_prompt = f"""
             Analyze the user's intent based on their message and conversation context.
