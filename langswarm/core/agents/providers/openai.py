@@ -287,11 +287,12 @@ class OpenAIProvider(IAgentProvider):
             
             messages.append(openai_msg)
         
-        # Add new message
-        messages.append({
-            "role": new_message.role,
-            "content": new_message.content
-        })
+        # Add new message (with null check)
+        if new_message is not None:
+            messages.append({
+                "role": new_message.role,
+                "content": new_message.content
+            })
         
         return messages
     

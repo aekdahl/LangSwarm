@@ -251,16 +251,17 @@ class AnthropicProvider(IAgentProvider):
             
             messages.append(anthropic_msg)
         
-        # Add new message
-        new_msg = {
-            "role": new_message.role,
-            "content": new_message.content
-        }
-        
-        if isinstance(new_message.content, list):
-            new_msg["content"] = new_message.content
+        # Add new message (with null check)
+        if new_message is not None:
+            new_msg = {
+                "role": new_message.role,
+                "content": new_message.content
+            }
             
-        messages.append(new_msg)
+            if isinstance(new_message.content, list):
+                new_msg["content"] = new_message.content
+                
+            messages.append(new_msg)
         
         return messages
     

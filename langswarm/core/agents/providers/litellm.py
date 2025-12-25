@@ -384,13 +384,13 @@ class LiteLLMProvider(IAgentProvider):
             # CRITICAL FIX: Check if the message is already in the context to prevent duplication
             # BaseAgent adds message to session before calling send_message, so it might be in context_messages
             is_duplicate = False
-            if messages:
+            if messages and new_message is not None:
                 last_msg = messages[-1]
                 if (last_msg.get("role") == new_message.role and 
                     last_msg.get("content") == new_message.content):
                     is_duplicate = True
             
-            if not is_duplicate:
+            if not is_duplicate and new_message is not None:
                 messages.append({
                     "role": new_message.role,
                     "content": new_message.content

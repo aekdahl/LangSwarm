@@ -266,7 +266,9 @@ class MistralProvider(IAgentProvider):
             if msg.role in ["user", "assistant"]:
                 messages.append(ChatMessage(role=msg.role, content=msg.content))
         
-        messages.append(ChatMessage(role=new_message.role, content=new_message.content))
+        # Add new message (with null check)
+        if new_message is not None:
+            messages.append(ChatMessage(role=new_message.role, content=new_message.content))
         return messages
     
     def _process_response(
