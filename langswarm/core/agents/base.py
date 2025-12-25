@@ -245,7 +245,8 @@ class AgentSession(IAgentSession):
     
     @property
     def messages(self) -> List[AgentMessage]:
-        return self._messages.copy()
+        # Filter out any None values that may have been added
+        return [msg for msg in self._messages if msg is not None]
     
     @property
     def created_at(self) -> datetime:
@@ -257,15 +258,18 @@ class AgentSession(IAgentSession):
     
     async def add_message(self, message: AgentMessage) -> None:
         """Add a message to the session"""
+        if message is None:
+            logging.getLogger(__name__).warning("Attempted to add None message to session, ignoring")
+            return
         async with self._lock:
             self._messages.append(message)
             self._updated_at = datetime.now()
             
             # Trim messages if we exceed the limit
             if len(self._messages) > self._max_messages:
-                # Keep the system message if it exists
-                system_messages = [msg for msg in self._messages if msg.role == "system"]
-                other_messages = [msg for msg in self._messages if msg.role != "system"]
+                # Keep the system message if it exists (filter out None values)
+                system_messages = [msg for msg in self._messages if msg is not None and msg.role == "system"]
+                other_messages = [msg for msg in self._messages if msg is not None and msg.role != "system"]
                 
                 # Keep the most recent messages
                 keep_count = self._max_messages - len(system_messages)
@@ -289,16 +293,16 @@ class AgentSession(IAgentSession):
         total_tokens = 0
         context_messages = []
         
-        # Include system messages first
-        system_messages = [msg for msg in self._messages if msg.role == "system"]
+        # Include system messages first (filter out None values)
+        system_messages = [msg for msg in self._messages if msg is not None and msg.role == "system"]
         for msg in system_messages:
             msg_tokens = len(msg.content) // 4
             if total_tokens + msg_tokens <= max_tokens:
                 context_messages.append(msg)
                 total_tokens += msg_tokens
         
-        # Include recent messages in reverse order
-        other_messages = [msg for msg in self._messages if msg.role != "system"]
+        # Include recent messages in reverse order (filter out None values)
+        other_messages = [msg for msg in self._messages if msg is not None and msg.role != "system"]
         for msg in reversed(other_messages):
             msg_tokens = len(msg.content) // 4
             if total_tokens + msg_tokens <= max_tokens:
@@ -678,10 +682,13 @@ class BaseAgent(AutoInstrumentedMixin):
         Does NOT call back to LLM - this must be done by caller.
         """
         try:
-            # Add the assistant's message with tool calls to session
-            await session.add_message(response.message)
-            # Persist assistant's tool call message to external memory
-            await self._persist_to_memory(session, response.message)
+            # Add the assistant's message with tool calls to session (if not None)
+            if response.message is not None:
+                await session.add_message(response.message)
+                # Persist assistant's tool call message to external memory
+                await self._persist_to_memory(session, response.message)
+            else:
+                self._logger.warning("Response message is None, skipping session add")
             
             # Get tool registry
             from langswarm.tools.registry import ToolRegistry

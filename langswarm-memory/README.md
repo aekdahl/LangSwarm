@@ -310,6 +310,15 @@ manager = create_memory_manager("sqlite")
 - 🔜 Memory analytics and optimization
 - 🔜 Long-term semantic memory with vector search
 
+### Phase 3 (Planned) - Evaluation & Quality
+- 🔜 8) **LLM-as-Judge Evaluator Worker** - Build independent evaluation service
+  - Run custom evaluations (deterministic checks + LLM judge)
+  - Use any model/provider for evaluation
+  - Run evals in CI/CD with custom SLAs
+  - Ingest results as scores into Langfuse
+  - Full control independent of external managed eval runners
+  - **Strategy**: Use Langfuse for storage/UI/datasets/score schemas, build our own evaluator for execution
+
 ---
 
 ## Contributing

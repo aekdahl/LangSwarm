@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "langswarm"
-version = "0.0.54.dev120"
-# langswarm-v0.0.54.dev120
+version = "0.0.54.dev121"
+# langswarm-v0.0.54.dev121
 # Tag format: langswarm-v{version}
 description = "A multi-agent ecosystem for large language models (LLMs) and autonomous systems."
 readme = "README.md"

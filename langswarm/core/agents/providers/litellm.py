@@ -413,12 +413,16 @@ class LiteLLMProvider(IAgentProvider):
         
         # Add Langfuse observability metadata
         # See: https://docs.litellm.ai/docs/observability/langfuse_integration
+        # Supported keys: session_id, trace_name, trace_id, trace_user_id, generation_name, tags
         if "metadata" not in params:
             params["metadata"] = {}
         
         # Session tracking - used by Langfuse to group related calls
-        if session and session.session_id:
+        if session and hasattr(session, 'session_id') and session.session_id:
             params["metadata"]["session_id"] = session.session_id
+            logger.debug(f"Langfuse session_id set: {session.session_id}")
+        else:
+            logger.debug(f"No session_id available (session={session}, has_attr={hasattr(session, 'session_id') if session else 'N/A'})")
         
         # Agent name and trace naming
         if hasattr(config, 'provider_config') and config.provider_config:
@@ -428,6 +432,7 @@ class LiteLLMProvider(IAgentProvider):
                 params["metadata"]["trace_name"] = agent_name
                 # Also keep agent_name for filtering/grouping
                 params["metadata"]["agent_name"] = agent_name
+                logger.debug(f"Langfuse trace_name set: {agent_name}")
             
             # Handle conditional observability disabling
             if config.provider_config.get("observability_disable_tracing", False):
@@ -435,6 +440,14 @@ class LiteLLMProvider(IAgentProvider):
                 if "extra_headers" not in params:
                     params["extra_headers"] = {}
                 params["extra_headers"]["x-litellm-disable-callbacks"] = "true"
+            
+            # Enable debug mode for Langfuse if requested
+            if config.provider_config.get("debug_langfuse", False):
+                params["metadata"]["debug_langfuse"] = True
+        
+        # Log the full metadata for debugging (at debug level)
+        if params.get("metadata"):
+            logger.debug(f"Langfuse metadata: {params['metadata']}")
         
         # Optional params
         if config.max_tokens:
