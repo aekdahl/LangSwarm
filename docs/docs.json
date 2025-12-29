@@ -1,0 +1,121 @@
+{
+    "$schema": "https://mintlify.com/schema.json",
+    "name": "LangSwarm",
+    "logo": {
+        "dark": "/logo/dark.svg",
+        "light": "/logo/light.svg"
+    },
+    "favicon": "/favicon.svg",
+    "colors": {
+        "primary": "#F59E0B",
+        "light": "#FCD34D",
+        "dark": "#D97706",
+        "anchors": {
+            "from": "#F59E0B",
+            "to": "#D97706"
+        }
+    },
+    "topbarLinks": [
+        {
+            "name": "GitHub",
+            "url": "https://github.com/aekdahl/LangSwarm"
+        }
+    ],
+    "topbarCtaButton": {
+        "name": "Get Started",
+        "url": "/getting-started/quickstart"
+    },
+    "tabs": [
+        {
+            "name": "API Reference",
+            "url": "api-reference"
+        }
+    ],
+    "anchors": [
+        {
+            "name": "GitHub",
+            "icon": "github",
+            "url": "https://github.com/aekdahl/LangSwarm"
+        },
+        {
+            "name": "Community",
+            "icon": "discord",
+            "url": "https://github.com/aekdahl/LangSwarm/discussions"
+        }
+    ],
+    "navigation": [
+        {
+            "group": "Getting Started",
+            "pages": [
+                "README",
+                "getting-started/quickstart/README",
+                "getting-started/installation/README",
+                "getting-started/first-project/README"
+            ]
+        },
+        {
+            "group": "User Guides",
+            "pages": [
+                {
+                    "group": "Agents",
+                    "pages": [
+                        "user-guides/agents/README",
+                        "user-guides/agents/response-modes",
+                        "user-guides/agents/workflows-vs-agents"
+                    ]
+                },
+                {
+                    "group": "Memory",
+                    "pages": [
+                        "user-guides/memory/README",
+                        "user-guides/memory/postgresql"
+                    ]
+                },
+                {
+                    "group": "Workflows",
+                    "pages": [
+                        "user-guides/workflows/README",
+                        "user-guides/workflows/yaml-compatibility/README"
+                    ]
+                },
+                {
+                    "group": "Tools",
+                    "pages": [
+                        "user-guides/tools/intent-based-calls",
+                        "user-guides/tools/tool-chaining",
+                        "user-guides/tools/mcp/local-mode",
+                        "user-guides/tools/mcp/remote-mode"
+                    ]
+                },
+                "user-guides/observability/README",
+                "user-guides/sessions/README",
+                "user-guides/vector-stores/README"
+            ]
+        },
+        {
+            "group": "Tools Reference",
+            "pages": [
+                "tools/README",
+                "tools/unified-system/README"
+            ]
+        },
+        {
+            "group": "Architecture",
+            "pages": [
+                "architecture/dual-interface-architecture",
+                "architecture/enhanced-pipeline-factory",
+                "architecture/unified-pipeline-system"
+            ]
+        },
+        {
+            "group": "Troubleshooting",
+            "pages": [
+                "troubleshooting/error-handling/README",
+                "troubleshooting/error-handling/critical-failures"
+            ]
+        }
+    ],
+    "footerSocials": {
+        "github": "https://github.com/aekdahl/LangSwarm"
+    }
+}
