@@ -9,11 +9,7 @@
     "colors": {
         "primary": "#F59E0B",
         "light": "#FCD34D",
-        "dark": "#D97706",
-        "anchors": {
-            "from": "#F59E0B",
-            "to": "#D97706"
-        }
+        "dark": "#D97706"
     },
     "topbarLinks": [
         {
@@ -25,12 +21,6 @@
         "name": "Get Started",
         "url": "/getting-started/quickstart"
     },
-    "tabs": [
-        {
-            "name": "API Reference",
-            "url": "api-reference"
-        }
-    ],
     "anchors": [
         {
             "name": "GitHub",
@@ -110,7 +100,9 @@
             ]
         }
     ],
-    "footerSocials": {
-        "github": "https://github.com/aekdahl/LangSwarm"
+    "footer": {
+        "socials": {
+            "github": "https://github.com/aekdahl/LangSwarm"
+        }
     }
 }
