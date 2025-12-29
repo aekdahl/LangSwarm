@@ -26,21 +26,49 @@ This provides a clean, beginner-friendly interface for the most common use cases
 ### create_agent
 
 ```python
-def create_agent(model: str, **kwargs) -> langswarm.simple_api.Agent
+def create_agent(model: str, memory_manager: Optional[ForwardRef('IMemoryManager')] = None, **kwargs) -> langswarm.simple_api.Agent
 ```
 
 Create a simple agent.
 
 Args:
     model: AI model name (e.g., "gpt-3.5-turbo", "gpt-4")
-    **kwargs: Additional agent options
+    memory_manager: Optional external memory manager for persistent sessions.
+        When provided, conversations are automatically persisted and can be
+        restored across agent restarts.
+    **kwargs: Additional agent options:
+        - provider: Provider name (auto-detected from model if not specified)
+        - system_prompt: System instructions for the agent
+        - memory: Enable in-memory conversation history (default: False)
+        - tools: List of tool names to enable
+        - stream: Enable streaming responses (default: False)
+        - track_costs: Track token usage and costs (default: False)
     
 Returns:
     Agent instance
+    
+Example:
+    # Simple agent
+    agent = create_agent(model="gpt-4")
+    
+    # Agent with persistent memory
+    from langswarm.core.memory import create_memory_manager
+    manager = create_memory_manager("sqlite", db_path="memory.db")
+    await manager.backend.connect()
+    
+    agent = create_agent(
+        model="gpt-4",
+        memory_manager=manager,
+        system_prompt="You are a helpful assistant"
+    )
+    
+    # Chat with session persistence
+    response = await agent.chat("Hello!", session_id="user-123")
 
 **Parameters:**
 
 - `model`: `str`
+- `memory_manager`: `Optional = None`
 - `kwargs`: `Any`
 
 **Returns:**
@@ -125,14 +153,22 @@ Simple agent wrapper for examples.
 #### chat
 
 ```python
-async def chat(self, message: str) -> str
+async def chat(self, message: str, session_id: Optional[str] = None) -> str
 ```
 
 Send a message and get a response.
 
+Args:
+    message: The user message to send
+    session_id: Optional session ID for external memory persistence
+    
+Returns:
+    The assistant's response
+
 **Parameters:**
 
 - `message`: `str`
+- `session_id`: `Optional = None`
 
 **Returns:**
 

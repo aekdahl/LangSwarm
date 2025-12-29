@@ -2,7 +2,7 @@
 
 Complete API documentation for LangSwarm's multi-agent orchestration framework.
 
-*Generated on 2025-10-06 13:34:13*
+*Generated on 2025-12-29 00:19:42*
 
 ## Quick Start
 
@@ -62,6 +62,27 @@ Simple API for LangSwarm examples.
 Orchestration-specific error handling for LangSwarm.
 
 - **Functions:** 5
+- **Classes:** 6
+
+### [langswarm_memory.interfaces](langswarm_memory_interfaces.md)
+
+Memory Interfaces for langswarm-memory
+
+- **Functions:** 0
+- **Classes:** 12
+
+### [langswarm_memory.backends](langswarm_memory_backends.md)
+
+Memory Backend Implementations for langswarm-memory
+
+- **Functions:** 0
+- **Classes:** 14
+
+### [langswarm_memory.errors](langswarm_memory_errors.md)
+
+Error handling for LangSwarm Memory
+
+- **Functions:** 0
 - **Classes:** 6
 
 ## Key Concepts

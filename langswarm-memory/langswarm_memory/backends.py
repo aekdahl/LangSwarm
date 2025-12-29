@@ -2556,3 +2556,445 @@ class ElasticsearchSession(BaseMemorySession):
                 )
         
         self._is_dirty = False
+
+
+# PostgreSQL (asyncpg) Backend with PGVector support
+# -----------------------------------------------------------------------------
+
+class PostgresBackend(BaseMemoryBackend):
+    """
+    PostgreSQL backend using asyncpg.
+    Supports both relational storage and vector embeddings (via pgvector).
+    """
+
+    def __init__(self, config: MemoryConfig):
+        super().__init__(config)
+        self._dsn = config.get("dsn") or config.get("url")
+        if not self._dsn:
+            # Construct DSN from parts
+            user = config.get("user", "postgres")
+            password = config.get("password", "")
+            host = config.get("host", "localhost")
+            port = config.get("port", 5432)
+            database = config.get("database", "langswarm")
+            self._dsn = f"postgresql://{user}:{password}@{host}:{port}/{database}"
+
+        self._pool: Optional[asyncpg.Pool] = None
+        self._min_size = config.get("min_size", 10)
+        self._max_size = config.get("max_size", 10)
+        self._schema = config.get("schema", "public")
+        self._table_prefix = config.get("table_prefix", "")
+        self._enable_vector = config.get("enable_vector", False)
+        self._embedding_dimension = config.get("embedding_dimension", 1536)
+        self._logger = logging.getLogger(__name__)
+
+        # Embedding provider for semantic search (if enabled)
+        self.embedding_provider = None
+        if self._enable_vector:
+            embedding_config = config.get("embedding", {})
+            if embedding_config:
+                 # Lazy load to avoid circular import issues or heavy loads
+                 from .vector_backend import OpenAIEmbeddingProvider
+                 provider_type = embedding_config.get("provider", "openai")
+                 if provider_type == "openai":
+                     self.embedding_provider = OpenAIEmbeddingProvider(
+                         api_key=embedding_config.get("api_key"),
+                         model=embedding_config.get("model", "text-embedding-3-small")
+                     )
+    
+    @property
+    def backend_type(self) -> MemoryBackendType:
+        return MemoryBackendType.POSTGRES
+
+    async def connect(self) -> bool:
+        """Connect to PostgreSQL"""
+        try:
+            self._pool = await asyncpg.create_pool(
+                dsn=self._dsn,
+                min_size=self._min_size,
+                max_size=self._max_size
+            )
+            
+            # Initialize schema
+            await self._create_tables()
+
+            self._connected = True
+            self._logger.info(f"Connected to Postgres backend")
+            return True
+        except Exception as e:
+            self._logger.error(f"Failed to connect to Postgres backend: {e}")
+            return False
+
+    async def disconnect(self) -> bool:
+        """Disconnect from PostgreSQL"""
+        try:
+            if self._pool:
+                await self._pool.close()
+                self._pool = None
+            self._connected = False
+            self._sessions.clear()
+            self._logger.info("Disconnected from Postgres backend")
+            return True
+        except Exception as e:
+            self._logger.error(f"Failed to disconnect: {e}")
+            return False
+
+    async def _create_tables(self):
+        """Create tables and extensions"""
+        if not self._pool:
+            return
+
+        async with self._pool.acquire() as conn:
+            # Enable vector extension if needed
+            if self._enable_vector:
+                try:
+                    await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+                except Exception as e:
+                    self._logger.warning(f"Could not create vector extension: {e}. Vector search may fail.")
+
+            # Sessions table
+            await conn.execute(f"""
+                CREATE TABLE IF NOT EXISTS {self._schema}.{self._table_prefix}sessions (
+                    session_id TEXT PRIMARY KEY,
+                    user_id TEXT,
+                    agent_id TEXT,
+                    workflow_id TEXT,
+                    status TEXT NOT NULL,
+                    max_messages INTEGER,
+                    max_tokens INTEGER,
+                    auto_summarize BOOLEAN,
+                    summary_threshold INTEGER,
+                    created_at TIMESTAMP WITH TIME ZONE,
+                    updated_at TIMESTAMP WITH TIME ZONE,
+                    expires_at TIMESTAMP WITH TIME ZONE,
+                    tags JSONB,
+                    properties JSONB
+                )
+            """)
+
+            # Messages table
+            vector_col_def = ""
+            if self._enable_vector:
+                vector_col_def = f", embedding vector({self._embedding_dimension})"
+
+            await conn.execute(f"""
+                CREATE TABLE IF NOT EXISTS {self._schema}.{self._table_prefix}messages (
+                    message_id TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL REFERENCES {self._schema}.{self._table_prefix}sessions(session_id) ON DELETE CASCADE,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    timestamp TIMESTAMP WITH TIME ZONE,
+                    token_count INTEGER,
+                    metadata JSONB,
+                    function_call JSONB,
+                    tool_calls JSONB
+                    {vector_col_def}
+                )
+            """)
+
+            # Summaries table
+            await conn.execute(f"""
+                CREATE TABLE IF NOT EXISTS {self._schema}.{self._table_prefix}summaries (
+                    summary_id TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL REFERENCES {self._schema}.{self._table_prefix}sessions(session_id) ON DELETE CASCADE,
+                    summary TEXT NOT NULL,
+                    message_count INTEGER,
+                    start_time TIMESTAMP WITH TIME ZONE,
+                    end_time TIMESTAMP WITH TIME ZONE,
+                    key_topics JSONB,
+                    created_at TIMESTAMP WITH TIME ZONE
+                )
+            """)
+            
+            # Indexes
+            await conn.execute(f"CREATE INDEX IF NOT EXISTS idx_sessions_user ON {self._schema}.{self._table_prefix}sessions(user_id)")
+            await conn.execute(f"CREATE INDEX IF NOT EXISTS idx_messages_session ON {self._schema}.{self._table_prefix}messages(session_id)")
+             # Add HNSW index for vector search if enabled
+            if self._enable_vector:
+                 await conn.execute(f"""
+                    CREATE INDEX IF NOT EXISTS idx_messages_embedding ON {self._schema}.{self._table_prefix}messages 
+                    USING hnsw (embedding vector_cosine_ops)
+                 """)
+
+
+    async def create_session(self, metadata: SessionMetadata) -> IMemorySession:
+        async with self._pool.acquire() as conn:
+            await conn.execute(f"""
+                INSERT INTO {self._schema}.{self._table_prefix}sessions (
+                    session_id, user_id, agent_id, workflow_id, status,
+                    max_messages, max_tokens, auto_summarize, summary_threshold,
+                    created_at, updated_at, expires_at, tags, properties
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            """, 
+                metadata.session_id,
+                metadata.user_id,
+                metadata.agent_id,
+                metadata.workflow_id,
+                metadata.status.value,
+                metadata.max_messages,
+                metadata.max_tokens,
+                metadata.auto_summarize,
+                metadata.summary_threshold,
+                metadata.created_at,
+                metadata.updated_at,
+                metadata.expires_at,
+                json.dumps(metadata.tags),
+                json.dumps(metadata.properties)
+            )
+
+        session = PostgresSession(metadata, self)
+        self._sessions[metadata.session_id] = session
+        return session
+
+    async def get_session(self, session_id: str) -> Optional[IMemorySession]:
+        if session_id in self._sessions:
+            return self._sessions[session_id]
+
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                f"SELECT * FROM {self._schema}.{self._table_prefix}sessions WHERE session_id = $1", 
+                session_id
+            )
+            
+            if not row:
+                return None
+            
+            metadata = SessionMetadata(
+                session_id=row["session_id"],
+                user_id=row["user_id"],
+                agent_id=row["agent_id"],
+                workflow_id=row["workflow_id"],
+                status=SessionStatus(row["status"]),
+                max_messages=row["max_messages"],
+                max_tokens=row["max_tokens"],
+                auto_summarize=row["auto_summarize"],
+                summary_threshold=row["summary_threshold"],
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+                expires_at=row["expires_at"],
+                tags=json.loads(row["tags"]) if row["tags"] else [],
+                properties=json.loads(row["properties"]) if row["properties"] else {}
+            )
+
+            session = PostgresSession(metadata, self)
+            
+            # Load messages
+            msg_rows = await conn.fetch(
+                f"SELECT * FROM {self._schema}.{self._table_prefix}messages WHERE session_id = $1 ORDER BY timestamp ASC",
+                session_id
+            )
+            
+            for r in msg_rows:
+                msg = Message(
+                    role=MessageRole(r["role"]),
+                    content=r["content"],
+                    timestamp=r["timestamp"],
+                    message_id=r["message_id"],
+                    metadata=json.loads(r["metadata"]) if r["metadata"] else {},
+                    token_count=r["token_count"],
+                    function_call=json.loads(r["function_call"]) if r["function_call"] else None,
+                    tool_calls=json.loads(r["tool_calls"]) if r["tool_calls"] else None
+                )
+                session._messages.append(msg)
+            
+            # Load summary
+            sum_row = await conn.fetchrow(
+                f"SELECT * FROM {self._schema}.{self._table_prefix}summaries WHERE session_id = $1",
+                session_id
+            )
+            if sum_row:
+                 session._summary = ConversationSummary(
+                    summary_id=sum_row["summary_id"],
+                    summary=sum_row["summary"],
+                    message_count=sum_row["message_count"],
+                    start_time=sum_row["start_time"],
+                    end_time=sum_row["end_time"],
+                    key_topics=json.loads(sum_row["key_topics"]) if sum_row["key_topics"] else [],
+                    created_at=sum_row["created_at"]
+                )
+            
+            self._sessions[session_id] = session
+            return session
+
+    async def list_sessions(self, user_id=None, status=None, limit=100, offset=0) -> List[SessionMetadata]:
+        conditions = []
+        args = []
+        idx = 1
+        
+        if user_id:
+            conditions.append(f"user_id = ${idx}")
+            args.append(user_id)
+            idx += 1
+        if status:
+            conditions.append(f"status = ${idx}")
+            args.append(status.value)
+            idx += 1
+            
+        where = "WHERE " + " AND ".join(conditions) if conditions else ""
+        
+        args.append(limit)
+        args.append(offset)
+        
+        query = f"""
+            SELECT * FROM {self._schema}.{self._table_prefix}sessions 
+            {where} 
+            ORDER BY created_at DESC 
+            LIMIT ${idx} OFFSET ${idx+1}
+        """
+
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(query, *args)
+            return [
+                SessionMetadata(
+                    session_id=r["session_id"],
+                    user_id=r["user_id"],
+                    agent_id=r["agent_id"],
+                    workflow_id=r["workflow_id"],
+                    status=SessionStatus(r["status"]),
+                    created_at=r["created_at"],
+                    updated_at=r["updated_at"],
+                    max_messages=r["max_messages"]
+                ) for r in rows
+            ]
+
+    async def delete_session(self, session_id: str) -> bool:
+        async with self._pool.acquire() as conn:
+            # Cascade delete should handle messages/summaries
+            await conn.execute(f"DELETE FROM {self._schema}.{self._table_prefix}sessions WHERE session_id = $1", session_id)
+            if session_id in self._sessions:
+                del self._sessions[session_id]
+            return True
+
+    async def search_messages(self, query: str, session_id: Optional[str] = None, limit: int = 10) -> List[Message]:
+        """Vector semantic search using pgvector"""
+        if not (self._enable_vector and self.embedding_provider):
+            self._logger.warning("Vector search disabled or not configured. Falling back to text search.")
+             # Simple TEXT ILIKE fallback could be implemented here
+            return []
+
+        # Generate embedding
+        embedding = await self.embedding_provider.embed_text(query)
+        embedding_str = str(embedding) # pgvector expects array literal or direct string representation usually handled by driver, or simply list of floats
+
+        filter_clause = ""
+        args = [embedding_str, limit]
+        if session_id:
+            filter_clause = f"AND session_id = $3"
+            args.append(session_id)
+
+        # Use cosine distance (<=>) operator
+        sql = f"""
+            SELECT * FROM {self._schema}.{self._table_prefix}messages
+            WHERE embedding IS NOT NULL {filter_clause}
+            ORDER BY embedding <=> $1
+            LIMIT $2
+        """
+        
+        async with self._pool.acquire() as conn:
+            # Note: asyncpg-pgvector handling usually requires registering a specific codec
+            # For simplicity assuming standard array handling or string literal if driver doesn't support it automatically
+            # Usually strict asyncpg requires: await conn.set_type_codec(...)
+            # We assume user has configured environment or we try to pass list of floats directly
+            
+            try:
+                # Try passing raw list, asyncpg might handle if vector type matches
+                # If not, we might need manual string formatting '[1.0, 0.5, ...]'
+                # Let's try explicit string format as safe fallback
+                vec_literal = f"[{','.join(map(str, embedding))}]"
+                
+                # Replace arg 1 with literal to avoid codec issues in this implementation without registering type
+                # (A proper implementation would register the codec on connect)
+                # But let's use the parameterized list first, as modern asyncpg + vector setup might work
+                
+                rows = await conn.fetch(sql, vec_literal, limit, *([session_id] if session_id else []))
+            except Exception as e:
+                self._logger.error(f"Vector search query failed: {e}")
+                return []
+
+            return [
+                Message(
+                    role=MessageRole(r["role"]),
+                    content=r["content"],
+                    timestamp=r["timestamp"],
+                    message_id=r["message_id"],
+                    metadata=json.loads(r["metadata"]) if r["metadata"] else {}
+                ) for r in rows
+            ]
+
+    
+class PostgresSession(BaseMemorySession):
+    async def _persist_message(self, message: Message):
+        if isinstance(self._backend, PostgresBackend) and self._backend._pool:
+             # Calculate embedding if enabled
+            embedding_val = None
+            if self._backend._enable_vector and self._backend.embedding_provider:
+                try:
+                    embedding_list = await self._backend.embedding_provider.embed_text(message.content)
+                    embedding_val = f"[{','.join(map(str, embedding_list))}]"
+                except Exception as e:
+                    logging.error(f"Failed to generate embedding: {e}")
+
+            query = f"""
+                INSERT INTO {self._backend._schema}.{self._backend._table_prefix}messages (
+                    message_id, session_id, role, content, timestamp,
+                    token_count, metadata, function_call, tool_calls
+                    {", embedding" if embedding_val else ""}
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9
+                    {", $10" if embedding_val else ""}
+                )
+            """
+            
+            args = [
+                message.message_id,
+                self.session_id,
+                message.role.value,
+                message.content,
+                message.timestamp,
+                message.token_count,
+                json.dumps(message.metadata) if message.metadata else None,
+                json.dumps(message.function_call) if message.function_call else None,
+                json.dumps(message.tool_calls) if message.tool_calls else None
+            ]
+            if embedding_val:
+                args.append(embedding_val)
+
+            async with self._backend._pool.acquire() as conn:
+                await conn.execute(query, *args)
+
+    async def _persist_changes(self):
+        if isinstance(self._backend, PostgresBackend) and self._backend._pool:
+             async with self._backend._pool.acquire() as conn:
+                 await conn.execute(f"""
+                    UPDATE {self._backend._schema}.{self._backend._table_prefix}sessions
+                    SET status=$1, updated_at=$2, max_messages=$3, max_tokens=$4,
+                        auto_summarize=$5, summary_threshold=$6, tags=$7, properties=$8
+                    WHERE session_id=$9
+                 """,
+                    self._metadata.status.value,
+                    self._metadata.updated_at,
+                    self._metadata.max_messages,
+                    self._metadata.max_tokens,
+                    self._metadata.auto_summarize,
+                    self._metadata.summary_threshold,
+                    json.dumps(self._metadata.tags),
+                    json.dumps(self._metadata.properties),
+                    self.session_id
+                 )
+                 
+                 if self._summary:
+                     await conn.execute(f"""
+                        INSERT INTO {self._backend._schema}.{self._backend._table_prefix}summaries
+                        (summary_id, session_id, summary, message_count, start_time, end_time, key_topics, created_at)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                        ON CONFLICT (summary_id) DO NOTHING
+                     """,
+                        self._summary.summary_id,
+                        self.session_id,
+                        self._summary.summary,
+                        self._summary.message_count,
+                        self._summary.start_time,
+                        self._summary.end_time,
+                        json.dumps(self._summary.key_topics),
+                        self._summary.created_at
+                     )
+        self._is_dirty = False

@@ -71,7 +71,10 @@ class APIDocumentationGenerator:
             "langswarm.core.workflows", 
             "langswarm.core.session",
             "langswarm.simple_api",
-            "langswarm.core.orchestration_errors"
+            "langswarm.core.orchestration_errors",
+            "langswarm_memory.interfaces",
+            "langswarm_memory.backends",
+            "langswarm_memory.errors"
         ]
     
     def generate_all_docs(self) -> None:
