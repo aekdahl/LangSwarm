@@ -54,47 +54,34 @@
             ]
         },
         {
-            "group": "User Guides",
+            "group": "Agents",
             "pages": [
-                {
-                    "group": "Agents",
-                    "pages": [
-                        "user-guides/agents/README",
-                        "user-guides/agents/response-modes",
-                        "user-guides/agents/workflows-vs-agents"
-                    ]
-                },
-                {
-                    "group": "Memory",
-                    "pages": [
-                        "user-guides/memory/README",
-                        "user-guides/memory/postgresql"
-                    ]
-                },
-                {
-                    "group": "Workflows",
-                    "pages": [
-                        "user-guides/workflows/README",
-                        "user-guides/workflows/yaml-compatibility/README"
-                    ]
-                },
-                {
-                    "group": "Tools",
-                    "pages": [
-                        "user-guides/tools/intent-based-calls",
-                        "user-guides/tools/tool-chaining",
-                        "user-guides/tools/mcp/local-mode",
-                        "user-guides/tools/mcp/remote-mode"
-                    ]
-                },
-                "user-guides/observability/README",
-                "user-guides/sessions/README",
-                "user-guides/vector-stores/README"
+                "user-guides/agents/README",
+                "user-guides/agents/response-modes",
+                "user-guides/agents/workflows-vs-agents"
             ]
         },
         {
-            "group": "Tools Reference",
+            "group": "Memory",
             "pages": [
+                "user-guides/memory/README",
+                "user-guides/memory/postgresql"
+            ]
+        },
+        {
+            "group": "Workflows",
+            "pages": [
+                "user-guides/workflows/README",
+                "user-guides/workflows/yaml-compatibility/README"
+            ]
+        },
+        {
+            "group": "Tools",
+            "pages": [
+                "user-guides/tools/intent-based-calls",
+                "user-guides/tools/tool-chaining",
+                "user-guides/tools/mcp/local-mode",
+                "user-guides/tools/mcp/remote-mode",
                 "tools/README",
                 "tools/unified-system/README"
             ]
@@ -112,6 +99,14 @@
             "pages": [
                 "troubleshooting/error-handling/README",
                 "troubleshooting/error-handling/critical-failures"
+            ]
+        },
+        {
+            "group": "More Guides",
+            "pages": [
+                "user-guides/observability/README",
+                "user-guides/sessions/README",
+                "user-guides/vector-stores/README"
             ]
         }
     ],
