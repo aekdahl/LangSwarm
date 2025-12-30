@@ -17,6 +17,7 @@
                         "group": "Getting Started",
                         "pages": [
                             "README",
+                            "QUICK_START",
                             "getting-started/quickstart/README",
                             "getting-started/installation/README",
                             "getting-started/first-project/README"
@@ -47,21 +48,37 @@
                 ]
             },
             {
-                "tab": "Tools & Architecture",
+                "tab": "Tools",
                 "groups": [
                     {
-                        "group": "Tools",
+                        "group": "Tool Guides",
                         "pages": [
-                            "user-guides/tools/intent-based-calls",
-                            "user-guides/tools/tool-chaining",
-                            "user-guides/tools/mcp/local-mode",
-                            "user-guides/tools/mcp/remote-mode",
                             "tools/README",
-                            "tools/unified-system/README"
+                            "user-guides/tools/intent-based-calls",
+                            "user-guides/tools/tool-chaining"
                         ]
                     },
                     {
-                        "group": "Architecture",
+                        "group": "MCP Integration",
+                        "pages": [
+                            "user-guides/tools/mcp/local-mode",
+                            "user-guides/tools/mcp/remote-mode"
+                        ]
+                    },
+                    {
+                        "group": "Tool System",
+                        "pages": [
+                            "tools/unified-system/README",
+                            "tools/legacy-migration/README"
+                        ]
+                    }
+                ]
+            },
+            {
+                "tab": "Architecture",
+                "groups": [
+                    {
+                        "group": "Design",
                         "pages": [
                             "architecture/dual-interface-architecture",
                             "architecture/enhanced-pipeline-factory",
@@ -73,6 +90,35 @@
                         "pages": [
                             "troubleshooting/error-handling/README",
                             "troubleshooting/error-handling/critical-failures"
+                        ]
+                    }
+                ]
+            },
+            {
+                "tab": "API Reference",
+                "groups": [
+                    {
+                        "group": "Core APIs",
+                        "pages": [
+                            "api-reference/README",
+                            "api-reference/agents/README",
+                            "api-reference/workflows/README",
+                            "api-reference/sessions/README"
+                        ]
+                    },
+                    {
+                        "group": "Memory APIs",
+                        "pages": [
+                            "api-reference/memory/README",
+                            "api-reference/vector-stores/README"
+                        ]
+                    },
+                    {
+                        "group": "Other",
+                        "pages": [
+                            "api-reference/configuration/README",
+                            "api-reference/observability/README",
+                            "api-reference/core/errors/README"
                         ]
                     }
                 ]
@@ -107,7 +153,7 @@
         "primary": {
             "type": "button",
             "label": "Get Started",
-            "href": "/getting-started/quickstart/README"
+            "href": "/QUICK_START"
         }
     },
     "contextual": {

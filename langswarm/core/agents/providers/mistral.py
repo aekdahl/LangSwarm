@@ -184,9 +184,16 @@ class MistralProvider(IAgentProvider):
     def _get_tool_mcp_schema(self, tool: Any) -> Dict[str, Any]:
         """Get MCP schema from tool (IToolInterface object)"""
         if hasattr(tool, 'list_tools'):
-            tools_list = tool.list_tools()
-            if tools_list:
-                return tools_list[0]
+            list_tools_method = tool.list_tools
+            # Check if it's an async method - if so, we can't await in sync context
+            # Fall back to metadata approach instead
+            if asyncio.iscoroutinefunction(list_tools_method):
+                logger.debug(f"list_tools is async, falling back to metadata for tool schema")
+                # Skip to fallback - handled below
+            else:
+                tools_list = list_tools_method()
+                if tools_list:
+                    return tools_list[0]
         
         if hasattr(tool, 'metadata'):
             metadata = tool.metadata

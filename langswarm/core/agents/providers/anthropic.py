@@ -351,10 +351,17 @@ class AnthropicProvider(IAgentProvider):
         try:
             # Use list_tools to get standard MCP format
             if hasattr(tool, 'list_tools'):
-                tools_list = tool.list_tools()
-                if tools_list and len(tools_list) > 0:
-                    # Return the first tool's schema (most tools have one main schema)
-                    return tools_list[0]
+                list_tools_method = tool.list_tools
+                # Check if it's an async method - if so, we can't await in sync context
+                # Fall back to metadata approach instead
+                if asyncio.iscoroutinefunction(list_tools_method):
+                    logger.debug(f"list_tools is async, falling back to metadata for tool schema")
+                    # Skip to fallback - handled below
+                else:
+                    tools_list = list_tools_method()
+                    if tools_list and len(tools_list) > 0:
+                        # Return the first tool's schema (most tools have one main schema)
+                        return tools_list[0]
             
             # Fallback: construct from tool metadata
             if hasattr(tool, 'metadata'):
