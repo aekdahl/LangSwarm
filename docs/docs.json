@@ -16,7 +16,7 @@
                     {
                         "group": "Getting Started",
                         "pages": [
-                            "README",
+                            "index",
                             "QUICK_START",
                             "getting-started/quickstart/README",
                             "getting-started/installation/README",
