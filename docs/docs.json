@@ -18,15 +18,15 @@
                         "pages": [
                             "index",
                             "QUICK_START",
-                            "getting-started/quickstart/README",
-                            "getting-started/installation/README",
-                            "getting-started/first-project/README"
+                            "getting-started/quickstart",
+                            "getting-started/installation",
+                            "getting-started/first-project"
                         ]
                     },
                     {
                         "group": "Agents",
                         "pages": [
-                            "user-guides/agents/README",
+                            "user-guides/agents",
                             "user-guides/agents/response-modes",
                             "user-guides/agents/workflows-vs-agents"
                         ]
@@ -34,15 +34,15 @@
                     {
                         "group": "Memory",
                         "pages": [
-                            "user-guides/memory/README",
+                            "user-guides/memory",
                             "user-guides/memory/postgresql"
                         ]
                     },
                     {
                         "group": "Workflows",
                         "pages": [
-                            "user-guides/workflows/README",
-                            "user-guides/workflows/yaml-compatibility/README"
+                            "user-guides/workflows",
+                            "user-guides/workflows/yaml-compatibility"
                         ]
                     }
                 ]
@@ -53,7 +53,7 @@
                     {
                         "group": "Tool Guides",
                         "pages": [
-                            "tools/README",
+                            "tools",
                             "user-guides/tools/intent-based-calls",
                             "user-guides/tools/tool-chaining"
                         ]
@@ -68,8 +68,8 @@
                     {
                         "group": "Tool System",
                         "pages": [
-                            "tools/unified-system/README",
-                            "tools/legacy-migration/README"
+                            "tools/unified-system",
+                            "tools/legacy-migration"
                         ]
                     }
                 ]
@@ -88,7 +88,7 @@
                     {
                         "group": "Troubleshooting",
                         "pages": [
-                            "troubleshooting/error-handling/README",
+                            "troubleshooting/error-handling",
                             "troubleshooting/error-handling/critical-failures"
                         ]
                     }
@@ -100,25 +100,25 @@
                     {
                         "group": "Core APIs",
                         "pages": [
-                            "api-reference/README",
-                            "api-reference/agents/README",
-                            "api-reference/workflows/README",
-                            "api-reference/sessions/README"
+                            "api-reference",
+                            "api-reference/agents",
+                            "api-reference/workflows",
+                            "api-reference/sessions"
                         ]
                     },
                     {
                         "group": "Memory APIs",
                         "pages": [
-                            "api-reference/memory/README",
-                            "api-reference/vector-stores/README"
+                            "api-reference/memory",
+                            "api-reference/vector-stores"
                         ]
                     },
                     {
                         "group": "Other",
                         "pages": [
-                            "api-reference/configuration/README",
-                            "api-reference/observability/README",
-                            "api-reference/core/errors/README"
+                            "api-reference/configuration",
+                            "api-reference/observability",
+                            "api-reference/core/errors"
                         ]
                     }
                 ]
