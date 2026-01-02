@@ -94,7 +94,7 @@ class CohereProvider(IAgentProvider):
     
     async def send_message(
         self, 
-        message: AgentMessage, 
+        message: Optional[AgentMessage], 
         session: IAgentSession,
         config: IAgentConfiguration
     ) -> IAgentResponse:
@@ -104,6 +104,24 @@ class CohereProvider(IAgentProvider):
             
             # Build chat history for Cohere API
             chat_history = await self._build_cohere_history(session, config)
+            
+            # Extract tool results from the last messages if they are tool results
+            tool_results = []
+            if session.messages:
+                # Find all tool results since the last assistant message
+                for msg in reversed(session.messages):
+                    if msg is None: continue
+                    if msg.role == "tool":
+                        tool_results.append({
+                            "call": {
+                                "id": msg.tool_call_id,
+                                "name": msg.metadata.get("tool_name", "unknown"),
+                                "parameters": {} # Parameters are not strictly required for result submission in v1
+                            },
+                            "outputs": [{"result": msg.content}]
+                        })
+                    elif msg.role == "assistant":
+                        break
             
             # Prepare tools if enabled
             tools = None
@@ -117,12 +135,17 @@ class CohereProvider(IAgentProvider):
                 if tool_instructions:
                     preamble += f"\n\n# Available Tools\n{tool_instructions}"
             
+            # Handle tool result submission (v1 chat API)
+            # If we have tool results, we don't send a new message, we send the results
+            api_message = message.content if message else ""
+            
             # Make API call
             start_time = time.time()
             response = await client.chat(
                 model=config.model,
-                message=message.content,
+                message=api_message,
                 chat_history=chat_history,
+                tool_results=tool_results if tool_results else None,
                 preamble=preamble if preamble else None,
                 tools=tools,
                 temperature=config.temperature or 0.7,
@@ -381,20 +404,33 @@ class CohereProvider(IAgentProvider):
         """Build chat history for Cohere API"""
         history = []
         
-        # Get recent messages (excluding current)
-        messages = session.messages[:-1] if session.messages else []
+        # Get recent messages
+        messages = session.messages
         
         for message in messages:
-            # Skip None messages
-            if message is None:
+            # Skip None messages and system messages
+            if message is None or message.role == "system":
                 continue
-            if message.role in ["user", "assistant"]:
-                # Map to Cohere format
-                cohere_role = "USER" if message.role == "user" else "CHATBOT"
+            
+            # Map roles
+            if message.role == "user":
                 history.append({
-                    "role": cohere_role,
-                    "message": message.content
+                    "role": "USER",
+                    "message": message.content or ""
                 })
+            elif message.role == "assistant":
+                msg_content = message.content or ""
+                
+                # If there were tool calls, append a summary to the message if content is empty
+                # Cohere v1 history expects a string message
+                if message.tool_calls and not msg_content:
+                    msg_content = "Attempting to use tools..."
+                
+                history.append({
+                    "role": "CHATBOT",
+                    "message": msg_content
+                })
+            # Note: "tool" role messages are handled via tool_results param in chat(), not history
         
         return history
     

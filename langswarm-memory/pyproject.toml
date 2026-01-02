@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "langswarm-memory"
-version = "0.1.3"
-# langswarm-memory-v0.1.3
+version = "0.1.4"
+# langswarm-memory-v0.1.4
 # Tag format: langswarm-memory-v{version}
 description = "Enterprise-grade conversational memory for AI agents"
 readme = "README.md"

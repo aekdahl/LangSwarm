@@ -250,7 +250,7 @@ class MistralProvider(IAgentProvider):
     def _build_messages(
         self, 
         session: IAgentSession, 
-        new_message: AgentMessage,
+        new_message: Optional[AgentMessage],
         config: IAgentConfiguration
     ) -> List[ChatMessage]:
         """Build messages for Mistral"""
@@ -267,15 +267,58 @@ class MistralProvider(IAgentProvider):
             messages.append(ChatMessage(role="system", content=system_content))
         
         for msg in session.messages:
-            # Skip None messages
-            if msg is None:
+            # Skip None messages and system messages
+            if msg is None or msg.role == "system":
                 continue
-            if msg.role in ["user", "assistant"]:
-                messages.append(ChatMessage(role=msg.role, content=msg.content))
+            
+            # Message formatting
+            if msg.role == "tool":
+                messages.append(ChatMessage(
+                    role="tool", 
+                    content=msg.content or "", 
+                    tool_call_id=msg.tool_call_id
+                ))
+            elif msg.role == "assistant" and msg.tool_calls:
+                messages.append(ChatMessage(
+                    role="assistant", 
+                    content=msg.content if msg.content else None,
+                    tool_calls=msg.tool_calls
+                ))
+            else:
+                messages.append(ChatMessage(
+                    role=msg.role, 
+                    content=msg.content or ""
+                ))
         
         # Add new message (with null check)
         if new_message is not None:
-            messages.append(ChatMessage(role=new_message.role, content=new_message.content))
+            # Check for duplication (BaseAgent adds message to session before call)
+            is_duplicate = False
+            if messages:
+                last_msg = messages[-1]
+                if (last_msg.role == new_message.role and 
+                    last_msg.content == new_message.content):
+                    is_duplicate = True
+            
+            if not is_duplicate:
+                if new_message.role == "tool":
+                    messages.append(ChatMessage(
+                        role="tool", 
+                        content=new_message.content or "", 
+                        tool_call_id=new_message.tool_call_id
+                    ))
+                elif new_message.role == "assistant" and new_message.tool_calls:
+                    messages.append(ChatMessage(
+                        role="assistant", 
+                        content=new_message.content if new_message.content else None,
+                        tool_calls=new_message.tool_calls
+                    ))
+                else:
+                    messages.append(ChatMessage(
+                        role=new_message.role, 
+                        content=new_message.content or ""
+                    ))
+                    
         return messages
     
     def _process_response(
@@ -284,14 +327,29 @@ class MistralProvider(IAgentProvider):
         execution_time: float,
         config: IAgentConfiguration
     ) -> AgentResponse:
-        """Process Mistral response"""
+        """Process Mistral response including tool calls"""
         try:
             choice = response.choices[0]
             message = choice.message
             
+            # Extract tool calls if present
+            tool_calls = None
+            if hasattr(message, 'tool_calls') and message.tool_calls:
+                tool_calls = []
+                for tc in message.tool_calls:
+                    tool_call = {
+                        "id": getattr(tc, 'id', f"call_{int(time.time())}_{len(tool_calls)}"),
+                        "name": tc.function.name if hasattr(tc, 'function') else tc.name,
+                        "arguments": tc.function.arguments if hasattr(tc, 'function') else json.dumps(tc.arguments),
+                        "type": "function"
+                    }
+                    tool_calls.append(tool_call)
+                logger.info(f"Mistral response contains {len(tool_calls)} tool call(s)")
+            
             agent_message = AgentMessage(
                 role="assistant",
                 content=message.content or "",
+                tool_calls=tool_calls,
                 metadata={
                     "model": config.model,
                     "provider": "mistral",
@@ -308,11 +366,14 @@ class MistralProvider(IAgentProvider):
                     model=config.model
                 )
             
-            return AgentResponse(
+            return AgentResponse.success_response(
+                content=message.content or "",
                 message=agent_message,
                 usage=usage,
                 execution_time=execution_time,
-                provider_response=response
+                model=config.model,
+                finish_reason=choice.finish_reason,
+                provider="mistral"
             )
             
         except Exception as e:

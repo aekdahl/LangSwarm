@@ -223,7 +223,7 @@ class AnthropicProvider(IAgentProvider):
     async def _build_anthropic_messages(
         self, 
         session: IAgentSession, 
-        new_message: AgentMessage,
+        new_message: Optional[AgentMessage],
         config: IAgentConfiguration
     ) -> List[Dict[str, Any]]:
         """Convert session messages to Anthropic format"""
@@ -236,16 +236,56 @@ class AnthropicProvider(IAgentProvider):
         
         # Convert to Anthropic format
         for msg in context_messages:
-            # Skip None messages and system messages for Anthropic - they use system parameter
+            # Skip None messages and system messages
             if msg is None or msg.role == "system":
                 continue
                 
+            # Handle tool call messages (assistant role)
+            if msg.role == "assistant" and msg.tool_calls:
+                content = []
+                if msg.content:
+                    content.append({"type": "text", "text": msg.content})
+                
+                for tc in msg.tool_calls:
+                    # Anthropic format for tool_use
+                    tool_use = {
+                        "type": "tool_use",
+                        "id": tc.get("id"),
+                        "name": tc.get("name") or tc.get("function", {}).get("name"),
+                        "input": tc.get("arguments") or tc.get("function", {}).get("arguments")
+                    }
+                    if isinstance(tool_use["input"], str):
+                        try:
+                            tool_use["input"] = json.loads(tool_use["input"])
+                        except:
+                            pass
+                    content.append(tool_use)
+                
+                messages.append({
+                    "role": "assistant",
+                    "content": content
+                })
+                continue
+
+            # Handle tool result messages (role "tool" in LangSwarm -> role "user" in Anthropic)
+            if msg.role == "tool":
+                messages.append({
+                    "role": "user",
+                    "content": [{
+                        "type": "tool_result",
+                        "tool_use_id": msg.tool_call_id,
+                        "content": msg.content or ""
+                    }]
+                })
+                continue
+            
+            # Regular user/assistant messages
             anthropic_msg = {
                 "role": msg.role,
-                "content": msg.content
+                "content": msg.content or ""
             }
             
-            # Handle multi-modal content
+            # Handle list content (already formatted)
             if isinstance(msg.content, list):
                 anthropic_msg["content"] = msg.content
             
@@ -253,15 +293,32 @@ class AnthropicProvider(IAgentProvider):
         
         # Add new message (with null check)
         if new_message is not None:
-            new_msg = {
-                "role": new_message.role,
-                "content": new_message.content
-            }
+            # Prevent duplication if already in context
+            is_duplicate = False
+            if messages:
+                last_msg = messages[-1]
+                if (last_msg.get("role") == new_message.role and 
+                    last_msg.get("content") == new_message.content):
+                    is_duplicate = True
             
-            if isinstance(new_message.content, list):
-                new_msg["content"] = new_message.content
-                
-            messages.append(new_msg)
+            if not is_duplicate:
+                if new_message.role == "tool":
+                    messages.append({
+                        "role": "user",
+                        "content": [{
+                            "type": "tool_result",
+                            "tool_use_id": new_message.tool_call_id,
+                            "content": new_message.content or ""
+                        }]
+                    })
+                else:
+                    new_msg = {
+                        "role": new_message.role,
+                        "content": new_message.content or ""
+                    }
+                    if isinstance(new_message.content, list):
+                        new_msg["content"] = new_message.content
+                    messages.append(new_msg)
         
         return messages
     

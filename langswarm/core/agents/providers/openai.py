@@ -271,19 +271,34 @@ class OpenAIProvider(IAgentProvider):
             # Skip None messages and system messages from context (we already added our own)
             if msg is None or msg.role == "system":
                 continue
-                
+            
+            # Handle tool response messages specially
+            if msg.role == "tool":
+                # OpenAI requires tool messages to have tool_call_id at top level
+                openai_msg = {
+                    "role": "tool",
+                    "content": msg.content or "",
+                    "tool_call_id": msg.tool_call_id
+                }
+                messages.append(openai_msg)
+                continue
+            
+            # Handle assistant messages with tool calls
+            if msg.role == "assistant" and msg.tool_calls:
+                # OpenAI allows content to be null when there are tool_calls
+                openai_msg = {
+                    "role": "assistant",
+                    "content": msg.content if msg.content else None,
+                    "tool_calls": self._format_tool_calls_for_openai(msg.tool_calls)
+                }
+                messages.append(openai_msg)
+                continue
+            
+            # Regular messages (user, assistant without tool_calls)
             openai_msg = {
                 "role": msg.role,
-                "content": msg.content
+                "content": msg.content or ""
             }
-            
-            # Add tool calls if present
-            if msg.tool_calls:
-                openai_msg["tool_calls"] = msg.tool_calls
-            
-            # Add tool call ID if present
-            if msg.tool_call_id:
-                openai_msg["tool_call_id"] = msg.tool_call_id
             
             messages.append(openai_msg)
         
@@ -295,6 +310,49 @@ class OpenAIProvider(IAgentProvider):
             })
         
         return messages
+    
+    def _format_tool_calls_for_openai(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Format tool calls to match OpenAI's expected structure"""
+        formatted = []
+        for tc in tool_calls:
+            # Handle different input formats and normalize to OpenAI format
+            if isinstance(tc, dict):
+                # Check if already in OpenAI format (has 'function' key)
+                if 'function' in tc:
+                    formatted.append({
+                        "id": tc.get("id", f"call_{int(time.time())}"),
+                        "type": "function",
+                        "function": {
+                            "name": tc["function"].get("name", ""),
+                            "arguments": tc["function"].get("arguments", "{}")
+                        }
+                    })
+                else:
+                    # Flat format - convert to OpenAI structure
+                    args = tc.get("arguments", tc.get("input", "{}"))
+                    if isinstance(args, dict):
+                        args = json.dumps(args)
+                    formatted.append({
+                        "id": tc.get("id", f"call_{int(time.time())}"),
+                        "type": "function",
+                        "function": {
+                            "name": tc.get("name", ""),
+                            "arguments": args
+                        }
+                    })
+            elif hasattr(tc, 'function'):
+                # OpenAI object format
+                formatted.append({
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments
+                    }
+                })
+            else:
+                logger.warning(f"Unknown tool_call format: {type(tc)}")
+        return formatted
     
     def _build_api_params(
         self, 

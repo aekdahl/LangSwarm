@@ -824,6 +824,7 @@ class BaseAgent(AutoInstrumentedMixin):
                     role="tool",
                     content=tool_result["content"],
                     tool_call_id=tool_result["tool_call_id"],
+                    trace_id=getattr(self, '_current_trace_id', None),  # Propagate trace_id
                     metadata={"tool_name": tool_result.get("name", "unknown")}
                 )
                 await session.add_message(tool_message)
@@ -876,10 +877,22 @@ class BaseAgent(AutoInstrumentedMixin):
         self,
         message: str,
         session_id: Optional[str] = None,
+        trace_id: Optional[str] = None,
         **kwargs
     ) -> IAgentResponse:
-        """Send a chat message with automatic instrumentation"""
+        """Send a chat message with automatic instrumentation
+        
+        Args:
+            message: The message to send
+            session_id: Optional session ID for conversation continuity
+            trace_id: Optional trace ID for cross-agent traceability. 
+                      Pass this when delegating to sub-agents to maintain trace continuity.
+            **kwargs: Additional arguments
+        """
         start_time = time.time()
+        
+        # Store trace_id for propagation to tool calls
+        self._current_trace_id = trace_id
         
         with self._auto_trace("chat",
                              agent_id=self._agent_id,
@@ -887,6 +900,7 @@ class BaseAgent(AutoInstrumentedMixin):
                              provider=str(self._configuration.provider),
                              model=self._configuration.model,
                              session_id=session_id,
+                             trace_id=trace_id,
                              message_length=len(message),
                              has_tools=self._configuration.tools_enabled) as span:
             
@@ -894,13 +908,14 @@ class BaseAgent(AutoInstrumentedMixin):
                 self._auto_log("info", f"Processing chat message for agent {self.name}",
                               agent_id=self._agent_id, 
                               session_id=session_id,
+                              trace_id=trace_id,
                               message_length=len(message))
                 
                 # Get or create session using two-level caching
                 session = await self._get_or_create_session(session_id)
                 
-                # Create user message (with deduplication)
-                user_message = AgentMessage(role="user", content=message)
+                # Create user message with trace_id (with deduplication)
+                user_message = AgentMessage(role="user", content=message, trace_id=trace_id)
                 
                 # Check if message is already the last one in session
                 is_duplicate = False
@@ -909,6 +924,9 @@ class BaseAgent(AutoInstrumentedMixin):
                     if last_msg is not None and last_msg.role == "user" and last_msg.content == message:
                         is_duplicate = True
                         user_message = last_msg # Use existing message instance
+                        # Update trace_id if provided
+                        if trace_id and not user_message.trace_id:
+                            user_message.trace_id = trace_id
                         self._logger.debug("Skipping duplicate user message in session (chat)")
                 
                 if not is_duplicate:
@@ -1063,23 +1081,34 @@ class BaseAgent(AutoInstrumentedMixin):
         self,
         message: str,
         session_id: Optional[str] = None,
+        trace_id: Optional[str] = None,
         **kwargs
     ) -> AsyncIterator[IAgentResponse]:
-        """Stream a chat response with tool call support"""
+        """Stream a chat response with tool call support
+        
+        Args:
+            message: The message to send
+            session_id: Optional session ID for conversation continuity
+            trace_id: Optional trace ID for cross-agent traceability
+            **kwargs: Additional arguments
+        """
         if not self._configuration.streaming_enabled:
             # Fallback to regular chat
-            response = await self.chat(message, session_id, **kwargs)
+            response = await self.chat(message, session_id, trace_id=trace_id, **kwargs)
             yield response
             return
         
         start_time = time.time()
         
+        # Store trace_id for propagation to tool calls
+        self._current_trace_id = trace_id
+        
         try:
             # Get or create session using two-level caching
             session = await self._get_or_create_session(session_id)
             
-            # Create user message (with deduplication)
-            user_message = AgentMessage(role="user", content=message)
+            # Create user message with trace_id (with deduplication)
+            user_message = AgentMessage(role="user", content=message, trace_id=trace_id)
             
             # Check if message is already the last one in session
             is_duplicate = False
@@ -1088,6 +1117,9 @@ class BaseAgent(AutoInstrumentedMixin):
                 if last_msg is not None and last_msg.role == "user" and last_msg.content == message:
                     is_duplicate = True
                     user_message = last_msg # Use existing message instance
+                    # Update trace_id if provided
+                    if trace_id and not user_message.trace_id:
+                        user_message.trace_id = trace_id
                     self._logger.debug("Skipping duplicate user message in session")
             
             if not is_duplicate:
@@ -1364,3 +1396,69 @@ class BaseAgent(AutoInstrumentedMixin):
     async def send_message(self, message: str, session_id: Optional[str] = None, **kwargs) -> IAgentResponse:
         """Alias for chat() - provides workflow compatibility with AgentStep"""
         return await self.chat(message, session_id, **kwargs)
+    
+    # Tracing and debugging methods
+    async def get_execution_trace(self, trace_id: str) -> List[AgentMessage]:
+        """Get all messages with the given trace_id across all sessions.
+        
+        Use this to trace execution across agent delegations.
+        
+        Args:
+            trace_id: The trace ID to search for
+            
+        Returns:
+            List of messages with that trace_id, sorted by timestamp
+        """
+        traced_messages = []
+        for session in self._sessions.values():
+            if session is None:
+                continue
+            for msg in session.messages:
+                if msg is not None and getattr(msg, 'trace_id', None) == trace_id:
+                    traced_messages.append(msg)
+        
+        # Sort by timestamp
+        return sorted(traced_messages, key=lambda m: m.timestamp if m else datetime.min)
+    
+    async def get_tool_history(self, session_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get tool call history from a session.
+        
+        Args:
+            session_id: Session to get history from. If None, uses current session.
+            
+        Returns:
+            List of tool call/result pairs with timestamps
+        """
+        session = await self._get_or_create_session(session_id) if session_id else self._current_session
+        if not session:
+            return []
+        
+        history = []
+        for msg in session.messages:
+            if msg is None:
+                continue
+            
+            # Assistant messages with tool calls
+            if msg.role == "assistant" and msg.tool_calls:
+                for tc in msg.tool_calls:
+                    history.append({
+                        "type": "call",
+                        "tool_name": tc.get("name") or tc.get("function", {}).get("name"),
+                        "arguments": tc.get("arguments") or tc.get("function", {}).get("arguments"),
+                        "id": tc.get("id"),
+                        "trace_id": msg.trace_id,
+                        "timestamp": msg.timestamp.isoformat()
+                    })
+            
+            # Tool result messages
+            elif msg.role == "tool":
+                history.append({
+                    "type": "result",
+                    "tool_call_id": msg.tool_call_id,
+                    "tool_name": msg.metadata.get("tool_name"),
+                    "content": msg.content,
+                    "trace_id": msg.trace_id,
+                    "timestamp": msg.timestamp.isoformat()
+                })
+        
+        return history

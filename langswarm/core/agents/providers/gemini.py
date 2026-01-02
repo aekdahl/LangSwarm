@@ -100,7 +100,7 @@ class GeminiProvider(IAgentProvider):
     
     async def send_message(
         self, 
-        message: AgentMessage, 
+        message: Optional[AgentMessage], 
         session: IAgentSession,
         config: IAgentConfiguration
     ) -> IAgentResponse:
@@ -111,11 +111,11 @@ class GeminiProvider(IAgentProvider):
             model = self._get_model(config)
             
             # Build messages for Gemini API
-            prompt = await self._build_gemini_prompt(session, message, config)
+            contents = await self._build_gemini_contents(session, message, config)
             
             # Make API call
             start_time = time.time()
-            response = await asyncio.to_thread(model.generate_content, prompt)
+            response = await asyncio.to_thread(model.generate_content, contents)
             execution_time = time.time() - start_time
             
             # Process response
@@ -127,7 +127,7 @@ class GeminiProvider(IAgentProvider):
     
     async def stream_message(
         self,
-        message: AgentMessage,
+        message: Optional[AgentMessage],
         session: IAgentSession, 
         config: IAgentConfiguration
     ) -> AsyncIterator[IAgentResponse]:
@@ -137,15 +137,15 @@ class GeminiProvider(IAgentProvider):
             genai.configure(api_key=config.api_key)
             model = self._get_model(config)
             
-            # Build prompt for Gemini API
-            prompt = await self._build_gemini_prompt(session, message, config)
+            # Build messages for Gemini API
+            contents = await self._build_gemini_contents(session, message, config)
             
             # Make streaming API call
             start_time = time.time()
-            response_stream = await asyncio.to_thread(model.generate_content, prompt, stream=True)
+            response = await asyncio.to_thread(model.generate_content, contents, stream=True)
             
             # Process streaming response
-            async for chunk in self._process_gemini_stream(response_stream, start_time, config):
+            async for chunk in self._process_gemini_stream(response, start_time, config):
                 yield chunk
                 
         except Exception as e:
@@ -363,38 +363,126 @@ class GeminiProvider(IAgentProvider):
             logger.warning(f"Failed to load tool instructions: {e}")
             return ""
     
-    async def _build_gemini_prompt(
+    async def _build_gemini_contents(
         self, 
         session: IAgentSession, 
-        new_message: AgentMessage,
+        new_message: Optional[AgentMessage],
         config: IAgentConfiguration
-    ) -> str:
-        """Convert session messages to Gemini prompt format"""
+    ) -> List[Dict[str, Any]]:
+        """Convert session messages to Gemini content format (list of dicts)"""
         # Get conversation context
         context_messages = await session.get_context(
             max_tokens=config.max_tokens - 1000 if config.max_tokens else None
         )
         
-        # Build conversation history
-        conversation_parts = []
+        contents = []
         
         for msg in context_messages:
-            # Skip None messages
-            if msg is None:
+            # Skip None messages and system messages (handled separately)
+            if msg is None or msg.role == "system":
                 continue
+            
+            # Message formatting
             if msg.role == "user":
-                conversation_parts.append(f"User: {msg.content}")
+                contents.append({
+                    "role": "user",
+                    "parts": [{"text": msg.content or ""}]
+                })
             elif msg.role == "assistant":
-                conversation_parts.append(f"Assistant: {msg.content}")
-            # Skip system messages as they're handled by system_instruction
+                parts = []
+                if msg.content:
+                    parts.append({"text": msg.content})
+                
+                if msg.tool_calls:
+                    for tc in msg.tool_calls:
+                        # Extract name and args
+                        name = tc.get("name") or tc.get("function", {}).get("name")
+                        args = tc.get("arguments") or tc.get("function", {}).get("arguments")
+                        if isinstance(args, str):
+                            try:
+                                args = json.loads(args)
+                            except:
+                                args = {}
+                        
+                        parts.append({
+                            "function_call": {
+                                "name": name,
+                                "args": args
+                            }
+                        })
+                
+                contents.append({
+                    "role": "model",
+                    "parts": parts
+                })
+            elif msg.role == "tool":
+                # Gemini expects tool results as "user" role with function_response part
+                try:
+                    response_val = json.loads(msg.content) if msg.content else {}
+                except:
+                    response_val = {"result": msg.content}
+                
+                if not isinstance(response_val, dict):
+                    response_val = {"result": response_val}
+                    
+                contents.append({
+                    "role": "user",
+                    "parts": [{
+                        "function_response": {
+                            "name": msg.metadata.get("tool_name", "unknown"),
+                            "response": response_val
+                        }
+                    }]
+                })
         
         # Add new message
-        conversation_parts.append(f"User: {new_message.content}")
+        if new_message is not None:
+            # Check for duplication
+            is_duplicate = False
+            if contents:
+                # Basic check for text content duplication
+                last_content = contents[-1]
+                if last_content["role"] == ("user" if new_message.role == "user" else "model"):
+                    last_text = ""
+                    for p in last_content["parts"]:
+                        if "text" in p: last_text += p["text"]
+                    if last_text == new_message.content:
+                        is_duplicate = True
+            
+            if not is_duplicate:
+                if new_message.role == "user":
+                    contents.append({
+                        "role": "user",
+                        "parts": [{"text": new_message.content or ""}]
+                    })
+                elif new_message.role == "tool":
+                    try:
+                        response_val = json.loads(new_message.content) if new_message.content else {}
+                    except:
+                        response_val = {"result": new_message.content}
+                        
+                    if not isinstance(response_val, dict):
+                        response_val = {"result": response_val}
+                        
+                    contents.append({
+                        "role": "user",
+                        "parts": [{
+                            "function_response": {
+                                "name": new_message.metadata.get("tool_name", "unknown"),
+                                "response": response_val
+                            }
+                        }]
+                    })
+                # Note: Assistant role with tool calls is usually not sent as 'new_message' 
+                # but we'll add basic support just in case
+                elif new_message.role == "assistant":
+                    parts = [{"text": new_message.content}] if new_message.content else []
+                    contents.append({
+                        "role": "model",
+                        "parts": parts
+                    })
         
-        # Join into single prompt
-        prompt = "\n\n".join(conversation_parts)
-        
-        return prompt
+        return contents
     
     def _process_gemini_response(
         self, 
@@ -402,15 +490,43 @@ class GeminiProvider(IAgentProvider):
         execution_time: float,
         config: IAgentConfiguration
     ) -> AgentResponse:
-        """Process Gemini API response"""
+        """Process Gemini API response including function calls"""
         try:
-            # Extract content from response
-            content = response.text or ""
+            # Extract content and function calls from response
+            content = ""
+            tool_calls = []
             
-            # Create agent message
+            # Gemini returns content in candidates[0].content.parts
+            # Each part can be text or function_call
+            if hasattr(response, 'candidates') and response.candidates:
+                candidate = response.candidates[0]
+                if hasattr(candidate, 'content') and candidate.content:
+                    parts = getattr(candidate.content, 'parts', [])
+                    for part in parts:
+                        # Handle text parts
+                        if hasattr(part, 'text') and part.text:
+                            content += part.text
+                        
+                        # Handle function call parts
+                        if hasattr(part, 'function_call') and part.function_call:
+                            fc = part.function_call
+                            tool_call = {
+                                "id": f"call_{int(time.time())}_{len(tool_calls)}",
+                                "name": fc.name,
+                                "arguments": json.dumps(dict(fc.args)) if hasattr(fc, 'args') else "{}",
+                                "type": "function"
+                            }
+                            tool_calls.append(tool_call)
+                            logger.info(f"Parsed Gemini function call: {fc.name}")
+            else:
+                # Fallback to simple text extraction
+                content = getattr(response, 'text', '') or ""
+            
+            # Create agent message with tool calls
             agent_message = AgentMessage(
                 role="assistant",
                 content=content,
+                tool_calls=tool_calls if tool_calls else None,
                 metadata={
                     "model": config.model,
                     "finish_reason": getattr(response, 'finish_reason', 'stop'),
@@ -418,6 +534,9 @@ class GeminiProvider(IAgentProvider):
                     "safety_ratings": getattr(response, 'safety_ratings', [])
                 }
             )
+            
+            if tool_calls:
+                logger.info(f"Gemini response contains {len(tool_calls)} tool call(s)")
             
             # Create usage information (Gemini doesn't provide detailed usage by default)
             usage = None

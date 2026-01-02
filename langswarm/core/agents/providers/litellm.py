@@ -366,37 +366,96 @@ class LiteLLMProvider(IAgentProvider):
             if msg is None or msg.role == "system":
                 continue
                 
-            openai_msg = {
+            # Handle tool response messages
+            if msg.role == "tool":
+                messages.append({
+                    "role": "tool",
+                    "content": msg.content or "",
+                    "tool_call_id": msg.tool_call_id
+                })
+                continue
+                
+            # Handle assistant messages with tool calls
+            if msg.role == "assistant" and msg.tool_calls:
+                messages.append({
+                    "role": "assistant",
+                    "content": msg.content if msg.content else None,
+                    "tool_calls": self._format_tool_calls_for_litellm(msg.tool_calls)
+                })
+                continue
+                
+            # Regular messages
+            messages.append({
                 "role": msg.role,
-                "content": msg.content
-            }
-            
-            if msg.tool_calls:
-                openai_msg["tool_calls"] = msg.tool_calls
-            
-            if msg.tool_call_id:
-                openai_msg["tool_call_id"] = msg.tool_call_id
-            
-            messages.append(openai_msg)
+                "content": msg.content or ""
+            })
         
         # New message (skip if None - tool continuation case)
         if new_message is not None:
             # CRITICAL FIX: Check if the message is already in the context to prevent duplication
-            # BaseAgent adds message to session before calling send_message, so it might be in context_messages
             is_duplicate = False
-            if messages and new_message is not None:
+            if messages:
                 last_msg = messages[-1]
                 if (last_msg.get("role") == new_message.role and 
                     last_msg.get("content") == new_message.content):
                     is_duplicate = True
             
-            if not is_duplicate and new_message is not None:
-                messages.append({
+            if not is_duplicate:
+                msg_to_add = {
                     "role": new_message.role,
-                    "content": new_message.content
-                })
+                    "content": new_message.content or ""
+                }
+                
+                # Handle tool calls in new message if present
+                if new_message.tool_calls:
+                    msg_to_add["tool_calls"] = self._format_tool_calls_for_litellm(new_message.tool_calls)
+                    if not msg_to_add["content"]:
+                        msg_to_add["content"] = None
+                
+                # Handle tool_call_id in new message if present
+                if new_message.tool_call_id:
+                    msg_to_add["tool_call_id"] = new_message.tool_call_id
+                    
+                messages.append(msg_to_add)
         
         return messages
+
+    def _format_tool_calls_for_litellm(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Format tool calls to match LiteLLM/OpenAI expected structure"""
+        formatted = []
+        for tc in tool_calls:
+            if isinstance(tc, dict):
+                if 'function' in tc:
+                    formatted.append({
+                        "id": tc.get("id", f"call_{int(time.time())}"),
+                        "type": "function",
+                        "function": {
+                            "name": tc["function"].get("name", ""),
+                            "arguments": tc["function"].get("arguments", "{}")
+                        }
+                    })
+                else:
+                    args = tc.get("arguments", tc.get("input", "{}"))
+                    if isinstance(args, dict):
+                        args = json.dumps(args)
+                    formatted.append({
+                        "id": tc.get("id", f"call_{int(time.time())}"),
+                        "type": "function",
+                        "function": {
+                            "name": tc.get("name", ""),
+                            "arguments": args
+                        }
+                    })
+            elif hasattr(tc, 'function'):
+                formatted.append({
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments
+                    }
+                })
+        return formatted
     
     def _build_params(
         self, 

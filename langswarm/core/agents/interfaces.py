@@ -94,6 +94,9 @@ class AgentMessage:
     tool_calls: Optional[List[Dict[str, Any]]] = None
     tool_call_id: Optional[str] = None
     
+    # Cross-agent traceability
+    trace_id: Optional[str] = None  # Propagates across agent delegations
+    
     # Enhanced multimodal support
     attachments: Optional[List[Dict[str, Any]]] = None  # Legacy format
     multimodal_content: Optional[List['MultimodalContent']] = None  # New format
@@ -124,6 +127,58 @@ class AgentMessage:
                     text_parts.append(f"[{content.modality.value.upper()}]: {text}")
         
         return "\n".join(text_parts)
+
+
+@dataclass
+class TraceContext:
+    """Context for tracing execution across agent boundaries.
+    
+    Enables complete traceability when agents delegate to other agents.
+    Pass this context through delegation tools to maintain trace continuity.
+    """
+    trace_id: str  # Unique ID for this execution chain
+    root_session_id: str  # Original session that started the trace
+    root_agent: Optional[str] = None  # Name of originating agent
+    parent_agent: Optional[str] = None  # Agent that delegated (immediate parent)
+    depth: int = 0  # Nesting level (0 = root, 1 = first delegation, etc.)
+    created_at: datetime = field(default_factory=datetime.now)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    
+    def create_child(self, agent_name: str) -> 'TraceContext':
+        """Create a child context for delegation to another agent"""
+        return TraceContext(
+            trace_id=self.trace_id,
+            root_session_id=self.root_session_id,
+            root_agent=self.root_agent,
+            parent_agent=agent_name,
+            depth=self.depth + 1,
+            metadata=self.metadata.copy()
+        )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization"""
+        return {
+            "trace_id": self.trace_id,
+            "root_session_id": self.root_session_id,
+            "root_agent": self.root_agent,
+            "parent_agent": self.parent_agent,
+            "depth": self.depth,
+            "created_at": self.created_at.isoformat(),
+            "metadata": self.metadata
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'TraceContext':
+        """Create from dictionary"""
+        return cls(
+            trace_id=data["trace_id"],
+            root_session_id=data["root_session_id"],
+            root_agent=data.get("root_agent"),
+            parent_agent=data.get("parent_agent"),
+            depth=data.get("depth", 0),
+            created_at=datetime.fromisoformat(data["created_at"]) if "created_at" in data else datetime.now(),
+            metadata=data.get("metadata", {})
+        )
 
 
 @dataclass

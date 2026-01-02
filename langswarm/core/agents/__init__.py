@@ -42,7 +42,9 @@ from .interfaces import (
     IAgentResponse,
     AgentCapability,
     AgentStatus,
-    ProviderType
+    ProviderType,
+    AgentMessage,
+    TraceContext
 )
 
 from .base import (
@@ -217,6 +219,8 @@ __all__ = [
     'AgentSession', 
     'AgentResponse',
     'AgentMetadata',
+    'AgentMessage',
+    'TraceContext',
     
     # Builder Pattern
     'AgentBuilder',
