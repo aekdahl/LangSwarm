@@ -415,6 +415,28 @@ print(response)  # "Hello! I'm a mock agent."
 
 ---
 
+## 🤖 Best Practices for LLM-Based Development
+
+When developing LangSwarm applications (or when asking an LLM to write code for you), follow these patterns for the best results:
+
+### 1. **Use Simple Entry Points**
+Prefer the `AgentBuilder` or high-level factory functions over deep nested imports.
+- ✅ **GOOD**: `from langswarm.core.agents import AgentBuilder`
+- ❌ **AVOID**: `from langswarm.core.agents.providers.openai import OpenAIProvider`
+
+### 2. **Rely on Smart Defaults**
+LangSwarm is designed to work out-of-the-box. Let it handle the complexity.
+- ✅ **GOOD**: `AgentBuilder().openai().model("gpt-4o").build()`
+- ❌ **AVOID**: Manually specifying all 15+ configuration parameters unless absolutely necessary.
+
+### 3. **Programmatic Configuration over YAML**
+While LangSwarm supports YAML, programmatic configuration is often safer for dynamic applications and easier for LLMs to generate correctly without syntax errors.
+
+### 4. **Graceful Dependency Management**
+Always ensure you have the required provider packages installed (`openai`, `anthropic`, etc.). LangSwarm will provide clear error messages if a dependency is missing.
+
+---
+
 ## 📚 Best Practices
 
 ### **Agent Creation**
@@ -440,7 +462,5 @@ print(response)  # "Hello! I'm a mock agent."
 - Validate user inputs
 - Monitor for harmful outputs
 - Use least-privilege tool access
-
----
 
 **LangSwarm V2 agents provide a powerful, intuitive way to build AI applications with native provider features, production-ready monitoring, and flexible configuration options.**

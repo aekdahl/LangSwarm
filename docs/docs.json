@@ -17,9 +17,8 @@
                         "group": "Getting Started",
                         "pages": [
                             "index",
-                            "QUICK_START",
-                            "getting-started/installation",
                             "getting-started/quickstart",
+                            "getting-started/installation",
                             "getting-started/first-project"
                         ]
                     },
@@ -40,11 +39,9 @@
                         ]
                     },
                     {
-                        "group": "Advanced Guides",
+                        "group": "Integrations",
                         "pages": [
-                            "LLM_USAGE_GUIDE",
-                            "MULTI_AGENT_ORCHESTRATION_GUIDE",
-                            "user-guides/token-tracking-integration-guide"
+                            "user-guides/integrations/token-tracking"
                         ]
                     }
                 ]
@@ -78,9 +75,9 @@
                 "tab": "Tools",
                 "groups": [
                     {
-                        "group": "Tool Guides",
+                        "group": "Guides",
                         "pages": [
-                            "tools",
+                            "user-guides/tools/index",
                             "user-guides/tools/intent-based-calls",
                             "user-guides/tools/tool-chaining"
                         ]
@@ -93,10 +90,10 @@
                         ]
                     },
                     {
-                        "group": "Tool System",
+                        "group": "Advanced",
                         "pages": [
-                            "tools/unified-system",
-                            "tools/legacy-migration"
+                            "user-guides/tools/architecture",
+                            "user-guides/tools/migration"
                         ]
                     }
                 ]
@@ -108,15 +105,23 @@
                         "group": "Design",
                         "pages": [
                             "architecture/dual-interface-architecture",
-                            "architecture/enhanced-pipeline-factory",
                             "architecture/unified-pipeline-system"
+                        ]
+                    },
+                    {
+                        "group": "Development",
+                        "pages": [
+                            "developer-guides/mcp-tool-development",
+                            "developer-guides/tracing",
+                            "developer-guides/debug-setup",
+                            "developer-guides/emergency-debugging"
                         ]
                     },
                     {
                         "group": "Troubleshooting",
                         "pages": [
-                            "troubleshooting/error-handling",
-                            "troubleshooting/error-handling/critical-failures"
+                            "troubleshooting/index",
+                            "troubleshooting/critical-failures"
                         ]
                     }
                 ]
@@ -173,7 +178,7 @@
         "primary": {
             "type": "button",
             "label": "Get Started",
-            "href": "/QUICK_START"
+            "href": "/getting-started/quickstart"
         }
     },
     "contextual": {

@@ -50,7 +50,7 @@ from langswarm import create_agent
 
 async def main():
     # Create an agent
-    agent = create_agent(model="gpt-5.2")
+    agent = create_agent(model="gpt-4o")
     
     # Chat with it
     response = await agent.chat("What's the capital of France?")
@@ -69,13 +69,13 @@ from langswarm.core.workflows import create_simple_workflow, get_workflow_engine
 # Create specialized agents
 researcher = create_agent(
     name="researcher",
-    model="gpt-5.2",
+    model="gpt-4o",
     system_prompt="You are a research specialist. Gather comprehensive information."
 )
 
 writer = create_agent(
     name="writer",
-    model="gpt-5.2",
+    model="gpt-4o",
     system_prompt="You are a writing specialist. Create clear, engaging content."
 )
 

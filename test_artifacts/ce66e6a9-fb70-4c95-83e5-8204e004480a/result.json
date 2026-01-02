@@ -1,5 +1,0 @@
-{
-  "success": false,
-  "error": "cannot import name 'create_session' from 'langswarm.core.session' (/Users/alexanderekdahl/Docker/LangSwarm/langswarm/core/session/__init__.py)",
-  "error_type": "ImportError"
-}
