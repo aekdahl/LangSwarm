@@ -1,10 +1,10 @@
-# LangSwarm V2 Unified Tool System
+# LangSwarm Unified Tool System
 
 **Single, consistent interface for all LangSwarm tools - MCP, Synapse, Retrievers, and Plugins unified**
 
 ## 🎯 Overview
 
-LangSwarm V2 introduces a unified tool system that consolidates 4 different tool types (MCP, Synapse, Retrievers, Plugins) into a single, consistent MCP-based architecture. This eliminates complexity, improves developer experience, and provides consistent behavior across all tools.
+LangSwarm features a unified tool system that consolidates various tool types (MCP, Synapse, Retrievers, Plugins) into a single, consistent MCP-based architecture. This eliminates complexity, improves developer experience, and provides consistent behavior across all tools.
 
 **Key Benefits:**
 - **Single Interface**: All tools use the same MCP-based interface
@@ -299,7 +299,6 @@ result = await adapted_tool.execute({
 ---
 
 ## 📊 Tool Discovery and Registration
-
 ### **Automatic Tool Discovery**
 
 ```python
@@ -376,7 +375,7 @@ class MyTool(UnifiedTool):
 
 ### **Unified Tool Interface for LLM**
 
-The V2 system presents a single, consistent interface to LLMs:
+The LangSwarm system presents a single, consistent interface to LLMs:
 
 ```json
 {
@@ -544,7 +543,7 @@ import pytest
 from langswarm.tools.testing import ToolTestCase
 
 class TestNewTool(ToolTestCase):
-    """Test framework for V2 tools"""
+    """Test framework for LangSwarm tools"""
     
     async def test_tool_execution(self):
         tool = NewTool()
@@ -613,4 +612,4 @@ class TestNewTool(ToolTestCase):
 
 ---
 
-**The LangSwarm V2 Unified Tool System simplifies tool development, improves performance, and provides a consistent experience while maintaining full backward compatibility with existing tools.**
+**The LangSwarm Unified Tool System simplifies tool development, improves performance, and provides a consistent experience while maintaining full backward compatibility with existing tools.**

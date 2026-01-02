@@ -1,8 +1,8 @@
-# LangSwarm V2 Token Tracking Integration Guide
+# LangSwarm Token Tracking Integration Guide
 
 ## Overview
 
-This guide provides step-by-step instructions for integrating the comprehensive token tracking system into existing LangSwarm V2 deployments without breaking functionality.
+This guide provides step-by-step instructions for integrating the comprehensive token tracking system into existing LangSwarm deployments without breaking functionality.
 
 ## Quick Start
 
@@ -549,6 +549,6 @@ logger.debug(f"Tracking stats: {stats}")
 
 ## Conclusion
 
-The LangSwarm V2 token tracking system provides comprehensive monitoring and management capabilities while maintaining backward compatibility. By following this integration guide, you can gradually enable features based on your needs and deployment environment.
+The LangSwarm token tracking system provides comprehensive monitoring and management capabilities while maintaining backward compatibility. By following this integration guide, you can gradually enable features based on your needs and deployment environment.
 
 For additional support or questions, please refer to the main documentation or create an issue in the LangSwarm repository.
