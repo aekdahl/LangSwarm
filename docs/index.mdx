@@ -1,6 +1,6 @@
 ---
-title: 'Home'
-description: 'Multi-Agent AI Orchestration Framework for building intelligent systems'
+title: "Home"
+description: "Multi-Agent AI Orchestration Framework for building intelligent systems"
 ---
 
 # 🐝 LangSwarm
@@ -9,13 +9,11 @@ description: 'Multi-Agent AI Orchestration Framework for building intelligent sy
 
 Build intelligent systems where multiple AI agents collaborate to solve complex tasks. LangSwarm makes it easy to create, orchestrate, and scale AI agent workflows with support for all major LLM providers and a rich ecosystem of tools.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) | [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-
 ---
 
 ## 🎯 What is LangSwarm?
 
-LangSwarm is a framework for **multi-agent AI orchestration**. Unlike simple chatbot libraries, LangSwarm enables you to:
+LangSwarm is a framework for **multi-agent AI orchestration**. LangSwarm enables you to:
 
 - **Orchestrate multiple specialized agents** working together on complex tasks
 - **Build workflows** where agents collaborate, hand off work, and combine their outputs
@@ -52,7 +50,7 @@ from langswarm import create_agent
 
 async def main():
     # Create an agent
-    agent = create_agent(model="gpt-3.5-turbo")
+    agent = create_agent(model="gpt-5.2")
     
     # Chat with it
     response = await agent.chat("What's the capital of France?")
@@ -71,13 +69,13 @@ from langswarm.core.workflows import create_simple_workflow, get_workflow_engine
 # Create specialized agents
 researcher = create_agent(
     name="researcher",
-    model="gpt-4",
+    model="gpt-5.2",
     system_prompt="You are a research specialist. Gather comprehensive information."
 )
 
 writer = create_agent(
     name="writer",
-    model="gpt-4",
+    model="gpt-5.2",
     system_prompt="You are a writing specialist. Create clear, engaging content."
 )
 
@@ -123,11 +121,12 @@ Workflows define how agents collaborate:
 - **Conditional**: Route based on results or criteria
 - **Nested**: Complex multi-stage pipelines
 
-### 3. **Tools (MCP)**
+### 3. **Tools**
 
 LangSwarm implements the Model Context Protocol (MCP) for tool integration:
 
 **Built-in Tools:**
+
 - `filesystem` - File operations (read, write, list)
 - `web_search` - Web search capabilities
 - `github` - GitHub repository operations
@@ -152,34 +151,13 @@ Conversation history and context management with multiple backends:
 
 ## 🏗️ Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    LangSwarm Framework                  │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
-│  │   Agents     │  │  Workflows   │  │    Tools     │ │
-│  │              │  │              │  │              │ │
-│  │ • OpenAI     │  │ • Sequential │  │ • MCP Local  │ │
-│  │ • Anthropic  │  │ • Parallel   │  │ • MCP Remote │ │
-│  │ • Google     │  │ • Conditional│  │ • Built-in   │ │
-│  │ • Mistral    │  │ • Nested     │  │ • Custom     │ │
-│  │ • Local      │  │              │  │              │ │
-│  └──────────────┘  └──────────────┘  └──────────────┘ │
-│                                                         │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  ┌────────────────────────────────────────────────┐   │
-│  │           Infrastructure Layer                  │   │
-│  │                                                 │   │
-│  │  Memory     Session      Observability         │   │
-│  │  • Postgres • Storage    • OpenTelemetry       │   │
-│  │  • Redis    • Providers  • Tracing             │   │
-│  │  • SQLite   • Lifecycle  • Metrics             │   │
-│  │  • BigQuery • Management                       │   │
-│  └────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────┘
-```
+<img
+  src="/images/image.png"
+  alt="Image"
+  title="Image"
+  className="mr-auto"
+  style={{ width:"74%" }}
+/>
 
 ---
 
