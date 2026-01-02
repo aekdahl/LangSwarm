@@ -11,15 +11,15 @@
     "navigation": {
         "tabs": [
             {
-                "tab": "Documentation",
+                "tab": "Core",
                 "groups": [
                     {
                         "group": "Getting Started",
                         "pages": [
                             "index",
                             "QUICK_START",
-                            "getting-started/quickstart",
                             "getting-started/installation",
+                            "getting-started/quickstart",
                             "getting-started/first-project"
                         ]
                     },
@@ -28,14 +28,8 @@
                         "pages": [
                             "user-guides/agents",
                             "user-guides/agents/response-modes",
-                            "user-guides/agents/workflows-vs-agents"
-                        ]
-                    },
-                    {
-                        "group": "Memory",
-                        "pages": [
-                            "user-guides/memory",
-                            "user-guides/memory/postgresql"
+                            "user-guides/agents/workflows-vs-agents",
+                            "agents/automatic-tool-injection"
                         ]
                     },
                     {
@@ -43,6 +37,39 @@
                         "pages": [
                             "user-guides/workflows",
                             "user-guides/workflows/yaml-compatibility"
+                        ]
+                    },
+                    {
+                        "group": "Advanced Guides",
+                        "pages": [
+                            "LLM_USAGE_GUIDE",
+                            "MULTI_AGENT_ORCHESTRATION_GUIDE",
+                            "user-guides/token-tracking-integration-guide"
+                        ]
+                    }
+                ]
+            },
+            {
+                "tab": "Memory",
+                "groups": [
+                    {
+                        "group": "Overview",
+                        "pages": [
+                            "user-guides/memory"
+                        ]
+                    },
+                    {
+                        "group": "Backends",
+                        "pages": [
+                            "user-guides/memory/postgresql"
+                        ]
+                    },
+                    {
+                        "group": "API Reference",
+                        "pages": [
+                            "api-reference/memory",
+                            "api-reference/vector-stores",
+                            "api-reference/langswarm_memory_backends"
                         ]
                     }
                 ]
@@ -107,14 +134,7 @@
                         ]
                     },
                     {
-                        "group": "Memory APIs",
-                        "pages": [
-                            "api-reference/memory",
-                            "api-reference/vector-stores"
-                        ]
-                    },
-                    {
-                        "group": "Other",
+                        "group": "Support",
                         "pages": [
                             "api-reference/configuration",
                             "api-reference/observability",
