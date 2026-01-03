@@ -1,181 +1,82 @@
 ---
 title: "Quickstart"
-description: "Build your first AI agent in 30 seconds"
+description: "Build your first AI agent swarm in 30 seconds"
 ---
 
-# ⚡ LangSwarm Quickstart
+# ⚡ Quickstart
 
-**Build your first AI agent and multi-agent system with minimal effort.**
+Build your first multi-agent system with LangSwarm.
 
-## 🚀 **30-Second Setup**
+<Steps>
+  <Step title="Install LangSwarm">
+    Install the package and set your API key.
 
-### **Step 1: Install LangSwarm**
-```bash
-pip install langswarm openai
-```
+    ```bash
+    pip install langswarm openai
+    export OPENAI_API_KEY="your-api-key-here"
+    ```
+  </Step>
 
-### **Step 2: Set Your API Key**
-```bash
-export OPENAI_API_KEY="your-api-key-here"
-```
+  <Step title="Create Your First Agent">
+    A simple "Hello World" to verify your setup.
 
-### **Step 3: Create Your First Agent**
+    ```python
+    import asyncio
+    from langswarm import create_agent
 
-#### **Option A: Pure Python Approach (Simplest)**
+    async def main():
+        # Create a streaming-enabled agent
+        agent = create_agent(model="gpt-4o", system_prompt="Be concise.")
+        
+        # Stream the response
+        async for chunk in agent.chat_stream("Hello, LangSwarm!"):
+            print(chunk.content, end="", flush=True)
 
-```python
-import asyncio
-from langswarm.core.agents import create_openai_agent
+    if __name__ == "__main__":
+        asyncio.run(main())
+    ```
+  </Step>
 
-async def main():
-    # Create an AI agent
-    agent = create_openai_agent(
-        model="gpt-4o",  # or gpt-3.5-turbo for cost efficiency
+  <Step title="Orchestrate a Swarm">
+    The real power: make two agents collaborate.
+
+    ```python
+    from langswarm import create_agent, create_workflow
+    from langswarm.core.agents import register_agent
+    from langswarm.core.workflows import get_workflow_engine
+
+    # 1. Specialized Agents
+    researcher = create_agent("researcher", model="gpt-4o", 
+                            system_prompt="You are a research analyst.")
+    writer = create_agent("writer", model="gpt-4o", 
+                        system_prompt="You are a technical writer.")
+
+    # 2. Register
+    register_agent(researcher)
+    register_agent(writer)
+
+    # 3. Workflow
+    workflow = create_workflow(
+        definition="Research Pipeline", # Utilizing simple_api workflow creation
+        agents=[
+             {"agent": "researcher", "task": "Find 3 key facts about: {input}"},
+             {"agent": "writer", "task": "Summarize these facts: {researcher.output}"}
+        ]
     )
-    
-    # Chat with it
-    response = await agent.chat("Hello! What can you do?")
-    print(f"AI: {response.content}")
 
-if __name__ == "__main__":
-    asyncio.run(main())
-```
+    # 4. Run (Note: create_workflow returns a bound workflow that can just .run())
+    print(await workflow.run(input_message="Quantum Computing"))
+    ```
+  </Step>
+</Steps>
 
-#### **Option B: Configuration File Approach (Scalable)**
+## 📚 Next Steps
 
-Create `langswarm.yaml`:
-```yaml
-version: "1.0"
-agents:
-  - id: "assistant"
-    name: "My Assistant"
-    provider: "openai"
-    model: "gpt-4o"
-    system_prompt: "You are a helpful AI assistant."
-```
-
-Run it:
-```python
-from langswarm.core.config import load_config
-
-# Load configuration
-config = load_config('langswarm.yaml')
-print(f'✅ Loaded {len(config.agents)} agents successfully!')
-
-# Get the agent
-agent = config.get_agent_instance("assistant")
-response = await agent.chat("Hello!")
-print(f"Agent: {response.content}")
-```
-
----
-
-## 🎯 **The 80% Use Case: Chatbot with Memory**
-
-Most users want a chatbot that remembers the conversation. Here's how to do it in one minute:
-
-```python
-import asyncio
-from langswarm.core.agents import AgentBuilder
-
-async def main():
-    # Create agent with memory
-    agent = (AgentBuilder()
-             .openai()
-             .model("gpt-4o")
-             .memory_enabled(True)  # PERSISTENT memory
-             .system_prompt("You are a helpful assistant named Claude.")
-             .build())
-    
-    # Multi-turn conversation
-    print("Chatbot: Hello! I'm Claude. How can I help you?")
-    
-    while True:
-        user_input = input("\nYou: ")
-        if user_input.lower() in ['quit', 'exit']:
-            break
-            
-        response = await agent.chat(user_input)
-        print(f"\nChatbot: {response.content}")
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
----
-
-## 🔥 **Advanced Features in 30 Seconds**
-
-### **1. Real-time Streaming**
-```python
-# Stream response as it's generated
-async for chunk in agent.chat_stream("Tell me a story"):
-    print(chunk.content, end="", flush=True)
-```
-
-### **2. Cost & Token Tracking**
-```python
-# Track usage automatically
-stats = agent.get_usage_stats()
-print(f"Total cost: ${stats['estimated_cost']:.4f}")
-print(f"Tokens used: {stats['total_tokens']}")
-```
-
-### **3. Support for Any Model**
-```python
-# Anthropic Claude
-agent = AgentBuilder().anthropic().model("claude-3-5-sonnet-20240620").build()
-
-# Google Gemini
-agent = AgentBuilder().gemini().model("gemini-1.5-pro").build()
-
-# Local Model (via LiteLLM/Ollama)
-agent = AgentBuilder().litellm().model("ollama/llama3").build()
-```
-
----
-
-## 🐝 **The "Swarm" in LangSwarm: Multi-Agent Orchestration**
-
-The real power of LangSwarm is orchestration. Here's how to make a **Researcher** and a **Writer** work together:
-
-```python
-from langswarm.core.agents import create_openai_agent, register_agent
-from langswarm.core.workflows import create_simple_workflow, get_workflow_engine
-
-# 1. Create specialized agents
-researcher = create_openai_agent(id="researcher", model="gpt-4o")
-writer = create_openai_agent(id="writer", model="gpt-4o")
-
-# 2. Register them for orchestration
-register_agent(researcher)
-register_agent(writer)
-
-# 3. Create a workflow: researcher → writer
-workflow = create_simple_workflow(
-    workflow_id="content_pipeline",
-    agent_chain=["researcher", "writer"]
-)
-
-# 4. Execute
-engine = get_workflow_engine()
-result = await engine.execute_workflow(
-    workflow=workflow,
-    input_data={"input": "Impact of AI on software development"}
-)
-
-print(f"Final Outcome: {result.output}")
-```
-
----
-
-## 📚 **Next Steps**
-
-- **[Core Architectural Patterns](../architecture/dual-interface-architecture)** - Understand how LangSwarm works.
-- **[Memory Backends](../../user-guides/memory/postgresql)** - Setup PostgreSQL for enterprise memory.
-- **[Using Tools](../../user-guides/tools/intent-based-calls)** - Give your agents real-world capabilities.
-- **[API Reference](../../api-reference)** - Deep dive into classes and methods.
-
----
-
-**🎉 Welcome to LangSwarm! You're ready to build the next generation of AI systems.**
+<CardGroup cols={2}>
+  <Card title="Build Custom Agents" icon="robot" href="/user-guides/agents">
+    Learn about tools, memory, and different providers.
+  </Card>
+  <Card title="Design Workflows" icon="diagram-project" href="/user-guides/workflows">
+    Create complex pipelines and state machines.
+  </Card>
+</CardGroup>

@@ -1,185 +1,67 @@
-# 🎯 Intent-Based Tool Calling - Recommended Approach
-
-**Avoid parameter mapping issues by using natural language intents instead of exact parameters.**
-
+---
+title: "Agentic Selection"
+description: "How agents reason about and select MCP tools"
 ---
 
-## 🤔 **The Problem with Direct Parameters**
+# 🧠 Agentic Tool Selection
 
-Agents often struggle with exact parameter names and can use incorrect parameters:
+Modern LLMs (like GPT-4o, Claude 3.5 Sonnet) are capable of sophisticated reasoning. Instead of manually mapping user inputs to tool parameters, LangSwarm allows agents to **autonomously select** the correct MCP tool and populate its arguments based on semantic understanding.
 
-```json
-❌ PROBLEMATIC - Direct Parameters:
-{
-  "mcp": {
-    "tool": "bigquery_vector_search",
-    "method": "similarity_search", 
-    "params": {"keyword": "refund policy"}  // Wrong parameter name!
-  }
-}
+## 🎯 How it Works
+
+1.  **Discovery**: The Agent inspects the `description` and `schema` of all connected MCP tools.
+2.  **Reasoning**: It analyzes the user's request (e.g., "Find high-margin customers").
+3.  **Selection**: It chooses the tool that best fits the goal (e.g., `database.query`) and generates the necessary SQL/parameters.
+
+## ✍️ Writing Good Tool Descriptions
+
+The key to accurate tool selection is writing clear, descriptive prompts for your tools within the MCP Server.
+
+### Bad Description
+```python
+@mcp.tool()
+def query(sql: str) -> str:
+    """Runs a query.""" 
+    # vague! agent doesn't know what tables exist
+    ...
 ```
 
-**Common Issues:**
-- Using `keyword` instead of `query`
-- Using `search` instead of `query` 
-- Using `text` instead of `query`
-- Parameter schema mismatches
-
-## ✅ **The Solution: Intent-Based Calling**
-
-Express what you want to accomplish, not how to do it:
-
-```json
-✅ RECOMMENDED - Intent-Based:
-{
-  "response": "I'll search our knowledge base for refund policy information.",
-  "mcp": {
-    "tool": "bigquery_vector_search",
-    "intent": "search for refund policy information",
-    "context": "user asking about refund procedures for enterprise customers"
-  }
-}
+### Good Description
+```python
+@mcp.tool()
+def query_customers_db(sql: str) -> str:
+    """
+    Executes a read-only SQL query against the 'customers' database.
+    Available tables:
+    - users (id, name, email, signup_date)
+    - orders (id, user_id, amount, margin, status)
+    
+    Use this to answer questions about customer spending and margins.
+    """
+    ...
 ```
 
----
+With the "Good" description, an agent asked to "Find high-margin customers" will know exactly how to construct the query `SELECT * FROM orders WHERE margin > ...`.
 
-## 🎯 **Intent-Based Examples**
+## 🧩 Hints & Reasoning
 
-### **Knowledge Base Search**
-```json
-{
-  "response": "Let me search for that information in our knowledge base.",
-  "mcp": {
-    "tool": "bigquery_vector_search",
-    "intent": "find information about pricing for restaurants",
-    "context": "user wants to know restaurant-specific pricing tiers and features"
-  }
-}
+Sometimes an agent needs guidance. You can inject reasoning hints into the **System Prompt** without changing the tools themselves.
+
+```python
+agent = await (AgentBuilder("analyst")
+    .system_prompt("""
+        You are a Data Analyst.
+        
+        STRATEGY:
+        1. When searching for files, always use 'grep' before 'read_file'.
+        2. When querying databases, limit results to 10 rows first.
+    """)
+    .add_mcp_server(...) 
+    .build())
 ```
 
-### **Document Retrieval**
-```json
-{
-  "response": "I'll retrieve the full document for you.",
-  "mcp": {
-    "tool": "bigquery_vector_search", 
-    "intent": "get complete document content",
-    "context": "user needs full content for document ID from previous search results"
-  }
-}
-```
+## 🔄 Replaces "Intent-Based" Calling
 
-### **Dataset Exploration**
-```json
-{
-  "response": "Let me check what datasets are available.",
-  "mcp": {
-    "tool": "bigquery_vector_search",
-    "intent": "list available knowledge bases",
-    "context": "user wants to explore what information sources are accessible"
-  }
-}
-```
+Older systems required agents to emit a vague "Intent" (e.g., `{"intent": "find users"}`) which was then mapped by code to a specific function.
 
----
-
-## 🔧 **How Intent-Based Works**
-
-### **1. Agent Expresses Intent**
-- Natural language description of what's needed
-- Context about why it's needed
-- No parameter mapping required
-
-### **2. Tool Workflow Processes Intent**
-- **Interprets** the natural language intent
-- **Extracts** required parameters automatically
-- **Asks for clarification** if anything is unclear
-
-### **3. Automatic Parameter Mapping**
-The tool workflow handles parameter extraction:
-```
-Intent: "search for refund policy information"
-Context: "user asking about refund procedures"
-↓
-Automatically mapped to:
-{
-  "method": "similarity_search",
-  "params": {
-    "query": "refund policy procedures",
-    "limit": 10,
-    "similarity_threshold": 0.7
-  }
-}
-```
-
----
-
-## 📋 **Best Practices**
-
-### **✅ Good Intent Descriptions**
-- **Specific**: "search for pricing information for restaurants"
-- **Action-oriented**: "find documents about", "retrieve content for", "list available"
-- **Contextual**: Include why the information is needed
-
-### **✅ Good Context Information**
-- **User's goal**: "user wants to understand pricing options"
-- **Previous results**: "following up on search results from earlier query"
-- **Specific needs**: "needs technical documentation for troubleshooting"
-
-### **❌ Avoid Vague Intents**
-- **Too generic**: "search for something"
-- **No context**: Missing why the information is needed
-- **Too technical**: Don't try to specify exact parameters
-
----
-
-## 🎉 **Benefits Summary**
-
-| **Aspect** | **Direct Parameters** | **Intent-Based** |
-|------------|----------------------|------------------|
-| **Parameter Issues** | ❌ Common mapping errors | ✅ No parameter knowledge needed |
-| **Maintainability** | ❌ Breaks with schema changes | ✅ Robust to tool updates |
-| **Agent Complexity** | ❌ Must know exact schemas | ✅ Natural language only |
-| **Error Recovery** | ❌ Hard failures | ✅ Automatic clarification |
-| **User Experience** | ❌ Cryptic parameter errors | ✅ Natural conversation |
-
----
-
-## 🚀 **Implementation**
-
-### **Update Your Agent Instructions**
-Instead of teaching agents parameter schemas, teach them to express intents:
-
-```yaml
-agents:
-  - id: "knowledge_assistant"
-    system_prompt: |
-      When users ask questions, use intent-based tool calling:
-      
-      For knowledge searches, express your intent naturally:
-      {
-        "mcp": {
-          "tool": "bigquery_vector_search",
-          "intent": "search for [what user needs]",
-          "context": "[why they need it]"
-        }
-      }
-      
-      Do NOT worry about exact parameter names or schemas.
-      Let the tool workflow handle the technical details.
-```
-
-### **Migrate Existing Configurations**
-Replace parameter-based examples with intent-based ones in your documentation and training.
-
----
-
-## 📚 **Related Documentation**
-
-- [System Prompt Template](langswarm/core/templates/system_prompt_template.md) - Intent examples
-- [Cross-Workflow Clarification](langswarm/core/templates/fragments/cross_workflow_clarification.md) - Clarification handling
-- [Workflows vs Direct Agents](docs/WORKFLOWS_VS_DIRECT_AGENTS_COMPARISON.md) - When to use each approach
-
----
-
-**🎯 Use intent-based calling to eliminate parameter mapping issues and create more robust, maintainable agent systems!**
+With LangSwarm + MCP, this is obsolete. The Agent **directly calls** the correct tool with the correct parameters, reducing latency and complexity.

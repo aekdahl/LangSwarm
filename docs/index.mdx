@@ -5,170 +5,105 @@ description: "Multi-Agent AI Orchestration Framework for building intelligent sy
 
 # 🐝 LangSwarm
 
-**Multi-Agent AI Orchestration Framework**
+**Production-Grade Multi-Agent Orchestration**
 
-Build intelligent systems where multiple AI agents collaborate to solve complex tasks. LangSwarm makes it easy to create, orchestrate, and scale AI agent workflows with support for all major LLM providers and a rich ecosystem of tools.
+LangSwarm is an async-first framework for building, orchestrating, and scaling AI agent swarms. It unifies **Model Context Protocol (MCP)**, enterprise memory (Postgres/BigQuery), and diverse LLM providers into a single, type-safe API.
 
----
-
-## 🎯 What is LangSwarm?
-
-LangSwarm is a framework for **multi-agent AI orchestration**. LangSwarm enables you to:
-
-- **Orchestrate multiple specialized agents** working together on complex tasks
-- **Build workflows** where agents collaborate, hand off work, and combine their outputs
-- **Integrate tools** through the Model Context Protocol (MCP) for real-world capabilities
-- **Support any LLM provider** (OpenAI, Anthropic, Google, Mistral, local models, and more)
-- **Scale from prototypes to production** with enterprise-grade memory, observability, and deployment options
-
-### Why Multi-Agent?
-
-Single AI agents hit limits quickly. Multi-agent systems unlock:
-
-- **Specialization**: Each agent excels at specific tasks (research, writing, analysis, coding)
-- **Collaboration**: Agents work together, combining strengths and compensating for weaknesses
-- **Scalability**: Distribute workload across multiple agents and providers
-- **Reliability**: Redundancy and validation through multiple perspectives
-- **Modularity**: Build, test, and deploy agents independently
-
----
+```bash
+pip install langswarm
+```
 
 ## ⚡ Quick Start
 
-### Installation
+Build your first swarm in seconds.
 
-```bash
-pip install langswarm openai
-export OPENAI_API_KEY="your-api-key-here"
-```
+<CodeGroup>
 
-### Simple Agent (30 seconds)
-
-```python
+```python Simple Agent
 import asyncio
 from langswarm import create_agent
 
 async def main():
-    # Create an agent
-    agent = create_agent(model="gpt-4o")
+    # 1. Create a context-aware agent
+    agent = create_agent(
+        model="gpt-4o",
+        system_prompt="You are a senior python engineer."
+    )
     
-    # Chat with it
-    response = await agent.chat("What's the capital of France?")
+    # 2. Chat with streaming support
+    response = await agent.chat("Explain async generators")
     print(response)
 
 asyncio.run(main())
 ```
 
-### Multi-Agent Orchestration (Real Power)
+```python Swarm Orchestration
+from langswarm import create_agent, register_agent
+from langswarm.core.workflows import create_workflow, get_engine
 
-```python
-from langswarm import create_agent
-from langswarm.core.agents import register_agent
-from langswarm.core.workflows import create_simple_workflow, get_workflow_engine
+# 1. Define specialized agents
+researcher = create_agent("researcher", model="claude-3-5-sonnet", 
+                         system_prompt="Gather comprehensive data.")
+writer = create_agent("writer", model="gpt-4o", 
+                     system_prompt="Synthesize research into a report.")
 
-# Create specialized agents
-researcher = create_agent(
-    name="researcher",
-    model="gpt-4o",
-    system_prompt="You are a research specialist. Gather comprehensive information."
-)
-
-writer = create_agent(
-    name="writer",
-    model="gpt-4o",
-    system_prompt="You are a writing specialist. Create clear, engaging content."
-)
-
-# Register for orchestration
+# 2. Register fleet
 register_agent(researcher)
 register_agent(writer)
 
-# Create workflow: researcher → writer
-workflow = create_simple_workflow(
-    workflow_id="content_creation",
-    name="Research and Write",
-    agent_chain=["researcher", "writer"]
+# 3. seamless Handoff Workflow
+workflow = create_workflow(
+    name="Research Report",
+    steps=[
+        {"agent": "researcher", "task": "Research: {input}"},
+        {"agent": "writer", "task": "Write report based on: {researcher.output}"}
+    ]
 )
 
-# Execute orchestrated workflow
-engine = get_workflow_engine()
-result = await engine.execute_workflow(
-    workflow=workflow,
-    input_data={"input": "Write an article about AI agents"}
-)
-
-print(result.output)  # Final result from both agents working together
+# 4. Execute
+result = await get_engine().run(workflow, input="Future of AI Agents")
 ```
 
----
+</CodeGroup>
 
-## 🧠 Core Concepts
+## 🚀 Key Capabilities
 
-### 1. **Agents**
+<CardGroup cols={2}>
+  <Card title="MCP Native" icon="plug">
+    First-class support for the **Model Context Protocol**. Connect agents to filesystem, GitHub, databases, and browser with zero glue code.
+  </Card>
+  <Card title="Provider Agnostic" icon="server">
+    Switch models instantly. Support for **OpenAI, Anthropic, Gemini, Mistral**, and local models via generic interfaces.
+  </Card>
+  <Card title="Enterprise Memory" icon="database">
+    Built-in persistence layers for **PostgreSQL (pgvector)**, **BigQuery**, **Redis**, and **ChromaDB**. State survives restarts.
+  </Card>
+  <Card title="Async First" icon="bolt">
+    Built from the ground up for **asyncio**. Handle massive swarms and concurrent workflows without blocking.
+  </Card>
+</CardGroup>
 
-Agents are AI-powered entities with specific roles and capabilities. LangSwarm supports:
+## 📚 Core Documentation
 
-- **Multiple providers**: OpenAI, Anthropic (Claude), Google (Gemini), Mistral, Cohere, local models
-- **Flexible configuration**: System prompts, temperature, tools, memory
-- **Built-in capabilities**: Streaming, structured outputs, cost tracking
+Explore the foundational concepts of LangSwarm.
 
-### 2. **Workflows**
-
-Workflows define how agents collaborate:
-
-- **Sequential**: Agent A → Agent B → Agent C
-- **Parallel**: Multiple agents work simultaneously
-- **Conditional**: Route based on results or criteria
-- **Nested**: Complex multi-stage pipelines
-
-### 3. **Tools**
-
-LangSwarm implements the Model Context Protocol (MCP) for tool integration:
-
-**Built-in Tools:**
-
-- `filesystem` - File operations (read, write, list)
-- `web_search` - Web search capabilities
-- `github` - GitHub repository operations
-- `sql_database` - SQL database access
-- `bigquery_vector_search` - Semantic search in BigQuery
-- `codebase_indexer` - Code analysis and understanding
-- `workflow_executor` - Dynamic workflow execution
-- `tasklist` - Task management
-- `message_queue` - Pub/sub message handling
-
-### 4. **Memory**
-
-Conversation history and context management with multiple backends:
-
-- **SQLite**: Zero-config, local development
-- **PostgreSQL**: Enterprise storage including pgvector support
-- **Redis**: Fast, distributed caching
-- **ChromaDB**: Vector embeddings and semantic search
-- **BigQuery**: Analytics-ready, enterprise scale
-
----
+<CardGroup cols={3}>
+  <Card title="Agents" icon="robot" href="/user-guides/agents">
+    Configure identities, tools, and LLM backends.
+  </Card>
+  <Card title="Workflows" icon="diagram-project" href="/user-guides/workflows">
+    Design complex orchestration pipelines and state machines.
+  </Card>
+  <Card title="Memory" icon="brain" href="/user-guides/memory">
+    Manage long-term state and vector retrieval.
+  </Card>
+</CardGroup>
 
 ## 🏗️ Architecture
 
 <img
   src="/images/image.png"
-  alt="Image"
-  title="Image"
-  className="mr-auto"
-  style={{ width:"74%" }}
+  alt="LangSwarm Architecture"
+  title="LangSwarm Architecture"
+  className="w-full rounded-lg shadow-lg border border-gray-200 dark:border-gray-800"
 />
-
----
-
-## 🙋 Support
-
-- **Issues**: [GitHub Issues](https://github.com/aekdahl/langswarm/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/aekdahl/langswarm/discussions)
-- **Examples**: [GitHub Examples](https://github.com/aekdahl/langswarm/tree/main/examples)
-
----
-
-## 🎉 Ready to Start?
-
-Check out the [Quick Start](/getting-started/quickstart) guide or browse the [API Reference](/api-reference).

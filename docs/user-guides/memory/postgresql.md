@@ -5,107 +5,94 @@ title: PostgreSQL & PGVector
 
 # PostgreSQL Memory Backend
 
-The PostgreSQL backend provides robust, production-grade memory storage for LangSwarm. It supports both standard relational storage for session history and native vector search using the `pgvector` extension.
+For production workloads requiring robust data integrity and scalability, LangSwarm supports PostgreSQL. This backend handles:
 
-## Features
+1.  **Session Persistence**: Storing standard chat history.
+2.  **Vector Search**:  Native RAG capabilities using the `pgvector` extension.
 
-- **Robust Persistence**: Store conversations securely in PostgreSQL.
-- **Vector Search**: Native semantic search using `pgvector`.
-- **AsyncIO**: Fully asynchronous using `asyncpg`.
-- **Scalable**: Suitable for high-concurrency production deployments.
-
-## Installation
-
-To use the PostgreSQL backend, install `langswarm` with the `postgres` extra:
+## 📦 Installation
 
 ```bash
 pip install "langswarm[postgres]"
-# or manually
-pip install asyncpg pgvector
+# Required: asyncpg, pgvector
 ```
 
-### Database Setup
+## 🚀 Configuration
 
-Ensure your PostgreSQL database has the `vector` extension installed if you plan to use semantic search:
+Use `create_memory_manager` to initialize the connection.
 
-```sql
-CREATE EXTENSION IF NOT EXISTS vector;
-```
+### Standard Persistence
 
-> The backend will attempt to create this extension automatically if the database user has sufficient privileges.
-
-## Configuration
-
-### Code-First Configuration
-
-You can configure the backend programmatically using `create_memory_manager`:
+Stores conversation history reliably in PostgreSQL.
 
 ```python
 from langswarm.core.memory import create_memory_manager
+from langswarm.core.agents import AgentBuilder
 
-manager = create_memory_manager(
-    backend="postgres",
-    # Connection details
-    url="postgresql://user:pass@localhost:5432/dbname",
-    # Or individual params:
-    # user="user", password="pass", host="localhost", port=5432, database="dbname"
-    
-    # Vector Search Configuration
-    enable_vector=True,
-    embedding_dimension=1536,  # Matches OpenAI text-embedding-3-small
-    embedding={
-        "provider": "openai",
-        "model": "text-embedding-3-small",
-        "api_key": "sk-..." 
+# 1. Initialize Manager
+memory_manager = create_memory_manager({
+    "backend": "postgres",
+    "config": {
+        "url": "postgresql://user:pass@localhost:5432/dbname",
+        "table_prefix": "ls_"  # Optional: Prefix for tables (default: ls_)
     }
-)
+})
 
-# Attach to agent
-agent = create_agent(..., memory_manager=manager)
+# 2. Attach to Agent
+agent = await (AgentBuilder("db_agent")
+    .memory_manager(memory_manager)
+    .build())
 ```
 
-### YAML Configuration
+### Vector Search (RAG)
 
-If using `langswarm.yaml`:
+Enable semantic search over long-term memory. Requires `pgvector` extension.
 
-```yaml
-agents:
-  - id: "my-agent"
-    memory:
-      enabled: true
-      backend: "postgres"
-      config:
-        url: "postgresql://user:pass@postgresql.railway.internal:5432/railway"
-        enable_vector: true
-        embedding:
-          provider: "openai"
-          model: "text-embedding-3-small"
+```sql
+-- Run this in your database first
+CREATE EXTENSION IF NOT EXISTS vector;
 ```
-
-## Vector Search
-
-When `enable_vector` is set to `True`, LangSwarm will automatically:
-
-1.  Generate embeddings for every new message using the configured provider.
-2.  Store the embedding in the `embedding` vector column.
-3.  Enable semantic search capabilities via `memory.search_messages()`.
-
-### Performing Semantic Search
 
 ```python
-# Search for relevant context
-results = await agent.memory.search_messages("What did we discuss about deployment?")
+memory_manager = create_memory_manager({
+    "backend": "postgres",
+    "config": {
+        "url": "postgresql://user:pass@localhost:5432/dbname",
+        
+        # Enable RAG capabilities
+        "enable_vector": True,
+        "embedding_dimension": 1536, # Matches text-embedding-3-small
+        "embedding": {
+            "provider": "openai",
+            "model": "text-embedding-3-small",
+            "api_key": "sk-..." 
+        }
+    }
+})
+```
 
-for msg in results:
-    print(f"[{msg.timestamp}] {msg.content}")
-``` 
+## 🔍 Semantic Search Usage
 
-## Tables Created
+Once configured with vector support, you can search past conversations.
 
-The backend automatically creates the following tables (transparently managed):
+```python
+# Search past session history
+relevant_memories = await memory_manager.search_history(
+    session_id="session_123", 
+    query="What was the deployment configuration?",
+    limit=5
+)
 
-- `sessions`: Stores session metadata.
-- `messages`: Stores chat messages and embeddings.
-- `summaries`: Stores conversation summaries.
+for mem in relevant_memories:
+    print(f"[{mem.score:.2f}] {mem.content}")
+```
 
-By default, tables are created in the `public` schema. You can override this with the `schema` parameter.
+## 📊 Schema
+
+LangSwarm automatically manages the following tables (transparently):
+
+| Table | Description |
+| :--- | :--- |
+| `ls_sessions` | Metadata for each conversation thread |
+| `ls_messages` | Full message logs (User, Assistant, Tool Calls) |
+| `ls_embeddings` | Vector embeddings (if `enable_vector=True`) |

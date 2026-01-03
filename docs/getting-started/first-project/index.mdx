@@ -1,364 +1,115 @@
-# 🏗️ Your First LangSwarm Project
+---
+title: "First Project"
+description: "Build a Financial Analysis Swarm in 5 minutes"
+---
 
-**Build a complete multi-agent AI system step-by-step.**
+# 🏗️ First Project: Financial Analysis Swarm
 
-In this tutorial, you'll build a **Document Analysis System** that can read files, extract insights, and generate summaries using multiple AI agents working together.
+Build a multi-agent system that analyzes market trends and gives investment advice.
 
-## 🎯 **What You'll Build**
+You will create a **Swarm** of three specialized agents:
+1.  **Reader**: Reads raw financial news.
+2.  **Analyst**: Identifies market signals.
+3.  **Advisor**: Recommends a buy/sell strategy.
 
-A document analysis system with:
-- 📄 **Document Reader Agent** - Reads and parses files
-- 🔍 **Analysis Agent** - Extracts key insights and data
-- 📝 **Summary Agent** - Creates comprehensive summaries
-- 🔄 **Workflow Orchestration** - Coordinates all agents
+## 🚀 The Code
 
-## 🚀 **Step 1: Project Setup**
+Create a file named `finance_swarm.py` and paste this code:
 
-### **Create Project Directory**
-```bash
-mkdir my-langswarm-project
-cd my-langswarm-project
-```
-
-### **Install LangSwarm**
-```bash
-pip install langswarm
-```
-
-### **Set API Key**
-```bash
-export OPENAI_API_KEY="your-openai-api-key"
-```
-
-## 📝 **Step 2: Create Configuration**
-
-Create `langswarm.yaml`:
-```yaml
-version: "2.0"
-name: "Document Analysis System"
-description: "Multi-agent document analysis and summarization"
-
-# Define our three agents
-agents:
-  - id: "document_reader"
-    name: "Document Reader"
-    provider: "openai"
-    model: "gpt-4o"
-    system_prompt: |
-      You are a document reader specialist. Your job is to:
-      1. Read and parse document content
-      2. Identify document structure and format
-      3. Extract raw text content cleanly
-      4. Preserve important formatting and structure
-
-  - id: "analyzer"
-    name: "Content Analyzer" 
-    provider: "openai"
-    model: "gpt-4o"
-    system_prompt: |
-      You are a content analysis expert. Your job is to:
-      1. Analyze document content for key themes and topics
-      2. Extract important facts, figures, and data points
-      3. Identify main arguments and conclusions
-      4. Note any actionable items or recommendations
-
-  - id: "summarizer"
-    name: "Summary Generator"
-    provider: "openai"
-    model: "gpt-4o"
-    system_prompt: |
-      You are a summary specialist. Your job is to:
-      1. Create clear, concise summaries
-      2. Highlight the most important points
-      3. Structure information logically
-      4. Make content accessible to any audience
-
-# Define tools for file operations
-tools:
-  filesystem:
-    type: "mcp"
-    local_mode: true
-    description: "Read and write files"
-
-# Define the analysis workflow
-workflows:
-  - id: "document_analysis"
-    name: "Document Analysis Pipeline"
-    description: "Complete document analysis from reading to summary"
-    steps:
-      - id: "read_step"
-        agent: "document_reader"
-        tools: ["filesystem"]
-        description: "Read and parse the document"
-        
-      - id: "analyze_step"
-        agent: "analyzer"
-        input: "${read_step.output}"
-        description: "Analyze content for insights"
-        
-      - id: "summarize_step"
-        agent: "summarizer"
-        input: "${analyze_step.output}"
-        description: "Generate final summary"
-        output: 
-          to: "user"
-
-# Memory configuration for persistent conversations
-memory:
-  backend: "sqlite"
-  settings:
-    persist_directory: "./data"
-
-# Observability for debugging
-observability:
-  logging:
-    level: "INFO"
-  tracing:
-    enabled: true
-```
-
-## 🤖 **Step 3: Create the Main Script**
-
-Create `analyze_document.py`:
 ```python
-#!/usr/bin/env python3
-"""
-Document Analysis System
-A complete LangSwarm V2 example showing multi-agent workflows.
-"""
-
 import asyncio
-import sys
-from pathlib import Path
-from langswarm.core.config import load_config
-from langswarm.core.workflows import get_workflow_engine
+import os
+from langswarm import create_workflow, register_agent
 from langswarm.core.agents import AgentBuilder
+from langswarm.core.workflows import get_workflow_engine
 
 async def main():
-    """Main function to run document analysis."""
-    
-    # Check if document path provided
-    if len(sys.argv) < 2:
-        print("Usage: python analyze_document.py <path_to_document>")
-        print("Example: python analyze_document.py ./sample_document.txt")
+    # 0. Setup (ensure OPENAI_API_KEY is set in env)
+    if not os.getenv("OPENAI_API_KEY"):
+        print("❌ Please set OPENAI_API_KEY environment variable")
         return
+
+    # 1. Build Specialized Agents
+    print("🤖 Building agents...")
     
-    document_path = sys.argv[1]
+    reader = await (AgentBuilder("reader")
+              .openai()
+              .model("gpt-4o")
+              .system_prompt("You are a financial news reader. Extract key facts from the input.")
+              .build())
+
+    analyst = await (AgentBuilder("analyst")
+               .openai()
+               .model("gpt-4o")
+               .system_prompt("You are a market analyst. Identify bullish/bearish trends in the data.")
+               .build())
+
+    advisor = await (AgentBuilder("advisor")
+               .openai()
+               .model("gpt-4o")
+               .system_prompt("You are an investment advisor. Recommend a strategy based on the analysis.")
+               .build())
+
+    # 2. Register Agents
+    await register_agent(reader)
+    await register_agent(analyst)
+    await register_agent(advisor)
+
+    # 3. Create Orchestration Workflow
+    # Passing data: Reader -> Analyst -> Advisor
+    workflow = create_workflow(
+        workflow_id="finance_v1",
+        name="Market Analysis Pipeline",
+        agent_chain=["reader", "analyst", "advisor"]
+    )
+
+    # 4. Execute
+    print("🚀 Running Financial Analysis Swarm...")
+    engine = get_workflow_engine()
     
-    # Verify document exists
-    if not Path(document_path).exists():
-        print(f"❌ Document not found: {document_path}")
-        return
-    
-    print(f"🚀 Starting document analysis for: {document_path}")
-    print("=" * 60)
-    
-    try:
-        # Load configuration
-        print("📋 Loading configuration...")
-        config = load_config("langswarm.yaml")
-        print(f"✅ Loaded {len(config.agents)} agents and {len(config.workflows)} workflows")
-        
-        # Get workflow engine
-        print("🔧 Initializing workflow engine...")
-        engine = get_workflow_engine()
-        
-        # Execute the document analysis workflow
-        print("🔄 Running document analysis workflow...")
-        result = await engine.execute_workflow(
-            workflow_id="document_analysis",
-            input_data={
-                "document_path": document_path,
-                "user_request": f"Please analyze the document at {document_path}"
-            }
-        )
-        
-        # Display results
-        print("\n" + "=" * 60)
-        print("📊 ANALYSIS RESULTS")
-        print("=" * 60)
-        print(result.output)
-        print("\n" + "=" * 60)
-        print(f"✅ Analysis completed successfully!")
-        print(f"📈 Workflow executed in {result.execution_time:.2f} seconds")
-        
-    except Exception as e:
-        print(f"❌ Error during analysis: {e}")
-        import traceback
-        traceback.print_exc()
+    result = await engine.execute_workflow(
+        workflow=workflow,
+        input_data={"input": "Apple (AAPL) reported record services revenue but iPhone sales dipped 2%."}
+    )
+
+    print("\n📊 Final Advice:")
+    print(result.output)
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-## 📄 **Step 4: Create Sample Document**
-
-Create `sample_document.txt`:
-```text
-# Quarterly Business Report - Q3 2024
-
-## Executive Summary
-Our company achieved record-breaking performance in Q3 2024, with revenue increasing by 35% compared to the same period last year. Key highlights include successful product launches, expanded market presence, and improved operational efficiency.
-
-## Financial Performance
-- Total Revenue: $2.4 million (35% increase YoY)
-- Net Profit: $480,000 (20% profit margin)
-- Operating Expenses: $1.92 million
-- Customer Acquisition Cost: $150 (down from $200)
-
-## Key Achievements
-1. **Product Launch**: Successfully launched our new AI-powered analytics platform
-2. **Market Expansion**: Entered 3 new geographic markets
-3. **Team Growth**: Hired 15 new employees across engineering and sales
-4. **Customer Satisfaction**: Achieved 94% customer satisfaction score
-
-## Challenges and Opportunities
-### Challenges
-- Supply chain disruptions affected delivery times
-- Increased competition in the AI analytics space
-- Higher than expected customer support volume
-
-### Opportunities
-- Growing demand for AI solutions in enterprise market
-- Potential partnerships with major cloud providers
-- Expansion into international markets showing strong interest
-
-## Action Items for Q4
-1. Optimize supply chain processes to reduce delivery times
-2. Invest in additional customer support resources
-3. Develop competitive analysis and pricing strategy
-4. Explore partnership opportunities with cloud providers
-5. Begin planning for international expansion
-
-## Conclusion
-Q3 2024 was a strong quarter that positions us well for continued growth. While we face some operational challenges, the market opportunities and our product-market fit give us confidence in our trajectory.
-```
-
-## 🚀 **Step 5: Run Your First Analysis**
+## 🏃 Run It
 
 ```bash
-python analyze_document.py sample_document.txt
+python finance_swarm.py
 ```
 
-Expected output:
-```
-🚀 Starting document analysis for: sample_document.txt
-============================================================
-📋 Loading configuration...
-✅ Loaded 3 agents and 1 workflows
-🔧 Initializing workflow engine...
-🔄 Running document analysis workflow...
+**Expected Output:**
 
-============================================================
-📊 ANALYSIS RESULTS
-============================================================
-## Document Analysis Summary
+```text
+🤖 Building agents...
+🚀 Running Financial Analysis Swarm...
 
-**Document Type**: Quarterly Business Report (Q3 2024)
-
-**Key Financial Metrics**:
-- Revenue: $2.4M (35% YoY growth)
-- Net Profit: $480K (20% margin)
-- Customer Acquisition Cost: $150 (improved from $200)
-
-**Major Achievements**:
-1. AI-powered analytics platform launch
-2. Geographic expansion (3 new markets)
-3. Team scaling (15 new hires)
-4. High customer satisfaction (94%)
-
-**Critical Action Items**:
-- Supply chain optimization needed
-- Customer support scaling required
-- Competitive analysis for AI market
-- International expansion planning
-
-**Overall Assessment**: Strong performance quarter with clear growth trajectory, though operational scaling challenges need attention.
-
-============================================================
-✅ Analysis completed successfully!
-📈 Workflow executed in 12.34 seconds
+📊 Final Advice:
+Based on the analysis of Apple's mixed earnings report... [Analysis follows] ... 
+Recommendation: HOLD. The dip in iPhone sales suggests caution, but services growth remains a strong bullish signal long-term.
 ```
 
-## 🎯 **Step 6: Extend Your Project**
+## 🧠 How It Works
 
-### **Add More Document Types**
-```python
-# Add support for different file types
-def detect_document_type(file_path):
-    """Detect document type and adjust analysis approach."""
-    extension = Path(file_path).suffix.lower()
-    
-    if extension == '.pdf':
-        return 'pdf_document'
-    elif extension in ['.md', '.txt']:
-        return 'text_document'
-    elif extension in ['.docx', '.doc']:
-        return 'word_document'
-    else:
-        return 'unknown_document'
-```
+1.  **AgentBuilder**: We used the fluent builder pattern to create three distinct agents with unique `system_prompts`.
+2.  **Registration**: `register_agent` makes them available to the swarm.
+3.  **Orchestration**: `create_workflow` binds them into a sequential chain. The output of the `reader` automatically becomes the input of the `analyst`, and so on.
+4.  **Execution**: The `WorkflowEngine` manages the async execution, error handling, and data passing.
 
-### **Add Memory and Context**
-```yaml
-# Add to langswarm.yaml
-memory:
-  backend: "sqlite"
-  settings:
-    persist_directory: "./analysis_history"
-    enable_semantic_search: true
-```
+## 📚 Next Steps
 
-### **Add More Specialized Agents**
-```yaml
-# Add to agents section in langswarm.yaml
-- id: "fact_checker"
-  name: "Fact Checker"
-  provider: "openai"
-  model: "gpt-4o"
-  system_prompt: |
-    You verify facts and claims in documents.
-    Cross-reference information and flag potential inaccuracies.
-
-- id: "action_extractor"
-  name: "Action Item Extractor"
-  provider: "openai"
-  model: "gpt-4o"
-  system_prompt: |
-    You identify and extract actionable items from documents.
-    Create clear, prioritized task lists with deadlines when mentioned.
-```
-
-## 🏆 **What You've Accomplished**
-
-Congratulations! You've built a complete multi-agent AI system that:
-
-- ✅ **Uses Multiple AI Agents** working together
-- ✅ **Processes Real Documents** with structured analysis
-- ✅ **Implements Workflows** for complex task orchestration
-- ✅ **Handles Configuration** through YAML files
-- ✅ **Provides Structured Output** with clear results
-- ✅ **Includes Error Handling** and user feedback
-- ✅ **Supports Extension** for additional features
-
-## 🔥 **Next Steps**
-
-### **Learn More Advanced Features**
-- **[Workflow Guide](../../user-guides/workflows/README.md)** - Advanced workflow patterns
-- **[Memory Systems](../../user-guides/memory/README.md)** - Persistent agent memory
-- **[Tool Development](../../user-guides/tools/README.md)** - Create custom tools
-- **[Multi-Modal Agents](../../user-guides/agents/README.md)** - Handle images, audio, video
-
-### **Deploy Your System**
-- **[Local Deployment](../../deployment/local/README.md)** - Run locally with Docker
-- **[Cloud Deployment](../../deployment/cloud/README.md)** - Deploy to AWS, GCP, Azure
-- **[Scaling Guide](../../deployment/scaling/README.md)** - Handle production workloads
-
-### **Join the Community**
-- **[Contributing](../../community/contributing/README.md)** - Contribute to LangSwarm
-- **[Examples](../../examples/README.md)** - More project examples
-- **[Support](../../community/support/README.md)** - Get help and share projects
-
----
-
-**🎉 You've successfully built your first LangSwarm project! Ready to build more advanced AI systems?**
+<CardGroup cols={2}>
+  <Card title="Add Tools" icon="screwdriver-wrench" href="/user-guides/tools">
+    Give your agents access to real-time stock prices or web search.
+  </Card>
+  <Card title="Persistent Memory" icon="database" href="/user-guides/memory">
+    Enable Long-term memory to track trends over months.
+  </Card>
+</CardGroup>
