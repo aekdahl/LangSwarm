@@ -1,122 +1,142 @@
----
-title: "Local Tools (MCP)"
-description: "Run tools locally via stdio"
----
+# 🔧 Local MCP Guide
 
-# 🔧 Local Tools (MCP)
-
-LangSwarm supports the **Model Context Protocol (MCP)**, allowing agents to connect to tools running locally on your machine via standard input/output (`stdio`). This enables zero-latency access to your filesystem, databases, or custom scripts without exposing them to the internet.
+**Local MCP Mode** enables zero-latency tool execution directly within LangSwarm without containers, external servers, or complex deployment. This approach delivers significantly faster tool calls while maintaining full MCP compatibility.
 
 ## 🚀 Quick Start
 
-Use `uvx` (from the `uv` package manager) to instantly run standard MCP servers.
+### Basic Usage
 
 ```python
-from langswarm.core.agents import AgentBuilder
+from langswarm.core.config import LangSwarmConfigLoader, WorkflowExecutor
 
-agent = await (AgentBuilder("sysadmin")
-    .openai()
-    .model("gpt-4o")
-    
-    # 1. Connect to Local Filesystem Server
-    .add_mcp_server(
-        name="filesystem",
-        command="uvx",
-        args=["-q", "mcp-server-filesystem", "/Users/alex/Desktop"]
-    )
-    
-    # 2. Connect to Local SQLite
-    .add_mcp_server(
-        name="sqlite",
-        command="uvx",
-        args=["-q", "mcp-server-sqlite", "--db-path", "./test.db"]
-    )
-    .build())
+# Load configuration
+loader = LangSwarmConfigLoader()
+workflows, agents, tools, *_ = loader.load()
 
-await agent.chat("List files in the Desktop folder")
+# Execute with local MCP tools
+executor = WorkflowExecutor(workflows, agents)
+result = executor.run_workflow("use_filesystem_tool", "List files in /tmp")
 ```
 
-## 📦 Running Custom Python Tools
+### Workflow Configuration
 
-You can run your own Python scripts as MCP servers easily.
+```yaml
+# workflows.yaml
+workflows:
+  main_workflow:
+    - id: use_filesystem_tool
+      description: "Use filesystem tool with zero latency"
+      steps:
+        - id: list_files
+          function: langswarm.core.utils.workflows.functions.mcp_call
+          args:
+            mcp_url: "local://filesystem"  # 🔥 Zero latency!
+            task: "list_directory"
+            params: {"path": "/tmp"}
+          output:
+            to: read_file
+```
 
-### 1. Create a Tool Script
-Create a file `my_tool.py` that uses the `mcp` library:
+## 🏗️ Architecture Overview
+
+Local MCP bypasses the HTTP networking layer entirely.
+
+```mermaid
+graph LR
+    A[Workflow YAML] --> B[WorkflowExecutor]
+    B --> C[mcp_call function]
+    C --> D{URL Type?}
+    D -->|local://| E[Local Server Registry]
+    D -->|http://| F[HTTP Request]
+    E --> H[Direct Python Call]
+    H --> I[Result]
+```
+
+### Performance Comparison
+
+| Mode | Latency | Setup | Use Case |
+|------|---------|-------|----------|
+| **Local Mode** | **~0.0ms** | Zero setup | Development, simple tools |
+| HTTP Mode | 50-100ms | Docker/uvicorn | Production deployment |
+
+## 🛠️ Available Local Tools
+
+### 1. Filesystem Tool
+
+**Capabilities:**
+- List directory contents
+- Read file contents
+- Zero-latency file operations
+
+**Usage:**
+
+```yaml
+# List directory
+- id: list_dir
+  function: langswarm.core.utils.workflows.functions.mcp_call
+  args:
+    mcp_url: "local://filesystem"
+    task: "list_directory"
+    params: {"path": "/Users/username/Documents"}
+```
+
+## 🔨 Building Custom Local Tools
+
+### Step 1: Create Tool Implementation
 
 ```python
-# my_tool.py
-from mcp.server.fastmcp import FastMCP
+# my_tools/calculator.py
+from langswarm.mcp.server_base import BaseMCPToolServer
+from pydantic import BaseModel
 
-mcp = FastMCP("my_tool")
+class CalculateInput(BaseModel):
+    expression: str
 
-@mcp.tool()
-def add(a: int, b: int) -> int:
-    """Add two numbers"""
-    return a + b
+class CalculateOutput(BaseModel):
+    result: float
+    expression: str
 
-if __name__ == "__main__":
-    mcp.run()
+def calculate_handler(expression: str):
+    """Safely evaluate mathematical expressions"""
+    try:
+        # Use a safe evaluator in production
+        result = eval(expression)
+        return {"result": result, "expression": expression}
+    except Exception as e:
+        return {"result": 0, "expression": f"Error: {e}"}
+
+# Create local MCP server
+calculator_server = BaseMCPToolServer(
+    name="calculator",
+    description="Mathematical calculator tool",
+    local_mode=True  # 🔧 Enable local mode
+)
+
+calculator_server.add_task(
+    name="calculate",
+    description="Evaluate a mathematical expression",
+    input_model=CalculateInput,
+    output_model=CalculateOutput,
+    handler=calculate_handler
+)
+
+# Auto-register when imported logic handles the rest
 ```
 
-### 2. Connect Agent
-Connect your agent to run this script directly.
+### Step 2: Use in Workflows
 
-```python
-agent = await (AgentBuilder("math_agent")
-    .add_mcp_server(
-        name="my_math_tool",
-        command="python", # Or "uv", "python3"
-        args=["my_tool.py"]
-    )
-    .build())
-
-await agent.chat("What is 5 + 10?")
-```
-
-## 🛠️ Configuration Directory
-
-For persistent setups, you can define servers in `~/.langswarm/mcp_settings.json`.
-
-```json
-{
-  "mcpServers": {
-    "git": {
-      "command": "uvx",
-      "args": ["mcp-server-git", "--repository", "."]
-    }
-  }
-}
-```
-
-Then load them automatically:
-
-```python
-agent = await (AgentBuilder("developer")
-    .load_mcp_settings() # Loads from default JSON location
-    .build())
-```
-
-## 🧩 Environment Variables
-
-Pass environment variables to your local servers (e.g. for API keys).
-
-```python
-agent = await (AgentBuilder("cloud_agent")
-    .add_mcp_server(
-        name="aws_tools",
-        command="uvx",
-        args=["mcp-server-aws"],
-        env={"AWS_PROFILE": "dev-profile"}
-    )
-    .build())
-```
-
-## 🔍 Debugging
-
-If a tool isn't working, check the stdio logs.
-
-```python
-# Enable debug logging for MCP transport
-import logging
-logging.getLogger("langswarm.mcp").setLevel(logging.DEBUG)
+```yaml
+# workflows.yaml
+workflows:
+  main_workflow:
+    - id: math_workflow
+      steps:
+        - id: calculate_result
+          function: langswarm.core.utils.workflows.functions.mcp_call
+          args:
+            mcp_url: "local://calculator"  # Matches server name
+            task: "calculate"
+            params: {"expression": "2 + 2 * 3"}
+          output:
+            to: user
 ```

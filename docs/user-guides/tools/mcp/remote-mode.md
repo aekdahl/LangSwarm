@@ -1,84 +1,113 @@
----
-title: "Remote Tools (MCP)"
-description: "Connect to remote MCP servers via SSE"
----
+# Remote MCP Tools Guide
 
-# ☁️ Remote Tools (MCP)
+A comprehensive guide for connecting LangSwarm to remote MCP servers via HTTP/HTTPS.
 
-LangSwarm supports connecting to remote MCP servers over HTTP/HTTPS using the standard **Server-Sent Events (SSE)** transport. This allows you to securely access tools hosted on cloud services, internal microservices, or third-party APIs.
+## Overview
 
-## 🚀 Quick Connect
+LangSwarm supports connecting to remote MCP (Model-Compatible Protocol) servers through HTTP/HTTPS endpoints. This enables integration with:
 
-Connect to any remote MCP server using its SSE endpoint URL.
+- External MCP services and APIs
+- Third-party tool providers
+- Cloud-hosted MCP servers
+- Enterprise MCP services
 
-```python
-from langswarm.core.agents import AgentBuilder
+## Quick Start
 
-agent = await (AgentBuilder("cloud_agent")
-    .openai()
-    .model("gpt-4o")
-    
-    # Connect via URL (SSE Transport)
-    .add_mcp_server(
-        name="weather_service",
-        url="https://api.weather-service.com/mcp/sse",
-        headers={"X-API-Key": "your-api-key"}
-    )
-    .build())
+### Basic Remote MCP Tool Configuration
 
-await agent.chat("What is the weather in Tokyo?")
+Configuration is handled automatically via the `ToolRegistry` and `RemoteMCPTool`. You can define them in your `tools.yaml` or instantiate programmatically.
+
+```yaml
+# tools.yaml
+tools:
+  - id: remote_service
+    type: mcpremote
+    description: "Remote MCP service for data processing"
+    mcp_url: "https://your-mcp-server.com/api"
+    headers:
+      Authorization: "Bearer ${API_TOKEN}"
+    timeout: 30
+    retry_count: 3
 ```
 
-## 🔒 Authentication
+### Agent Configuration
 
-Pass custom headers for authentication (Bearer tokens, API keys).
-
-```python
-agent = await (AgentBuilder("enterprise_agent")
-    .add_mcp_server(
-        name="internal_db",
-        url="https://internal-api.corp.com/mcp",
-        headers={
-            "Authorization": "Bearer eyJhbGciOi...",
-            "X-Tenant-ID": "tenant-123"
-        }
-    )
-    .build())
+```yaml
+# agents.yaml
+agents:
+  - id: data_agent
+    agent_type: openai
+    model: gpt-4o
+    system_prompt: |
+      You can use remote MCP tools for external operations.
+      
+      Available tools:
+      - remote_service: External data processing
+    tools:
+      - remote_service
 ```
 
-## 🌐 Transport Protocols
+## Configuration Reference
 
-LangSwarm automatically detects and handles the standard MCP handshake:
+### Required Parameters
 
-1.  **SSE Connection**: Connects to the main SSE endpoint for real-time events.
-2.  **POST Endpoint**: Uses the associated POST endpoint (discovery via SSE) for sending client requests.
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `id` | string | Unique tool identifier |
+| `type` | string | Must be `mcpremote` |
+| `mcp_url` | string | HTTP/HTTPS URL of the remote MCP server |
 
-You only need to provide the initial SSE URL.
+### Optional Parameters
 
-## ⚠️ Security Best Practices
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `description` | string | Auto-generated | Tool description |
+| `headers` | object | `{}` | HTTP headers for authentication |
+| `timeout` | integer | `30` | Request timeout in seconds |
+| `retry_count` | integer | `3` | Number of retry attempts |
+| `auto_initialize` | boolean | `true` | Auto-connect on startup |
 
-When connecting to remote servers:
+## Authentication
 
-1.  **HTTPS Only**: Always use `https://` for remote connections to protect data in transit.
-2.  **Secret Management**: Never hardcode API keys. Use `os.getenv()`:
-    ```python
-    .add_mcp_server(
-        name="secure_service",
-        url=os.getenv("MCP_URL"),
-        headers={"Authorization": f"Bearer {os.getenv('MCP_TOKEN')}"}
-    )
-    ```
-3.  **Trust**: Only connect to trusted MCP servers. Agents grant these servers ability to execute code or access data depending on the tools they expose.
+### API Key Authentication
 
-## 🔧 Debugging Remote Connections
+```yaml
+tools:
+  - id: secure_service
+    type: mcpremote
+    mcp_url: "https://api.service.com/mcp"
+    headers:
+      x-api-key: "${SERVICE_API_KEY}"
+```
 
-If connection fails:
+### Bearer Token Authentication
 
-1.  Check if the server is reachable (`curl -v https://...`).
-2.  Ensure it supports the **Model Context Protocol** version 1.0+.
-3.  Enable debug mode to see the handshake logs:
+```yaml
+tools:
+  - id: jwt_service
+    type: mcpremote
+    mcp_url: "https://api.service.com/mcp"
+    headers:
+      Authorization: "Bearer ${JWT_TOKEN}"
+```
 
-```python
-import logging
-logging.getLogger("langswarm.mcp.client").setLevel(logging.DEBUG)
+## Environment Variables
+
+Use environment variables for sensitive information. LangSwarm supports explicit variable expansion `${VAR_NAME}` in your YAML configurations.
+
+```bash
+# Authentication
+export SERVICE_API_KEY="your-api-key"
+export MCP_SERVER_URL="https://prod-api.service.com/mcp"
+```
+
+Then reference in configuration:
+
+```yaml
+tools:
+  - id: env_service
+    type: mcpremote
+    mcp_url: "${MCP_SERVER_URL}"
+    headers:
+      x-api-key: "${SERVICE_API_KEY}"
 ```

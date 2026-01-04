@@ -45,13 +45,28 @@
                         ]
                     },
                     {
+                        "group": "Planning",
+                        "pages": [
+                            "user-guides/planning/hierarchical",
+                            "user-guides/planning/examples"
+                        ]
+                    },
+                    {
+                        "group": "Observability",
+                        "pages": [
+                            "user-guides/observability/examples"
+                        ]
+                    },
+                    {
                         "group": "Tools",
                         "pages": [
                             "user-guides/tools/index",
                             "user-guides/tools/intent-based-calls",
                             "user-guides/tools/tool-chaining",
                             "user-guides/tools/mcp/local-mode",
+                            "user-guides/tools/mcp/local-mode",
                             "user-guides/tools/mcp/remote-mode",
+                            "user-guides/tools/message-queue-consumer",
                             "user-guides/tools/architecture",
                             "user-guides/tools/migration"
                         ]
