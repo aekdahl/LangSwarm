@@ -1,1 +1,0 @@
-# BigQuery adapter for LangSwarm memory system 

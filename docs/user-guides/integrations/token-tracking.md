@@ -1,101 +1,49 @@
----
-title: "Token Tracking"
-description: "Monitor costs and enforce budgets"
----
+# Token Tracking & Usage
 
-# 💰 Token Tracking
+LangSwarm provides built-in support for tracking token usage across all LLM interactions. While the advanced Budgeting and Accounting system is currently in development, accurate usage data is available for every response.
 
-LangSwarm provides built-in token tracking and cost estimation for all major providers (OpenAI, Anthropic, Gemini, etc.), powered by LiteLLM.
+## Accessing Token Usage
 
-## 🚀 Quick Enable
+Standard usage statistics (prompt tokens, completion tokens, total tokens) are automatically extracted from the provider's response and available in the `metadata` of the `AgentResult` object.
 
-Enable tracking on any agent with a single builder method.
+### Example
 
 ```python
+import asyncio
 from langswarm.core.agents import AgentBuilder
 
-agent = await (AgentBuilder("analyst")
-    .openai()
-    .model("gpt-4o")
-    .cost_tracking(True)  # Enable tracking
-    .build())
+async def main():
+    agent = AgentBuilder.litellm().model("gpt-4o").build()
     
-# Chat normally
-await agent.chat("Analyze this report...")
-
-# Get real-time stats
-stats = await agent.get_usage_stats()
-print(f"Total Cost: ${stats.total_cost:.4f}")
-print(f"Tokens Used: {stats.total_tokens}")
-```
-
-## 🛑 Budget Enforcement
-
-Prevent runaway costs by setting daily or session limits.
-
-```python
-agent = await (AgentBuilder("bounded_agent")
-    .openai()
-    .model("gpt-4o")
-    .cost_tracking(enabled=True)
+    result = await agent.run("Calculate the fibonacci of 10")
     
-    # Budget Configuration
-    .cost_limit_daily(5.00)      # $5.00 USD per day
-    .token_limit_daily(100_000)  # 100k tokens per day
+    # Access token usage from metadata
+    usage = result.metadata.get("token_usage", {})
     
-    # Actions on limit reached
-    .on_limit_reached("error")   # or "warning"
-    .build())
+    print(f"Input Tokens: {usage.get('prompt_tokens')}")
+    print(f"Output Tokens: {usage.get('completion_tokens')}")
+    print(f"Total Tokens: {usage.get('total_tokens')}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
-If a limit is exceeded, the agent will raise a `BudgetExceededError`.
+## Provider Support
 
-## 📊 Usage Analytics
+Token usage tracking is supported for all major providers that expose this information, including:
 
-You can access granular usage data for reporting.
+- **OpenAI**
+- **Anthropic**
+- **Google Gemini**
+- **Mistral**
+- **LiteLLM** (Unified Interface)
 
-### Per-Session Stats
-```python
-# Create a specific session
-response = await agent.chat("Hello", session_id="session_123")
+## Roadmap: Unified Accounting System
 
-# Get usage for that session only
-session_stats = await agent.get_session_usage("session_123")
-print(f"Session Cost: ${session_stats.cost}")
-```
+We are actively developing a comprehensive **Token Accounting & Budgeting System** that will include:
 
-### Global Aggregation
-```python
-from langswarm.core.observability import get_global_usage
+- **Budget Enforcement**: Set daily/monthly limits per agent or user.
+- **Cost Estimation**: Real-time dollar cost calculation based on model pricing.
+- **Analytics**: Historical usage trends and optimization insights.
 
-# Get total usage across ALL agents in the process
-global_stats = get_global_usage()
-
-for model, usage in global_stats.by_model.items():
-    print(f"{model}: {usage.cost:.4f}")
-```
-
-## 🧠 Context Management
-
-Token tracking works with memory to optimize context usage.
-
-```python
-agent = await (AgentBuilder("memory_agent")
-    .openai()
-    .memory_enabled(True)
-    .max_tokens(4096)
-    
-    # Auto-summarize when context gets full
-    .auto_compress_context(True) 
-    .build())
-```
-
-## 🔧 Supported Providers
-
-Costs are calculated using up-to-date pricing from the [LiteLLM Model Cost Map](https://github.com/BerriAI/litellm).
-
-- **OpenAI**: GPT-4o, GPT-4-Turbo, GPT-3.5
-- **Anthropic**: Claude 3.5 Sonnet, Opus, Haiku
-- **Google**: Gemini 1.5 Pro, Flash
-- **Cohere**: Command R+
-- **Mistral**: Mistral Large, Small
+These features are currently in the design phase. You can view the [Investigation Reports](/archive/reports/token-tracking-system) for more details on the proposed architecture.

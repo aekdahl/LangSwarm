@@ -1,150 +1,168 @@
-# LangSwarm Debugging & Tracing Guide
+# 🐞 Debugging & Observability
 
-## 🚀 Quick Start (Emergency Debugging)
+LangSwarm provides a **zero-overhead, opt-in observability system** that integrates tracing, logging, and metrics. It is designed to be invisible in production unless enabled, but powerful enough for deep debugging when needed.
 
-**Debug tracing is DISABLED by default**. To enable it for emergency debugging:
+## 🚀 Quick Start
+
+To enable full debug tracing (console output + detailed logs), initialize the observability system at the start of your application.
 
 ```python
-from langswarm.core.debug import enable_debug_tracing, disable_debug_tracing
+from langswarm.core.agents import AgentBuilder
+from langswarm.core.observability.auto_instrumentation import (
+    initialize_auto_instrumentation
+)
+from langswarm.core.observability.provider import create_development_observability
 
-# 1. Enable tracing (34% performance impact)
-enable_debug_tracing("emergency_trace.jsonl")
+# 1. Initialize Observability (do this once at startup)
+# This automatically instruments all Agents, Tools, and Workflows
+provider = initialize_auto_instrumentation(
+    create_development_observability()
+)
 
-# 2. Run your code (it will be automatically traced)
-agent.chat("debug this issue")
+# 2. Run your code normally
+async def main():
+    agent = await AgentBuilder("debugger").build()
+    await agent.chat("Hello!") 
+    # Output will now show detailed traces:
+    # [INFO] Started operation: agent.chat
+    # [INFO] Started operation: llm.request
+    # ...
 
-# 3. Disable when done
-disable_debug_tracing()
+# 3. Clean up
+await provider.stop()
 ```
-
-### CLI Quick Commands
-
-```bash
-# Initialize configuration
-python -m langswarm.core.debug.cli init-config
-
-# Run a test case
-python -m langswarm.core.debug.cli run-case-1
-
-# Analyze a trace file
-python -m langswarm.core.debug.cli detail emergency_trace.jsonl
-```
-
----
-
-## 🔍 Overview
-
-The LangSwarm Debug and Tracing System provides comprehensive, structured logging and tracing capabilities. It is designed to be **production-safe**, meaning it has zero performance overhead when disabled.
-
-**Key Features:**
-- **Hierarchical Tracing**: Nested operations (Agents -> Workflows -> Tools).
-- **Structured JSON**: Machine-readable logs (`.jsonl`).
-- **Production Safe**: Negligible overhead when disabled (`0.000023ms`/call).
-
----
 
 ## ⚙️ Configuration
 
-### 1. Configuration File
-The system looks for `debug_config.yaml` in the current directory or `~/.langswarm/`.
+For more control, configure the `ObservabilityProvider` manually.
 
-```yaml
-# OpenAI (Required)
-openai:
-  api_key: sk-your-key
-  model: gpt-4o
-
-# Google Cloud (For BigQuery Tools)
-google_cloud:
-  project_id: your-project-id
-
-# Output Settings
-output_dir: debug_traces
-log_level: INFO
-```
-
-### 2. Environment Variables
-Environment variables override configuration files:
-
-| Variable | Description |
-|----------|-------------|
-| `OPENAI_API_KEY` | OpenAI API Key |
-| `LANGSWARM_DEBUG` | Set to `true` to enable tracing globally |
-| `GOOGLE_CLOUD_PROJECT` | GCP Project ID |
-
----
-
-## 🏭 Production Pattern
-
-To safely instrument production applications:
+### Development Mode
+Best for local debugging. Logs to console and memory buffers.
 
 ```python
-import os
-from langswarm.core.debug import enable_debug_tracing
+from langswarm.core.observability.auto_instrumentation import initialize_auto_instrumentation
+from langswarm.core.observability.provider import create_development_observability
 
-# Only enable if env var is set
-if os.getenv('LANGSWARM_DEBUG') == 'true':
-    # Log to a volume or temp path
-    enable_debug_tracing("/var/log/langswarm/debug.jsonl")
-    print("🔍 Debug tracing enabled")
-
-# Your application code runs normally
+initialize_auto_instrumentation(create_development_observability())
 ```
 
----
+### Production Mode
+Best for deployment. Logs to files, samples traces (10%), and handles I/O asynchronously to avoid blocking the main thread.
+
+```python
+from langswarm.core.observability.provider import create_production_observability
+
+config = create_production_observability(
+    log_file_path="/var/log/langswarm/app.log",
+    opentelemetry_enabled=True,
+    otlp_endpoint="http://otel-collector:4317"
+)
+
+initialize_auto_instrumentation(config)
+```
+
+## 🔍 How It Works
+
+LangSwarm uses a **Global Observer** pattern. 
+
+1.  **Auto-Instrumentation**: All core components (`BaseAgent`, `ToolRegistry`, etc.) inherit from `AutoInstrumentedMixin`.
+2.  **Global Provider**: The `initialize_auto_instrumentation()` function sets a global provider instance.
+3.  **Zero-Overhead**: If no provider is set (default), the instrumentation hooks are no-ops with negligible performance cost.
+
+### Manual Instrumentation
+
+If you write custom components, you can hook into this system using the `AutoInstrumentedMixin` or decorators.
+
+#### Using Mixin
+```python
+from langswarm.core.observability.auto_instrumentation import AutoInstrumentedMixin
+
+class MyCustomService(AutoInstrumentedMixin):
+    async def do_work(self):
+        # Automatically creates a span: "mycustomservice.do_work"
+        async with self._auto_trace_async("do_work"):
+            self._auto_log("info", "Working...")
+```
+
+#### Using Decorators
+```python
+from langswarm.core.observability.auto_instrumentation import instrument_agent_operation
+
+@instrument_agent_operation("custom_action")
+async def my_function():
+    print("This is traced!")
+```
 
 ## 📊 Trace Analysis
 
-Traces are saved as JSON Lines (`.jsonl`). Each line is a JSON object representing an event (Start, End, Info, Error).
+When enabled, traces are structured JSON objects containing:
+-   `trace_id`: Unique ID for the entire transaction.
+-   `span_id`: ID for the specific operation.
+-   `parent_id`: ID of the calling operation.
+-   `component`: The system component (e.g., `agent`, `tool`).
+-   `duration_ms`: Execution time.
 
-### Example Event
-```json
-{
-  "trace_id": "abc123",
-  "component": "agent", 
-  "operation": "chat",
-  "event_type": "END",
-  "duration_ms": 1250,
-  "data": {
-    "response": "Hello world"
-  }
-}
+### Example Console Output
+```text
+[INFO] [agent] Started operation: agent.chat (trace_id=abc-123)
+[INFO] [tool] Executing tool: filesystem (trace_id=abc-123)
+[INFO] [agent] Completed operation: agent.chat (duration=1200ms)
 ```
 
-### Analyzing with CLI
+## 📈 Metrics & Telemetry
+
+Beyond traces, LangSwarm automatically collects metrics to track health and performance.
+
+### Automatic Metrics
+- `agent.chat.duration_seconds`: Histogram of response times.
+- `agent.chat.input_tokens`: Counter for input tokens.
+- `agent.chat.output_tokens`: Counter for output tokens.
+- `tool.execution.errors_total`: Counter for tool failures.
+
+### Custom Metrics
+You can record your own business metrics using the mixin or helper:
+
+```python
+from langswarm.core.observability.auto_instrumentation import auto_record_metric
+
+# Record a counter
+auto_record_metric(
+    "business.sales.completed", 
+    1.0, 
+    "counter", 
+    region="us-east", 
+    product="premium"
+)
+
+# Record a histogram (latency)
+auto_record_metric("api.latency_ms", 350.0, "histogram")
+```
+
+## 📡 OpenTelemetry Integration
+
+LangSwarm supports exporting all traces and metrics to OTLP-compatible backends (Jaeger, Honeycomb, DataDog, etc.).
+
+### Installation
 ```bash
-# Get a summary of the trace
-python -m langswarm.core.debug.cli summary trace.jsonl
-
-# View detailed hierarchy
-python -m langswarm.core.debug.cli detail trace.jsonl
+pip install langswarm[opentelemetry]
 ```
 
-### Analyzing with `jq`
+### Configuration (Environment Variables)
+The easiest way to enable OTel is via environment variables:
+
 ```bash
-# Find all errors
-jq 'select(.level == "ERROR")' trace.jsonl
+# Service Identity
+export OTEL_SERVICE_NAME="langswarm-app"
 
-# Operations taking > 1s
-jq 'select(.duration_ms > 1000)' trace.jsonl
+# Exporter Endpoint (e.g., Jaeger or Collector)
+export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4317"
+
+# Optional Headers (e.g., for Honeycomb/DataDog)
+export OTEL_EXPORTER_OTLP_HEADERS="x-honeycomb-team=YOUR_KEY"
 ```
 
----
-
-## 🏗️ Architecture & Internals
-
-When enabled, the tracers monkey-patch key components:
-
-1.  **AgentWrapper**: Traces `chat()` calls.
-2.  **WorkflowExecutor**: Traces workflow steps.
-3.  **Middleware**: Traces tool execution and parameter validation.
-
-Because these patches are only applied when `enable_debug_tracing()` is called, the system remains lightweight by default.
-
----
-
-## ❓ Troubleshooting
-
--   **Files not appearing?** Check `output_dir` permissions or if `disable_debug_tracing()` was called early.
--   **Performance slow?** Ensure you are NOT running with debug enabled in high-throughput production (overhead is ~34%).
--   **Config not found?** Run `python -m langswarm.core.debug.cli validate-config` to check paths.
+### Automatic startup
+When `opentelemetry_enabled=True` is passed to the provider (or configured via env vars), LangSwarm automatically:
+1.  Batches traces for performance.
+2.  Exports metrics (counters/histograms) to the configured endpoint.
+3.  Handles connection failures gracefully (logs warning, doesn't crash app).

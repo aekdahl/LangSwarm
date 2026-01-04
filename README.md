@@ -571,20 +571,17 @@ agent = create_agent(model="gpt-4", tools=["my_custom_tool"])
 ## 📖 Documentation
 
 **📋 Main Resources**
-- **[Documentation Index](docs/INDEX.md)** - Complete documentation map
-- **[Quick Start Guide](docs/guides/QUICK_START_COMPLETE.md)** - Get up and running in 5 minutes
-- **[Multi-Agent Orchestration](docs/MULTI_AGENT_ORCHESTRATION_GUIDE.md)** - Learn workflow patterns
-- **[Simple Examples](examples/simple/)** - 10 working examples to learn from
+- **[Quick Start Guide](docs/getting-started/quickstart.mdx)** - Get up and running in 5 minutes
+- **[Documentation](docs/user-guides/)** - Complete user guides
 
 **🚀 Core Features**
-- **[Hierarchical Planning](docs/planning/HIERARCHICAL_PLANNING_COMPLETE.md)** - Advanced orchestration system
-- **[Retrospective Validation](docs/planning/RETROSPECTIVE_VALIDATION_COMPLETE.md)** - Async validation & rollback
-- **[Planning Examples](examples/planning/)** - 6 comprehensive workflow examples
+- **[Hierarchical Planning](docs/user-guides/planning/hierarchical.md)** - Advanced orchestration system with retro-validation
+- **[Organizational Patterns](docs/user-guides/advanced/organizational-patterns.md)** - Manager/Worker architectures
+- **[Intent-Based Tools](docs/user-guides/tools/intent-based-calling.md)** - Hybrid MCP calling (Natural Language + Direct)
 
-**🔧 Advanced Topics**
-- **[Tool Development](docs/tools/mcp/MCP_TOOL_DEVELOPER_GUIDE.md)** - Create custom tools
-- **[API Reference](docs/api-reference/)** - Complete API documentation
-- **[Observability Guide](docs/observability/)** - Monitoring and tracing
+**🔧 Developer Guides**
+- **[Debugging & Observability](docs/developer-guides/debugging.md)** - Zero-overhead tracing and metrics
+- **[Tool Development](docs/developer-guides/mcp-tool-development.md)** - Create custom MCP tools
 
 ---
 
