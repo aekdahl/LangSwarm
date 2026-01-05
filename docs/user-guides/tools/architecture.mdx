@@ -25,14 +25,14 @@ Agents are **MCP Clients**. They discover tools from connected servers and invok
 ```mermaid
 graph LR
     subgraph "MC Host (LangSwarm)"
-        A[Agent] -->|1. List Tools| EM[Extension Manager]
-        EM -->|2. Route Request| S1[Local Server]
-        EM -->|2. Route Request| S2[Remote Server]
+        A[Agent] -->|1. List Tools| EM["Extension Manager"]
+        EM -->|2. Route Request| S1["Local Server"]
+        EM -->|2. Route Request| S2["Remote Server"]
     end
     
     subgraph "Execution"
-        S1 -->|stdio| P1[Process (git, grep)]
-        S2 -->|SSE/HTTP| P2[API (Stripe, Slack)]
+        S1 -->|stdio| P1["Process (git, grep)"]
+        S2 -->|SSE/HTTP| P2["API (Stripe, Slack)"]
     end
 ```
 

@@ -93,3 +93,10 @@ __all__ = [
     # Version
     '__version__'
 ]
+
+# Auto-configure observability if environment variables are present
+try:
+    from langswarm.core.observability.auto_config import auto_configure_langfuse
+    auto_configure_langfuse()
+except Exception:
+    pass

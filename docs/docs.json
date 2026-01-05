@@ -11,7 +11,7 @@
     "navigation": {
         "tabs": [
             {
-                "tab": "Core",
+                "tab": "Documentation",
                 "groups": [
                     {
                         "group": "Getting Started",
@@ -64,11 +64,9 @@
                             "user-guides/tools/intent-based-calls",
                             "user-guides/tools/tool-chaining",
                             "user-guides/tools/mcp/local-mode",
-                            "user-guides/tools/mcp/local-mode",
                             "user-guides/tools/mcp/remote-mode",
                             "user-guides/tools/message-queue-consumer",
-                            "user-guides/tools/architecture",
-                            "user-guides/tools/migration"
+                            "user-guides/tools/architecture"
                         ]
                     },
                     {
@@ -76,21 +74,18 @@
                         "pages": [
                             "user-guides/integrations/token-tracking"
                         ]
-                    }
-                ]
-            },
-            {
-                "tab": "Architecture",
-                "groups": [
+                    },
                     {
-                        "group": "Design",
+                        "group": "Architecture & Design",
                         "pages": [
                             "architecture/dual-interface-architecture",
-                            "architecture/unified-pipeline-system"
+                            "architecture/unified-pipeline-system",
+                            "troubleshooting/index",
+                            "troubleshooting/critical-failures"
                         ]
                     },
                     {
-                        "group": "Development",
+                        "group": "Development Guides",
                         "pages": [
                             "developer-guides/mcp-tool-development",
                             "developer-guides/tracing",
@@ -98,18 +93,6 @@
                             "developer-guides/emergency-debugging"
                         ]
                     },
-                    {
-                        "group": "Troubleshooting",
-                        "pages": [
-                            "troubleshooting/index",
-                            "troubleshooting/critical-failures"
-                        ]
-                    }
-                ]
-            },
-            {
-                "tab": "API Reference",
-                "groups": [
                     {
                         "group": "Core APIs",
                         "pages": [
@@ -124,7 +107,7 @@
                         ]
                     },
                     {
-                        "group": "Memory",
+                        "group": "Memory API",
                         "pages": [
                             "api-reference/memory",
                             "api-reference/vector-stores",
@@ -134,7 +117,7 @@
                         ]
                     },
                     {
-                        "group": "Support",
+                        "group": "Support API",
                         "pages": [
                             "api-reference/configuration",
                             "api-reference/observability",
