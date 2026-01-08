@@ -9,9 +9,11 @@ import asyncio
 import json
 import logging
 import time
+import os
+from pathlib import Path
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional, AsyncIterator, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, AsyncIterator, TYPE_CHECKING, Union
 import uuid
 
 from .interfaces import (
@@ -438,6 +440,9 @@ class BaseAgent(AutoInstrumentedMixin):
             try:
                 self._auto_log("info", f"Initializing agent {self.name}", 
                               agent_id=self._agent_id, provider=str(self._configuration.provider))
+                
+                # Construct dynamic system prompt (Modular Prompts)
+                await self._construct_system_prompt()
                 
                 # Validate configuration
                 self._configuration.validate()
@@ -1462,3 +1467,68 @@ class BaseAgent(AutoInstrumentedMixin):
                 })
         
         return history
+    
+    # Modular System Prompts
+    async def _construct_system_prompt(self) -> None:
+        """
+        Construct the final system prompt using modular template fragments.
+        
+        Strategy ("Smart Append"):
+        1. If user provided a custom prompt, append enabled feature instructions to it.
+        2. If no prompt provided, load the base template and append feature instructions.
+        """
+        try:
+            templates_dir = Path(__file__).parent.parent / "templates"
+            fragments_dir = templates_dir / "fragments"
+            
+            # Start with existing prompt or base template
+            final_prompt = self._configuration.system_prompt
+            
+            if not final_prompt:
+                # No custom prompt, load base template
+                base_template_path = templates_dir / "system_prompt_template.md"
+                if base_template_path.exists():
+                    final_prompt = self._read_template(base_template_path)
+                else:
+                    self._logger.warning(f"Base system prompt template not found at {base_template_path}")
+                    final_prompt = "You are a helpful AI assistant."
+            
+            # Determine which fragments to include based on configuration
+            fragments_to_add = []
+            
+            # 1. Clarification & Intent (if intent-based tools are present or tools enabled)
+            # We assume if tools are enabled, we might want clarification capabilities
+            if self._configuration.tools_enabled:
+                fragments_to_add.append("clarification.md")
+                fragments_to_add.append("intent_workflow.md")
+                fragments_to_add.append("cross_workflow_clarification.md")
+            
+            # 2. Retry (if configured)
+            # Currently there isn't a strict 'retry_enabled' flag in AgentConfiguration, 
+            # but we can check if it's set in provider_config or similar.
+            # For now, we'll check a generic flag or default to adding it if tools are present
+            # as tools often need retries.
+            if self._configuration.tools_enabled: 
+                 fragments_to_add.append("retry.md")
+
+            # Append fragments
+            for fragment_file in fragments_to_add:
+                fragment_path = fragments_dir / fragment_file
+                if fragment_path.exists():
+                    fragment_content = self._read_template(fragment_path)
+                    final_prompt += f"\n\n{fragment_content}"
+                else:
+                    self._logger.warning(f"Prompt fragment not found: {fragment_path}")
+
+            # Update configuration with the final constructed prompt
+            self._configuration.system_prompt = final_prompt
+            self._logger.info("Constructed modular system prompt")
+            
+        except Exception as e:
+            self._logger.error(f"Failed to construct system prompt: {e}")
+            # Don't crash, just proceed with what we have (even if None)
+
+    def _read_template(self, path: Path) -> str:
+        """Read a template file and return its content"""
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read().strip()

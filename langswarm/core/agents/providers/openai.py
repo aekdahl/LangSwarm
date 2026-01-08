@@ -232,6 +232,21 @@ class OpenAIProvider(IAgentProvider):
             if config.base_url:
                 client_params["base_url"] = config.base_url
             
+            # Check for Langfuse credentials
+            import os
+            if os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY"):
+                try:
+                    import langfuse
+                    from langfuse.openai import AsyncOpenAI as LangfuseAsyncOpenAI
+                    logger.info("✅ Enabling Langfuse tracing for OpenAI native provider")
+                    self._client_cache[client_key] = LangfuseAsyncOpenAI(**client_params)
+                    return self._client_cache[client_key]
+                except ImportError:
+                    logger.warning("Langfuse credentials found but 'langfuse' package not installed. Using standard OpenAI client.")
+                except Exception as e:
+                    logger.warning(f"Failed to initialize Langfuse client: {e}. Using standard OpenAI client.")
+
+            # Fallback to standard client
             self._client_cache[client_key] = AsyncOpenAI(**client_params)
         
         return self._client_cache[client_key]

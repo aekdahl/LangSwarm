@@ -125,7 +125,7 @@ class BaseSession(ISession):
                 message = await middleware.process_outgoing_message(self, message)
             
             # Send through provider or add to local messages
-            if self._provider_session and self._context.backend == SessionBackend.PROVIDER_NATIVE:
+            if self._provider_session and self._context.backend in [SessionBackend.PROVIDER_NATIVE, SessionBackend.HYBRID]:
                 response_message = await self._send_via_provider(message)
             else:
                 response_message = await self._send_local(message)
@@ -400,7 +400,7 @@ class SessionManager(ISessionManager):
             provider_session = self._provider_sessions.get(provider)
             
             # Create provider session if using native backend
-            if backend == SessionBackend.PROVIDER_NATIVE and provider_session:
+            if backend in [SessionBackend.PROVIDER_NATIVE, SessionBackend.HYBRID] and provider_session:
                 try:
                     provider_session_id = await provider_session.create_provider_session(
                         user_id, **kwargs
@@ -477,6 +477,35 @@ class SessionManager(ISessionManager):
                     
                     # Restore messages
                     session._messages = messages
+                    
+                    # Hydrate stateless provider session if needed
+                    # We import here to avoid circular imports
+                    from .providers import BaseStatelessProviderSession
+                    
+                    if isinstance(provider_session, BaseStatelessProviderSession) and context.provider_session_id:
+                        try:
+                            # Re-populate conversation history from stored messages
+                            conversation = []
+                            for msg in messages:
+                                role = "user"
+                                if msg.role == MessageRole.ASSISTANT:
+                                    role = "assistant"
+                                elif msg.role == MessageRole.SYSTEM:
+                                    role = "system"
+                                elif msg.role == MessageRole.USER:
+                                    role = "user"
+                                else:
+                                    # Fallback for tool roles etc if not mapped yet
+                                    role = msg.role.value
+                                
+                                conversation.append({"role": role, "content": msg.content})
+                            
+                            # Direct injection into provider session state
+                            provider_session._conversations[context.provider_session_id] = conversation
+                            session._logger.debug(f"Hydrated stateless session {context.provider_session_id} with {len(conversation)} messages")
+                            
+                        except Exception as e:
+                            session._logger.warning(f"Failed to hydrate provider session: {e}")
                     
                     # Add global middleware and hooks
                     for middleware in self._global_middleware:

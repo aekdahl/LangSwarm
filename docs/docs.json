@@ -41,7 +41,10 @@
                         "group": "Memory",
                         "pages": [
                             "user-guides/memory",
-                            "user-guides/memory/postgresql"
+                            "user-guides/memory/hybrid-sessions",
+                            "user-guides/memory/backends",
+                            "user-guides/memory/reflexive",
+                            "user-guides/memory/examples"
                         ]
                     },
                     {
@@ -62,6 +65,7 @@
                         "pages": [
                             "user-guides/tools/index",
                             "user-guides/tools/intent-based-calls",
+                            "user-guides/tools/clarification",
                             "user-guides/tools/tool-chaining",
                             "user-guides/tools/mcp/local-mode",
                             "user-guides/tools/mcp/remote-mode",
@@ -91,38 +95,6 @@
                             "developer-guides/tracing",
                             "developer-guides/debug-setup",
                             "developer-guides/emergency-debugging"
-                        ]
-                    },
-                    {
-                        "group": "Core APIs",
-                        "pages": [
-                            "api-reference",
-                            "api-reference/agents",
-                            "api-reference/langswarm_core_agents",
-                            "api-reference/workflows",
-                            "api-reference/langswarm_core_workflows",
-                            "api-reference/sessions",
-                            "api-reference/langswarm_core_session",
-                            "api-reference/langswarm_simple_api"
-                        ]
-                    },
-                    {
-                        "group": "Memory API",
-                        "pages": [
-                            "api-reference/memory",
-                            "api-reference/vector-stores",
-                            "api-reference/langswarm_memory_backends",
-                            "api-reference/langswarm_memory_interfaces",
-                            "api-reference/langswarm_memory_errors"
-                        ]
-                    },
-                    {
-                        "group": "Support API",
-                        "pages": [
-                            "api-reference/configuration",
-                            "api-reference/observability",
-                            "api-reference/core/errors",
-                            "api-reference/langswarm_core_orchestration_errors"
                         ]
                     }
                 ]

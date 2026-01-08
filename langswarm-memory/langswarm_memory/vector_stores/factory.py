@@ -13,6 +13,8 @@ from .pinecone_native import NativePineconeStore
 from .qdrant_native import NativeQdrantStore
 from .chroma_native import NativeChromaStore
 from .sqlite_native import NativeSQLiteStore
+from .pgvector_native import NativePGVectorStore
+from .redis_native import NativeRedisVectorStore
 
 
 logger = logging.getLogger(__name__)
@@ -41,7 +43,11 @@ class VectorStoreFactory:
         "chroma": NativeChromaStore,
         "chromadb": NativeChromaStore,
         "sqlite": NativeSQLiteStore,
-        "local": NativeSQLiteStore
+        "local": NativeSQLiteStore,
+        "pgvector": NativePGVectorStore,
+        "postgres": NativePGVectorStore,
+        "postgresql": NativePGVectorStore,
+        "redis": NativeRedisVectorStore
     }
     
     @classmethod
@@ -56,7 +62,7 @@ class VectorStoreFactory:
         Create a vector store instance.
         
         Args:
-            store_type: Type of vector store (pinecone, qdrant, chroma, sqlite)
+            store_type: Type of vector store (pinecone, qdrant, chroma, sqlite, pgvector, redis)
             embedding_dimension: Dimension of embeddings
             connection_params: Store-specific connection parameters
             **kwargs: Additional configuration options
@@ -98,20 +104,7 @@ class VectorStoreFactory:
         namespace: Optional[str] = None,
         metric: str = "cosine"
     ) -> NativePineconeStore:
-        """
-        Create Pinecone vector store with specific configuration.
-        
-        Args:
-            api_key: Pinecone API key
-            environment: Pinecone environment
-            index_name: Pinecone index name
-            embedding_dimension: Dimension of embeddings
-            namespace: Optional namespace
-            metric: Distance metric (cosine, euclidean, dotproduct)
-            
-        Returns:
-            Configured Pinecone store
-        """
+        """Create Pinecone vector store"""
         connection_params = {
             "api_key": api_key,
             "environment": environment,
@@ -136,20 +129,7 @@ class VectorStoreFactory:
         prefer_grpc: bool = False,
         metric: str = "cosine"
     ) -> NativeQdrantStore:
-        """
-        Create Qdrant vector store with specific configuration.
-        
-        Args:
-            url: Qdrant server URL
-            collection_name: Qdrant collection name
-            embedding_dimension: Dimension of embeddings
-            api_key: Optional API key
-            prefer_grpc: Whether to prefer gRPC connection
-            metric: Distance metric (cosine, euclidean, dotproduct)
-            
-        Returns:
-            Configured Qdrant store
-        """
+        """Create Qdrant vector store"""
         connection_params = {
             "url": url,
             "collection_name": collection_name,
@@ -174,20 +154,7 @@ class VectorStoreFactory:
         persist_directory: Optional[str] = None,
         metric: str = "cosine"
     ) -> NativeChromaStore:
-        """
-        Create ChromaDB vector store with specific configuration.
-        
-        Args:
-            collection_name: ChromaDB collection name
-            embedding_dimension: Dimension of embeddings
-            host: ChromaDB server host
-            port: ChromaDB server port
-            persist_directory: Optional directory for persistence
-            metric: Distance metric (cosine, euclidean, dotproduct)
-            
-        Returns:
-            Configured ChromaDB store
-        """
+        """Create ChromaDB vector store"""
         connection_params = {
             "collection_name": collection_name,
             "host": host,
@@ -210,18 +177,7 @@ class VectorStoreFactory:
         table_name: str = "vectors",
         metric: str = "cosine"
     ) -> NativeSQLiteStore:
-        """
-        Create SQLite vector store with specific configuration.
-        
-        Args:
-            db_path: Path to SQLite database file
-            embedding_dimension: Dimension of embeddings
-            table_name: Name of the vectors table
-            metric: Distance metric (cosine, euclidean, dotproduct)
-            
-        Returns:
-            Configured SQLite store
-        """
+        """Create SQLite vector store"""
         connection_params = {
             "db_path": db_path,
             "table_name": table_name
@@ -229,6 +185,56 @@ class VectorStoreFactory:
         
         return cls.create_store(
             store_type="sqlite",
+            embedding_dimension=embedding_dimension,
+            connection_params=connection_params,
+            metric=metric
+        )
+        
+    @classmethod
+    def create_pgvector_store(
+        cls,
+        embedding_dimension: int,
+        dsn: Optional[str] = None,
+        host: str = "localhost",
+        port: int = 5432,
+        database: str = "langswarm",
+        user: str = "postgres",
+        password: str = "postgres",
+        table_name: str = "vectors",
+        metric: str = "cosine"
+    ) -> NativePGVectorStore:
+        """Create PGVector store"""
+        connection_params = {
+            "dsn": dsn,
+            "host": host,
+            "port": port,
+            "database": database,
+            "user": user,
+            "password": password,
+            "table_name": table_name
+        }
+        return cls.create_store(
+            store_type="pgvector",
+            embedding_dimension=embedding_dimension,
+            connection_params=connection_params,
+            metric=metric
+        )
+
+    @classmethod
+    def create_redis_store(
+        cls,
+        embedding_dimension: int,
+        url: str = "redis://localhost:6379",
+        index_name: str = "idx:vectors",
+        metric: str = "cosine"
+    ) -> NativeRedisVectorStore:
+        """Create Redis vector store"""
+        connection_params = {
+            "url": url,
+            "index_name": index_name
+        }
+        return cls.create_store(
+            store_type="redis",
             embedding_dimension=embedding_dimension,
             connection_params=connection_params,
             metric=metric
@@ -286,6 +292,18 @@ class VectorStoreFactory:
                 "required_params": ["db_path"],
                 "optional_params": ["table_name"],
                 "description": "SQLite-based vector storage - local file-based"
+            },
+            "pgvector": {
+                "pip_package": "asyncpg",
+                "required_params": ["database", "user", "password"],
+                "optional_params": ["host", "port", "dsn", "table_name"],
+                "description": "PostgreSQL with pgvector extension"
+            },
+            "redis": {
+                "pip_package": "redis",
+                "required_params": ["url"],
+                "optional_params": ["index_name"],
+                "description": "Redis Stack with RediSearch and Vector search"
             }
         }
         

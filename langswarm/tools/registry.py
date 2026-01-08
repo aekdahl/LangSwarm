@@ -518,6 +518,7 @@ class ToolDiscovery(IToolDiscovery):
             "langswarm/v2/tools/mcp",        # V2 MCP tools (new location)
             "langswarm/mcp/tools",           # Legacy MCP tools (fallback)
             "langswarm/v2/tools/builtin",
+            "langswarm/tools/core",          # Core tools (e.g., clarification)
             "langswarm/synapse/tools",
             "."  # Current directory
         ]
