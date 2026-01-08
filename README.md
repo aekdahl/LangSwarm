@@ -9,6 +9,16 @@ Build intelligent systems where multiple AI agents collaborate to solve complex 
 
 ---
 
+## 🌟 Key Features (v0.1.0)
+
+- **🤖 Multi-Agent Governance**: Built-in approval workflows (`ApprovalQueue`) for human-in-the-loop control.
+- **📅 Autonomous Scheduling**: Schedule recurring tasks and reliable background jobs (`JobManager`).
+- **🧠 MemoryPro**: Advanced hybrid memory with priority tiers and automatic fading.
+- **💰 Token Budgeting**: Real-time cost estimation and strict budget enforcement.
+- **🔌 Unified Provider**: One interface for OpenAI, Anthropic, Gemini, Mistral, and local models.
+
+---
+
 ## 🎯 What is LangSwarm?
 
 LangSwarm is a framework for **multi-agent AI orchestration**. Unlike simple chatbot libraries, LangSwarm enables you to:

@@ -3,18 +3,15 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "langswarm-memory"
-version = "0.2.0"
-# langswarm-memory-v0.2.0
-# Tag format: langswarm-memory-v{version}
-description = "Enterprise-grade conversational memory for AI agents"
+name = "langswarm-pro"
+version = "0.1.0"
+description = "Professional extensions for LangSwarm, including governance, advanced tools, and schedulers."
 readme = "README.md"
 authors = [{name = "Alexander Ekdahl", email = "alexander.ekdahl@gmail.com"}]
-license = {text = "Apache-2.0"}
+license = {text = "Proprietary"}
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
@@ -26,52 +23,19 @@ classifiers = [
 ]
 requires-python = ">=3.8"
 dependencies = [
-    "pyyaml>=6.0",
+    "langswarm>=0.0.54",
+    "pydantic>=2.0.0",
+    "sentence-transformers>=2.2.0",
+    "numpy>=1.21.0",
 ]
-keywords = ["AI", "agents", "memory", "conversation", "LLM", "chatbot"]
+keywords = ["AI", "agents", "governance", "scheduling", "enterprise", "LLM"]
 
 [project.optional-dependencies]
-# Core backends
-redis = ["redis>=4.0.0"]
-bigquery = ["google-cloud-bigquery>=3.0.0"]
-postgres = ["asyncpg>=0.27.0", "pgvector>=0.2.0"]
-mongodb = ["motor>=3.0.0"]
-elasticsearch = ["elasticsearch[async]>=8.0.0"]
-
-# Vector stores
-vector = ["numpy>=1.20.0"]
-chromadb = ["chromadb>=0.4.0"]
-qdrant = ["qdrant-client>=1.0.0"]
-pinecone = ["pinecone-client>=2.0.0"]
-
-# Combined options
-all-backends = [
-    "redis>=4.0.0",
-    "google-cloud-bigquery>=3.0.0",
-    "asyncpg>=0.27.0",
-    "pgvector>=0.2.0",
-    "motor>=3.0.0",
-    "elasticsearch[async]>=8.0.0",
-]
-all-vector = [
-    "numpy>=1.20.0",
-    "chromadb>=0.4.0",
-    "qdrant-client>=1.0.0",
-    "pinecone-client>=2.0.0",
-]
-all = [
-    "redis>=4.0.0",
-    "google-cloud-bigquery>=3.0.0",
-    "asyncpg>=0.27.0",
-    "pgvector>=0.2.0",
-    "motor>=3.0.0",
-    "elasticsearch[async]>=8.0.0",
-    "numpy>=1.20.0",
-    "chromadb>=0.4.0",
-    "qdrant-client>=1.0.0",
-    "pinecone-client>=2.0.0",
-]
 dev = ["pytest>=7.0", "pytest-asyncio>=0.21", "black", "mypy", "twine", "build"]
+integrations = [
+    "langchain-core",
+    "llama-index-core"
+]
 
 [project.urls]
 Homepage = "https://github.com/aekdahl/langswarm"
@@ -81,7 +45,7 @@ Issues = "https://github.com/aekdahl/langswarm/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["langswarm_memory*"]
+include = ["langswarm_pro*"]
 
 [tool.black]
 line-length = 100
@@ -99,6 +63,3 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
-
-
-

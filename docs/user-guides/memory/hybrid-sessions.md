@@ -5,7 +5,7 @@ description: 'Learn how LangSwarm combines native provider sessions with local p
 
 # Hybrid Session Management
 
-LangSwarm V2 introduces **Hybrid Session Management**, a powerful layer that unifies stateful and stateless LLM providers into a single, cohesive interface. This system allows you to use providers like Claude and Gemini with the same persistence guarantees as OpenAI Assistants.
+LangSwarm introduces **Hybrid Session Management**, a powerful layer that unifies stateful and stateless LLM providers into a single, cohesive interface. This system allows you to use providers like Claude and Gemini with the same persistence guarantees as OpenAI Assistants.
 
 ## Overview
 

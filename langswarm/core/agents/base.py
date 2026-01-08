@@ -27,6 +27,7 @@ from ..observability.auto_instrumentation import (
 # Type hint for memory manager without importing (avoid circular imports)
 if TYPE_CHECKING:
     from langswarm.core.memory import IMemoryManager
+    from langswarm.core.middleware.pipeline import Pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -372,7 +373,8 @@ class BaseAgent(AutoInstrumentedMixin):
         configuration: AgentConfiguration,
         provider: IAgentProvider,
         agent_id: Optional[str] = None,
-        memory_manager: Optional["IMemoryManager"] = None
+        memory_manager: Optional["IMemoryManager"] = None,
+        pipeline: Optional["Pipeline"] = None
     ):
         self._agent_id = agent_id or str(uuid.uuid4())
         self._name = name
@@ -387,6 +389,9 @@ class BaseAgent(AutoInstrumentedMixin):
         
         # External memory manager for persistent session storage
         self._memory_manager: Optional["IMemoryManager"] = memory_manager
+        
+        # Middleware pipeline
+        self._pipeline = pipeline
         
         # Performance tracking
         self._response_times: List[float] = []
@@ -890,10 +895,25 @@ class BaseAgent(AutoInstrumentedMixin):
         Args:
             message: The message to send
             session_id: Optional session ID for conversation continuity
-            trace_id: Optional trace ID for cross-agent traceability. 
-                      Pass this when delegating to sub-agents to maintain trace continuity.
+            trace_id: Optional trace ID for cross-agent traceability.
             **kwargs: Additional arguments
         """
+        # Route through middleware pipeline
+        return await self.process_through_middleware(
+            message=message, 
+            session_id=session_id, 
+            trace_id=trace_id, 
+            **kwargs
+        )
+
+    async def _execute_chat(
+        self,
+        message: str,
+        session_id: Optional[str] = None,
+        trace_id: Optional[str] = None,
+        **kwargs
+    ) -> IAgentResponse:
+        """Internal execution of chat message (bypassing middleware)"""
         start_time = time.time()
         
         # Store trace_id for propagation to tool calls
@@ -1254,27 +1274,55 @@ class BaseAgent(AutoInstrumentedMixin):
     async def process_through_middleware(
         self,
         message: str,
-        context: Optional[Dict[str, Any]] = None
+        session_id: Optional[str] = None,
+        trace_id: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+        **kwargs
     ) -> IAgentResponse:
         """Process message through V2 middleware pipeline"""
         try:
-            from langswarm.core.middleware import create_default_pipeline
+            from langswarm.core.middleware.enhanced_pipeline import create_default_pipeline
             from langswarm.core.middleware.context import RequestContext, RequestType
+            from langswarm.core.errors import ToolError
             
             # Create middleware pipeline
-            pipeline = create_default_pipeline()
-            
+            if self._pipeline:
+                pipeline = self._pipeline
+            else:
+                pipeline = create_default_pipeline()
+
+            # Define execution handler
+            async def chat_handler(method: str, params: Dict[str, Any]) -> IAgentResponse:
+                return await self._execute_chat(
+                    message=params["message"],
+                    session_id=params.get("session_id"),
+                    trace_id=params.get("trace_id"),
+                    **{k: v for k, v in params.items() if k not in ["message", "session_id", "trace_id"]}
+                )
+
+            # Prepare parameters
+            params = {
+                "message": message,
+                "session_id": session_id,
+                "trace_id": trace_id,
+                **kwargs
+            }
+
             # Create request context
             request_context = RequestContext(
                 action_id=f"agent.{self.name}.chat",
                 method="chat",
-                request_type=RequestType.TOOL_CALL,  # Use existing request type
-                params={"message": message},
+                request_type=RequestType.TOOL_CALL,
+                params=params,
                 metadata={
                     "agent_id": self.agent_id,
                     "agent_name": self.name,
+                    "session_id": session_id,
+                    "user_id": context.get("user_id") if context else None,
                     "provider": self.configuration.provider.value,
                     "model": self.configuration.model,
+                    "handler": chat_handler,
+                    "handler_type": "internal",
                     **(context or {})
                 }
             )
@@ -1283,24 +1331,30 @@ class BaseAgent(AutoInstrumentedMixin):
             response = await pipeline.process(request_context)
             
             if response.is_success():
-                # If middleware handled it, create agent response
-                return AgentResponse.success_response(
-                    content=str(response.result),
-                    metadata={
-                        "middleware_processed": True,
-                        "middleware_status": response.status.value,
-                        "processing_time": response.processing_time
-                    }
-                )
+                # If middleware handled it, return the result
+                # The result is likely an IAgentResponse from _execute_chat
+                if isinstance(response.result, IAgentResponse):
+                    return response.result
+                elif hasattr(response.result, "content"): # Duck typing check
+                     return response.result
+                else:
+                    return AgentResponse.success_response(
+                        content=str(response.result),
+                        metadata={
+                            "middleware_processed": True,
+                            "middleware_status": response.status.value,
+                            "processing_time": response.processing_time
+                        }
+                    )
             else:
-                # If middleware failed, fall back to direct chat
-                self._logger.warning("Middleware processing failed, falling back to direct chat")
-                return await self.chat(message)
-                
+                # If middleware failed, fall back to direct execution
+                self._logger.warning(f"Middleware processing failed ({response.status}): {response.error}, falling back to direct chat")
+                return await self._execute_chat(message, session_id, trace_id, **kwargs)
+            
         except Exception as e:
             self._logger.error(f"Middleware processing error: {e}")
-            # Fall back to direct chat
-            return await self.chat(message)
+            # Fall back to direct execution
+            return await self._execute_chat(message, session_id, trace_id, **kwargs)
     
     async def get_health(self) -> Dict[str, Any]:
         """Get agent health status and metrics"""

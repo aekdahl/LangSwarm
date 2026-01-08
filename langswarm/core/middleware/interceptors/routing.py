@@ -192,6 +192,17 @@ class RoutingInterceptor(BaseInterceptor):
         
         logger.debug(f"Routing request for action: {action_id}")
         
+        # Check if handler is already provided in metadata
+        existing_handler = context.metadata.get('handler')
+        if existing_handler:
+            logger.debug(f"Using existing handler for {action_id}")
+            # Ensure handler_type is set
+            enhanced_context = context.with_metadata(
+                handler_type=context.metadata.get('handler_type', 'internal'),
+                routing_interceptor="routing"
+            )
+            return await next_interceptor(enhanced_context)
+
         # Try to find handler in registries
         handler, registry_type = self._find_handler(action_id)
         

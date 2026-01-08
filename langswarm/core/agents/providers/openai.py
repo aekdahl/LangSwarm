@@ -1,5 +1,5 @@
 """
-OpenAI Provider Implementation for LangSwarm V2
+OpenAI Provider Implementation for LangSwarm
 
 Native OpenAI integration that replaces the complex AgentWrapper with
 clean, OpenAI-specific implementation optimized for OpenAI's API patterns.

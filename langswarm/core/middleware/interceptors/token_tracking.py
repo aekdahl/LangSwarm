@@ -1,5 +1,5 @@
 """
-LangSwarm V2 Token Tracking Middleware Interceptor
+LangSwarm Token Tracking Middleware Interceptor
 
 Middleware interceptor that automatically tracks token usage and context sizes
 for all agent interactions without breaking existing functionality.
@@ -16,6 +16,7 @@ from ...observability.token_tracking import (
     TokenUsageEvent, ContextSizeInfo, TokenEventType, TokenUsageAggregator,
     ContextSizeMonitor, TokenBudgetManager, TokenBudgetConfig
 )
+from ...observability.cost_estimator import CostEstimator
 from ...observability import get_observability_provider
 from ...agents.interfaces import IAgentResponse, AgentUsage
 
@@ -264,7 +265,10 @@ class TokenTrackingInterceptor(BaseInterceptor):
         
         try:
             # Extract token usage from response
-            token_usage = await self._extract_token_usage_from_response(response)
+            token_usage = await self._extract_token_usage_from_response(
+                response, 
+                model=request_info.get("model")
+            )
             
             if not token_usage:
                 return  # No token usage information available
@@ -320,7 +324,8 @@ class TokenTrackingInterceptor(BaseInterceptor):
     
     async def _extract_token_usage_from_response(
         self,
-        response: IResponseContext
+        response: IResponseContext,
+        model: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """Extract token usage information from response"""
         
@@ -335,7 +340,7 @@ class TokenTrackingInterceptor(BaseInterceptor):
                 )
                 
                 if token_data:
-                    return self._normalize_token_data(token_data)
+                    return self._normalize_token_data(token_data, model)
             
             # Check if response result has token information
             if hasattr(response, 'result') and response.result:
@@ -355,7 +360,7 @@ class TokenTrackingInterceptor(BaseInterceptor):
                 if hasattr(result, 'metadata') and result.metadata:
                     token_data = result.metadata.get('token_usage')
                     if token_data:
-                        return self._normalize_token_data(token_data)
+                        return self._normalize_token_data(token_data, model)
             
             return None
             
@@ -363,11 +368,13 @@ class TokenTrackingInterceptor(BaseInterceptor):
             logger.warning(f"Failed to extract token usage from response: {e}")
             return None
     
-    def _normalize_token_data(self, token_data: Any) -> Dict[str, Any]:
+    def _normalize_token_data(self, token_data: Any, model: Optional[str] = None) -> Dict[str, Any]:
         """Normalize token data from various formats"""
         
+        normalized = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0, "cost_estimate": 0.0}
+
         if isinstance(token_data, dict):
-            return {
+            normalized = {
                 "input_tokens": token_data.get("input_tokens") or token_data.get("prompt_tokens", 0),
                 "output_tokens": token_data.get("output_tokens") or token_data.get("completion_tokens", 0),
                 "total_tokens": token_data.get("total_tokens", 0),
@@ -376,14 +383,22 @@ class TokenTrackingInterceptor(BaseInterceptor):
         
         elif hasattr(token_data, '__dict__'):
             # Handle objects with attributes
-            return {
+            normalized = {
                 "input_tokens": getattr(token_data, 'prompt_tokens', getattr(token_data, 'input_tokens', 0)),
                 "output_tokens": getattr(token_data, 'completion_tokens', getattr(token_data, 'output_tokens', 0)),
                 "total_tokens": getattr(token_data, 'total_tokens', 0),
                 "cost_estimate": getattr(token_data, 'cost_estimate', 0.0)
             }
         
-        return {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0, "cost_estimate": 0.0}
+        # Fallback cost calculation if missing and model is available
+        if normalized["cost_estimate"] == 0.0 and model:
+            normalized["cost_estimate"] = CostEstimator.estimate_cost(
+                model, 
+                normalized["input_tokens"], 
+                normalized["output_tokens"]
+            )
+            
+        return normalized
     
     def _create_budget_exceeded_response(self, context: IRequestContext) -> IResponseContext:
         """Create response for when budget limits are exceeded"""

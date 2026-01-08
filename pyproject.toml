@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "langswarm"
-version = "0.0.54.dev125"
-# langswarm-v0.0.54.dev125
+version = "0.1.0"
+# langswarm-v0.1.0
 # Tag format: langswarm-v{version}
 description = "A multi-agent ecosystem for large language models (LLMs) and autonomous systems."
 readme = "README.md"
@@ -15,7 +15,7 @@ keywords = ["LLM", "multi-agent", "huggingface", "openai", "MCP", "agent", "orch
 python = ">=3.8,<4.0"
 
 # Memory system
-langswarm-memory = "^0.1.4"
+langswarm-memory = "^0.2.0"
 
 # Core dependencies
 pyyaml = "^6.0.2"

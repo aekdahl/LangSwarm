@@ -94,7 +94,26 @@
                             "developer-guides/mcp-tool-development",
                             "developer-guides/tracing",
                             "developer-guides/debug-setup",
-                            "developer-guides/emergency-debugging"
+                            "developer-guides/emergency-debugging",
+                            "developer-guides/token-budgeting"
+                        ]
+                    }
+                ]
+            },
+            {
+                "tab": "LangSwarm Pro",
+                "groups": [
+                    {
+                        "group": "Overview",
+                        "pages": [
+                            "langswarm-pro/index"
+                        ]
+                    },
+                    {
+                        "group": "Advanced APIs",
+                        "pages": [
+                            "langswarm-pro/memory-pro",
+                            "langswarm-pro/action-queue"
                         ]
                     }
                 ]
